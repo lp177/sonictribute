@@ -4,11 +4,37 @@ import { playerBox, overlaps, type Rect } from './entities.ts';
 export type BossPhase = 'intro' | 'sway' | 'telegraph' | 'dive' | 'retreat' | 'stunned' | 'defeated';
 
 /**
+ * Common contract every end-of-zone boss fulfils. The LEVEL owns the fight:
+ * bosses report contacts from `interact` and never damage the player
+ * themselves (single damage path — see AGENTS.md).
+ */
+export interface BossLike {
+  x: number;
+  y: number;
+  hp: number;
+  readonly maxHp: number;
+  invuln: number;
+  phase: string;
+  /** Which procedural art/pattern this boss uses. */
+  readonly kind: 'pod' | 'press';
+  /** Intro banner / health bar labels. */
+  readonly title: string;
+  readonly subtitle: string;
+  readonly defeated: boolean;
+  update(player: Player): string[];
+  interact(p: Player): 'hit' | 'hurt' | null;
+}
+
+/**
  * Dr. Yolk's Wrecking Pod: hovers above the arena swinging a mace, dives at
  * the player after a telegraph. Eight hits to defeat. Fully deterministic
  * (pattern is timer-driven, no RNG) so unit tests are stable.
  */
-export class Boss {
+export class Boss implements BossLike {
+  readonly kind = 'pod' as const;
+  readonly title = 'DR. YOLK';
+  readonly subtitle = 'WRECKING POD';
+  readonly maxHp = 8;
   x: number;
   y: number;
   hp = 8;

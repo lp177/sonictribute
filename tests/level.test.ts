@@ -6,6 +6,7 @@ import { PHYS } from '../src/physics/constants.ts';
 import { zone1 } from '../src/levels/zone1.ts';
 import { Player } from '../src/game/Player.ts';
 import { input } from './helpers.ts';
+import { hasCrown } from './loopHelpers.ts';
 
 const T = PHYS.tile;
 
@@ -50,9 +51,8 @@ describe('Zone 1 — Verdant Rush (structure)', () => {
       for (let dx = -6; dx <= 6; dx++) {
         expect(level.map.get(cxTile + dx, surfaceRow, 0).heights.some((h) => h > 0)).toBe(true);
       }
-      // Annulus crown present on layer 1.
-      const crown = level.map.get(cxTile, surfaceRow - 6, 1);
-      expect(crown.heightsTop.some((h) => h > 0) || crown.heights.some((h) => h > 0)).toBe(true);
+      // Annulus crown present on layer 1, wherever the loop's radius puts it.
+      expect(hasCrown(level, loop)).toBe(true);
     }
   });
 });

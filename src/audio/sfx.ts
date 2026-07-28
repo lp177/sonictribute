@@ -98,6 +98,29 @@ export class Sfx {
         this.noise(0.15);
         this.blip(200, 0.18, 'sawtooth', -100);
         break;
+      case 'boss-slam':
+        this.noise(0.3);
+        this.blip(70, 0.35, 'sawtooth', -30);
+        break;
+      case 'boss-telegraph':
+        this.blip(700, 0.08, 'square');
+        this.blip(700, 0.08, 'square', 0, 0.12);
+        break;
+      case 'loop-boost':
+        this.noise(0.18);
+        this.blip(300, 0.3, 'sawtooth', 700);
+        break;
+      case 'dash-pad':
+        this.noise(0.12);
+        this.blip(240, 0.2, 'sawtooth', 500);
+        break;
+      case 'board':
+        this.blip(330, 0.12, 'triangle', 200);
+        this.blip(660, 0.16, 'triangle', 200, 0.1);
+        break;
+      case 'board-end':
+        this.blip(660, 0.1, 'triangle', -200);
+        break;
       case 'boss-defeated':
         this.noise(0.6);
         this.blip(100, 0.6, 'sawtooth', -60);

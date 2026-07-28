@@ -53,10 +53,10 @@ export class HUD {
       ctx.fillStyle = '#3a3f4a';
       ctx.fillRect(ctx.canvas.width / 2 - 72, 15, 144, 8);
       ctx.fillStyle = '#e8384f';
-      ctx.fillRect(ctx.canvas.width / 2 - 72, 15, (144 * Math.max(0, level.boss.hp)) / 8, 8);
+      ctx.fillRect(ctx.canvas.width / 2 - 72, 15, (144 * Math.max(0, level.boss.hp)) / level.boss.maxHp, 8);
       ctx.fillStyle = '#9aa3b2';
       ctx.font = 'bold 9px monospace';
-      ctx.fillText('DR. YOLK', ctx.canvas.width / 2 - 76, 24);
+      ctx.fillText(level.boss.title, ctx.canvas.width / 2 - 76, 24);
     }
     ctx.restore();
   }

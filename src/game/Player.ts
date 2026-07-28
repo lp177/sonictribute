@@ -35,6 +35,18 @@ export const NO_INPUT: PlayerInput = {
 const sign = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);
 
 /**
+ * Mag-Board vehicle tuning (not SPG values — original mechanic). The board
+ * enforces a minimum forward ground speed and absorbs one hit; steering in
+ * the air stays free so the player still chooses paths between routes.
+ */
+export const BOARD = {
+  /** Minimum rightward ground speed while riding. */
+  min: 7,
+  /** Small pop when the ride ends at a dismount line. */
+  hop: 3,
+} as const;
+
+/**
  * The hero. Movement follows the Sonic Physics Guide: ground speed (gsp) is
  * the master variable while grounded; xsp/ysp are derived from it and the
  * ground angle. Airborne, xsp/ysp are master and gsp is recomputed on landing
@@ -61,6 +73,8 @@ export class Player {
   shield = false;
   /** Speed shoes timer (frames): raises top speed while active. */
   shoes = 0;
+  /** Riding a Mag-Board (level-specific vehicle): fast, forward, one free hit. */
+  board = false;
   dead = false;
   finished = false;
   /** Active collision layer (0 = normal, 1 = inside loops). */
@@ -123,14 +137,14 @@ export class Player {
       return;
     }
 
-    // --- Start rolling ---
-    if (!this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
+    // --- Start rolling (not from a board: the board IS the ride) ---
+    if (!this.board && !this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
       this.adjustHeight(true);
       this.rolling = true;
       this.events.push('roll');
     }
     // --- Start spin dash ---
-    if (!this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
+    if (!this.board && !this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
       this.spindashing = true;
       this.spinRevs = 0;
       this.events.push('dash-charge');
@@ -153,13 +167,16 @@ export class Player {
       }
     } else {
       const top = PHYS.top + (this.shoes > 0 ? 2 : 0);
+      // SPG: acceleration only applies BELOW top speed. Holding the direction
+      // you are already over-speeding in (spin dash, spring, dash pad, loop
+      // boost) must never brake you back down to `top`.
       if (input.left) {
         if (this.gsp > 0) this.gsp -= PHYS.dec;
-        else this.gsp = Math.max(this.gsp - PHYS.acc, -top);
+        else if (this.gsp > -top) this.gsp = Math.max(this.gsp - PHYS.acc, -top);
         this.facing = -1;
       } else if (input.right) {
         if (this.gsp < 0) this.gsp += PHYS.dec;
-        else this.gsp = Math.min(this.gsp + PHYS.acc, top);
+        else if (this.gsp < top) this.gsp = Math.min(this.gsp + PHYS.acc, top);
         this.facing = 1;
       }
       if (Math.abs(this.gsp) > 0.05 || Math.abs(sinDeg(this.angle)) > 0.719) {
@@ -170,6 +187,12 @@ export class Player {
       }
     }
     this.gsp = Math.max(-PHYS.gspMax, Math.min(PHYS.gspMax, this.gsp));
+
+    // The Mag-Board drives itself: never slower than BOARD.min, always right.
+    if (this.board) {
+      this.facing = 1;
+      this.gsp = Math.max(this.gsp, BOARD.min);
+    }
 
     // --- Derive xsp/ysp and move ---
     this.xsp = this.gsp * cosDeg(this.angle);
@@ -326,9 +349,23 @@ export class Player {
 
   /* ------------------------------ Combat etc. ------------------------------ */
 
-  /** Returns rings lost (0 when the hit was absorbed by shield/invulnerability). */
+  /** Returns rings lost (0 when the hit was absorbed by board/shield/invulnerability). */
   hurt(fromX: number): number {
     if (this.invuln > 0 || this.dead) return 0;
+    if (this.board) {
+      // The board takes the hit and is destroyed; rings and shield survive.
+      this.board = false;
+      this.invuln = 120;
+      this.adjustHeight(false);
+      this.grounded = false;
+      this.rolling = false;
+      this.jumping = false;
+      this.spindashing = false;
+      this.xsp = this.x < fromX ? -2 : 2;
+      this.ysp = -4;
+      this.events.push('board-lost');
+      return 0;
+    }
     if (this.shield) {
       this.shield = false;
       this.invuln = 120;
@@ -376,6 +413,26 @@ export class Player {
     this.jumping = true;
   }
 
+  /** Step onto a Mag-Board (no-op if already riding). */
+  mountBoard(): void {
+    if (this.board || this.dead) return;
+    if (this.rolling && !this.jumping) this.adjustHeight(false); // uncurl onto the deck
+    this.board = true;
+    this.rolling = false;
+    this.spindashing = false;
+  }
+
+  /** End of the ride (dismount line): small hop off the board. */
+  dismountBoard(): void {
+    if (!this.board) return;
+    this.board = false;
+    if (this.grounded) {
+      this.grounded = false;
+      this.ysp = -BOARD.hop;
+      this.jumping = false;
+    }
+  }
+
   respawn(x: number, y: number): void {
     this.x = x;
     this.y = y;
@@ -384,6 +441,8 @@ export class Player {
     this.mode = MODE_FLOOR;
     this.grounded = false;
     this.rolling = this.jumping = this.spindashing = false;
+    this.board = false;
+    this.layer = 0;
     this.dead = false;
     this.invuln = 60;
     this.rings = 0;

@@ -2,8 +2,10 @@ import { PHYS } from '../physics/constants.ts';
 import { TILES, TILE_EMPTY } from '../physics/TileMap.ts';
 import type { TileMap } from '../physics/TileMap.ts';
 import type { Player } from '../game/Player.ts';
-import type { Boss } from '../game/Boss.ts';
+import type { Boss, BossLike } from '../game/Boss.ts';
+import type { PressBoss } from '../game/PressBoss.ts';
 import type { LoopZone } from '../game/loops.ts';
+import type { LevelTheme } from '../game/Level.ts';
 
 const T = PHYS.tile;
 
@@ -31,6 +33,40 @@ export const PAL = {
   pod: '#c8cdd6',
   podDark: '#8f96a3',
   yolk: '#f2b03d',
+  board: '#38e0c8',
+  boardDark: '#1a9c8a',
+};
+
+/** Per-theme terrain colours (body fill, surface cap, one-way platforms). */
+interface TerrainTheme {
+  body: string;
+  bodyDark: string;
+  cap: string;
+  capDark: string;
+  platTop: string;
+  platTopDark: string;
+  platBody: string;
+}
+
+const TERRAIN_THEMES: Record<LevelTheme, TerrainTheme> = {
+  verdant: {
+    body: PAL.dirt,
+    bodyDark: PAL.dirtDark,
+    cap: PAL.grass,
+    capDark: PAL.grassDark,
+    platTop: PAL.grass,
+    platTopDark: PAL.grassDark,
+    platBody: PAL.dirt,
+  },
+  gear: {
+    body: '#4a4f5c',
+    bodyDark: '#343947',
+    cap: '#7b8496',
+    capDark: '#565e6c',
+    platTop: '#e8c832',
+    platTopDark: '#23262e',
+    platBody: '#4a4f5c',
+  },
 };
 
 /* ------------------------------ Static terrain ----------------------------- */
@@ -39,7 +75,8 @@ export const PAL = {
  * Renders the layer-0 terrain into offscreen chunks (one canvas per 16-tile
  * column band) once at level load — no per-frame tile work afterwards.
  */
-export function renderTerrain(map: TileMap): HTMLCanvasElement[] {
+export function renderTerrain(map: TileMap, theme: LevelTheme = 'verdant'): HTMLCanvasElement[] {
+  const pal = TERRAIN_THEMES[theme];
   const chunkTiles = 16;
   const chunks: HTMLCanvasElement[] = [];
   for (let cx = 0; cx < map.w; cx += chunkTiles) {
@@ -50,7 +87,7 @@ export function renderTerrain(map: TileMap): HTMLCanvasElement[] {
     for (let tx = cx; tx < Math.min(cx + chunkTiles, map.w); tx++) {
       for (let ty = 0; ty < map.h; ty++) {
         const id = tileId(map, tx, ty);
-        if (id !== TILE_EMPTY) drawTile(ctx, map, id, (tx - cx) * T, ty * T, tx, ty);
+        if (id !== TILE_EMPTY) drawTile(ctx, map, id, (tx - cx) * T, ty * T, tx, ty, pal);
       }
     }
     chunks.push(cv);
@@ -63,21 +100,21 @@ function tileId(map: TileMap, tx: number, ty: number): number {
   return TILES.findIndex((c) => c === t);
 }
 
-function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: number, py: number, tx: number, ty: number): void {
+function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: number, py: number, tx: number, ty: number, pal: TerrainTheme): void {
   const above = map.get(tx, ty - 1, 0);
   const exposed = above === TILES[TILE_EMPTY];
   ctx.save();
   ctx.translate(px, py);
 
-  // Dirt body from the tile's height array.
+  // Solid body from the tile's height array.
   const heights = TILES[id].heights;
-  ctx.fillStyle = PAL.dirt;
+  ctx.fillStyle = pal.body;
   for (let c = 0; c < T; c++) {
     if (id === 8) continue; // one-way platform: drawn separately
     ctx.fillRect(c, T - heights[c], 1, heights[c]);
   }
   if (id !== 8) {
-    ctx.fillStyle = PAL.dirtDark;
+    ctx.fillStyle = pal.bodyDark;
     for (let c = 0; c < T; c += 4) {
       const h = heights[c];
       if (h > 6) ctx.fillRect(c + 1, T - h + 6, 2, 2);
@@ -86,21 +123,21 @@ function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: n
   }
 
   if (id === 8) {
-    // One-way platform: grassy slab.
-    ctx.fillStyle = PAL.dirt;
+    // One-way platform: capped slab (grass ledge / hazard-striped girder).
+    ctx.fillStyle = pal.platBody;
     ctx.fillRect(0, 8, T, 8);
-    ctx.fillStyle = PAL.grass;
+    ctx.fillStyle = pal.platTop;
     ctx.fillRect(0, 0, T, 8);
-    ctx.fillStyle = PAL.grassDark;
+    ctx.fillStyle = pal.platTopDark;
     ctx.fillRect(0, 6, T, 2);
   } else if (exposed) {
-    // Grass cap following the surface.
-    ctx.fillStyle = PAL.grass;
+    // Surface cap following the terrain profile.
+    ctx.fillStyle = pal.cap;
     for (let c = 0; c < T; c++) {
       const top = T - heights[c];
       ctx.fillRect(c, top, 1, Math.min(6, heights[c]));
     }
-    ctx.fillStyle = PAL.grassDark;
+    ctx.fillStyle = pal.capDark;
     for (let c = 0; c < T; c += 3) {
       const top = T - heights[c];
       ctx.fillRect(c, top + 4, 1, 2);
@@ -110,7 +147,8 @@ function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: n
 }
 
 /** Pre-renders a loop's annulus art (decor, always visible). */
-export function renderLoopArt(loop: LoopZone): HTMLCanvasElement {
+export function renderLoopArt(loop: LoopZone, theme: LevelTheme = 'verdant'): HTMLCanvasElement {
+  const pal = TERRAIN_THEMES[theme];
   const r = loop.outerR + 8;
   const cv = document.createElement('canvas');
   cv.width = cv.height = r * 2;
@@ -120,12 +158,12 @@ export function renderLoopArt(loop: LoopZone): HTMLCanvasElement {
   ctx.beginPath();
   ctx.arc(0, 0, loop.outerR, 0, Math.PI * 2);
   ctx.arc(0, 0, loop.innerR, 0, Math.PI * 2, true);
-  ctx.fillStyle = PAL.dirt;
+  ctx.fillStyle = pal.body;
   ctx.fill('evenodd');
   // Checker accents.
   ctx.save();
   ctx.clip('evenodd');
-  ctx.fillStyle = PAL.dirtDark;
+  ctx.fillStyle = pal.bodyDark;
   for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
     ctx.save();
     ctx.rotate(a);
@@ -133,23 +171,27 @@ export function renderLoopArt(loop: LoopZone): HTMLCanvasElement {
     ctx.restore();
   }
   ctx.restore();
-  // Grass on the outer top half.
+  // Cap on the outer top half.
   ctx.beginPath();
   ctx.arc(0, 0, loop.outerR, Math.PI, Math.PI * 2);
   ctx.arc(0, 0, loop.outerR - 6, Math.PI * 2, Math.PI, true);
   ctx.closePath();
-  ctx.fillStyle = PAL.grass;
+  ctx.fillStyle = pal.cap;
   ctx.fill();
   return cv;
 }
 
 /* -------------------------------- Background ------------------------------- */
 
-export function renderBackground(w: number, h: number): HTMLCanvasElement {
+export function renderBackground(w: number, h: number, theme: LevelTheme = 'verdant'): HTMLCanvasElement {
   const cv = document.createElement('canvas');
   cv.width = w;
   cv.height = h;
   const ctx = cv.getContext('2d')!;
+  if (theme === 'gear') {
+    renderGearBackground(ctx, w, h);
+    return cv;
+  }
 
   const sky = ctx.createLinearGradient(0, 0, 0, h);
   sky.addColorStop(0, PAL.skyTop);
@@ -181,6 +223,79 @@ export function renderBackground(w: number, h: number): HTMLCanvasElement {
   // Near hills.
   ridge(ctx, w, h, h * 0.78, 46, PAL.hillNear, 7);
   return cv;
+}
+
+/** Cog Skyway: smog-lit sky, factory skyline, giant gear silhouettes. */
+function renderGearBackground(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#0d0d16');
+  sky.addColorStop(0.65, '#1c1a2e');
+  sky.addColorStop(1, '#3a2620');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  let seed = 12;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // Smog-dimmed stars.
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  for (let i = 0; i < 40; i++) {
+    ctx.globalAlpha = 0.1 + rnd() * 0.35;
+    ctx.fillRect(rnd() * w, rnd() * h * 0.4, 1, 1);
+  }
+  ctx.globalAlpha = 1;
+
+  // Furnace glow on the horizon.
+  const glow = ctx.createRadialGradient(w * 0.3, h * 0.95, 10, w * 0.3, h * 0.95, w * 0.5);
+  glow.addColorStop(0, 'rgba(255,120,40,0.30)');
+  glow.addColorStop(1, 'rgba(255,120,40,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  // Giant background gears.
+  const gear = (cx: number, cy: number, r: number, teeth: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * Math.PI * 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(a);
+      ctx.fillRect(r - 2, -r * 0.09, r * 0.22, r * 0.18);
+      ctx.restore();
+    }
+    ctx.fillStyle = '#0d0d16';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  gear(w * 0.82, h * 0.34, 52, 12, '#232134');
+  gear(w * 0.16, h * 0.22, 34, 10, '#1e1c2c');
+  gear(w * 0.55, h * 0.5, 26, 8, '#262238');
+
+  // Factory skyline: blocks, smokestacks, lit windows.
+  ctx.fillStyle = '#15131f';
+  for (let x = 0; x < w; ) {
+    const bw = 30 + rnd() * 60;
+    const bh = 40 + rnd() * 90;
+    ctx.fillRect(x, h - bh, bw, bh);
+    if (rnd() > 0.5) ctx.fillRect(x + bw * 0.3, h - bh - 26, 8, 26); // smokestack
+    x += bw + 4;
+  }
+  seed = 99;
+  ctx.fillStyle = 'rgba(255,190,80,0.8)';
+  for (let i = 0; i < 70; i++) {
+    ctx.globalAlpha = 0.25 + rnd() * 0.6;
+    ctx.fillRect(rnd() * w, h - rnd() * 100, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+
+  // Near catwalk silhouette.
+  ctx.fillStyle = '#100e18';
+  ctx.fillRect(0, h - 22, w, 22);
+  for (let x = 8; x < w; x += 26) ctx.fillRect(x, h - 34, 4, 12);
 }
 
 function ridge(ctx: CanvasRenderingContext2D, w: number, h: number, base: number, amp: number, color: string, seed: number): void {
@@ -339,6 +454,83 @@ export function drawSnapCrab(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 }
 
+export function drawDashPad(ctx: CanvasRenderingContext2D, x: number, y: number, dir: number, cooldown: number, frame: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(dir >= 0 ? 1 : -1, 1);
+  ctx.fillStyle = cooldown > 8 ? '#3d4452' : '#23262e';
+  ctx.beginPath();
+  ctx.roundRect(-12, -2, 24, 8, 2);
+  ctx.fill();
+  // Scrolling chevrons.
+  for (let i = 0; i < 3; i++) {
+    const lit = (Math.floor(frame / 5) + i) % 3 === 0;
+    ctx.fillStyle = lit ? PAL.board : PAL.boardDark;
+    ctx.beginPath();
+    ctx.moveTo(-8 + i * 7, -4);
+    ctx.lineTo(-3 + i * 7, 0);
+    ctx.lineTo(-8 + i * 7, 4);
+    ctx.lineTo(-6 + i * 7, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+export function drawBoardPad(ctx: CanvasRenderingContext2D, x: number, y: number, frame: number): void {
+  const bob = Math.sin(frame / 25) * 2;
+  ctx.save();
+  ctx.translate(x, y);
+  // Pedestal.
+  ctx.fillStyle = '#23262e';
+  ctx.fillRect(-9, 8, 18, 6);
+  ctx.fillStyle = '#3d4452';
+  ctx.fillRect(-7, 6, 14, 2);
+  // Hover glow.
+  const glow = ctx.createRadialGradient(0, bob - 2, 2, 0, bob - 2, 18);
+  glow.addColorStop(0, 'rgba(56,224,200,0.5)');
+  glow.addColorStop(1, 'rgba(56,224,200,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(-18, bob - 20, 36, 36);
+  // The board itself, hovering.
+  ctx.fillStyle = PAL.board;
+  ctx.beginPath();
+  ctx.roundRect(-11, bob - 4, 22, 5, 3);
+  ctx.fill();
+  ctx.fillStyle = PAL.boardDark;
+  ctx.fillRect(-8, bob + 1, 16, 2);
+  ctx.restore();
+}
+
+export function drawBuzzDrone(ctx: CanvasRenderingContext2D, x: number, y: number, dir: number, frame: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(dir >= 0 ? 1 : -1, 1);
+  // Rotor (spinning blur).
+  ctx.strokeStyle = 'rgba(200,210,225,0.8)';
+  ctx.lineWidth = 2;
+  const spin = Math.sin(frame / 1.5) * 7;
+  ctx.beginPath();
+  ctx.moveTo(-spin, -9);
+  ctx.lineTo(spin, -9);
+  ctx.stroke();
+  ctx.fillStyle = '#565d6e';
+  ctx.fillRect(-1, -9, 2, 3);
+  // Body.
+  ctx.fillStyle = PAL.enemy;
+  ctx.beginPath();
+  ctx.roundRect(-8, -6, 16, 11, 5);
+  ctx.fill();
+  ctx.fillStyle = PAL.podDark;
+  ctx.fillRect(-8, 0, 16, 3);
+  // Eye.
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(2, -4, 4, 4);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(4, -3, 2, 2);
+  ctx.restore();
+}
+
 export function drawGoal(ctx: CanvasRenderingContext2D, x: number, y: number, spinning: number, frame: number): void {
   ctx.save();
   ctx.translate(x, y);
@@ -356,7 +548,12 @@ export function drawGoal(ctx: CanvasRenderingContext2D, x: number, y: number, sp
   ctx.restore();
 }
 
-export function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, frame: number): void {
+export function drawBoss(ctx: CanvasRenderingContext2D, boss: BossLike, frame: number): void {
+  if (boss.kind === 'press') drawPressBoss(ctx, boss as PressBoss, frame);
+  else drawPodBoss(ctx, boss as Boss, frame);
+}
+
+function drawPodBoss(ctx: CanvasRenderingContext2D, boss: Boss, frame: number): void {
   const flash = boss.invuln > 0 && frame % 4 < 2;
   ctx.save();
   // Mace.
@@ -409,7 +606,76 @@ export function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, frame: numbe
   ctx.restore();
 }
 
+function drawPressBoss(ctx: CanvasRenderingContext2D, boss: PressBoss, frame: number): void {
+  const flash = boss.invuln > 0 && frame % 4 < 2;
+  const open = boss.phase === 'open';
+  const warning = boss.phase === 'telegraph' && frame % 8 < 4;
+  ctx.save();
+
+  // Ground shockwaves: rippling energy arcs.
+  for (const s of boss.shockwaves) {
+    const a = 1 - s.age / 80;
+    ctx.strokeStyle = `rgba(255,170,60,${0.9 * a})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc(s.x, boss.groundY, 6 + i * 5, Math.PI, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  ctx.translate(boss.x, boss.y);
+  // Piston body: heavy cylinder with side rails.
+  ctx.fillStyle = flash ? '#fff' : warning ? '#7c4a52' : '#59616f';
+  ctx.beginPath();
+  ctx.roundRect(-22, -18, 44, 30, 6);
+  ctx.fill();
+  ctx.fillStyle = flash ? '#eee' : '#3d4452';
+  ctx.fillRect(-22, -6, 44, 4);
+  ctx.fillRect(-26, -18, 5, 30);
+  ctx.fillRect(21, -18, 5, 30);
+  // Crush plate.
+  ctx.fillStyle = flash ? '#fff' : '#23262e';
+  ctx.beginPath();
+  ctx.roundRect(-24, 12, 48, 8, 2);
+  ctx.fill();
+  ctx.fillStyle = PAL.spring;
+  for (let i = 0; i < 4; i++) ctx.fillRect(-20 + i * 12, 14, 6, 4); // hazard studs
+  // Vulnerable vents glow while open.
+  if (open) {
+    const pulse = 0.5 + Math.sin(frame / 4) * 0.3;
+    ctx.fillStyle = `rgba(255,140,40,${pulse})`;
+    ctx.fillRect(-16, -14, 10, 6);
+    ctx.fillRect(6, -14, 10, 6);
+  }
+  // Yolk cockpit dome on top.
+  ctx.fillStyle = flash ? '#ffd' : PAL.yolk;
+  ctx.beginPath();
+  ctx.roundRect(-12, -28, 24, 12, 6);
+  ctx.fill();
+  if (!flash) {
+    ctx.fillStyle = '#20303f';
+    ctx.fillRect(-7, -25, 5, 4);
+    ctx.fillRect(2, -25, 5, 4);
+    ctx.fillStyle = '#7a4a21';
+    ctx.fillRect(-6, -19, 12, 3);
+  }
+  ctx.restore();
+}
+
 /* ---------------------------------- Hero ----------------------------------- */
+
+/** Translucent speed afterimage (ball or standing silhouette). */
+export function drawAfterimage(ctx: CanvasRenderingContext2D, x: number, y: number, ball: boolean, alpha: number, color = PAL.heroBlue): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  if (ball) ctx.arc(x, y, 12, 0, Math.PI * 2);
+  else ctx.roundRect(x - 8, y - 16, 16, 34, 8);
+  ctx.fill();
+  ctx.restore();
+}
 
 export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number): void {
   if (p.invuln > 0 && frame % 4 < 2) return; // damage blink
@@ -417,6 +683,26 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
   ctx.translate(p.x, p.y);
   if (p.grounded) ctx.rotate((-p.angle * Math.PI) / 180);
   ctx.scale(p.facing, 1);
+
+  // Mag-Board deck under the rider (vehicle, zone-specific).
+  if (p.board) {
+    const deckY = p.ball ? 14 : 19;
+    const glow = ctx.createRadialGradient(0, deckY + 2, 2, 0, deckY + 2, 16);
+    glow.addColorStop(0, 'rgba(56,224,200,0.45)');
+    glow.addColorStop(1, 'rgba(56,224,200,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-18, deckY - 8, 36, 22);
+    ctx.fillStyle = PAL.board;
+    ctx.beginPath();
+    ctx.roundRect(-13, deckY - 1, 27, 5, 3);
+    ctx.fill();
+    ctx.fillStyle = PAL.boardDark;
+    ctx.fillRect(-9, deckY + 4, 19, 2);
+    // Mag-field sparks trailing the deck.
+    ctx.fillStyle = `rgba(56,224,200,${0.4 + Math.sin(frame / 3) * 0.3})`;
+    ctx.fillRect(-17, deckY, 3, 2);
+    ctx.fillRect(-20, deckY + 2, 2, 2);
+  }
 
   if (p.ball) {
     // Ball form: spinning disc.

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { PHYS } from '../src/physics/constants.ts';
 import { stampLoop, TileMap, TILE_FULL } from '../src/physics/TileMap.ts';
-import { Player } from '../src/game/Player.ts';
-import { makeLoopZone, loopLayerAt } from '../src/game/loops.ts';
+import { Player, NO_INPUT } from '../src/game/Player.ts';
+import { makeLoopZone, LoopTracker, LOOP } from '../src/game/loops.ts';
 import { makeFlatMap, fillRect, spawnOnGround, input, run, T } from './helpers.ts';
 
 describe('running physics (Sonic Physics Guide values)', () => {
@@ -147,31 +147,43 @@ describe('rolling & spin dash', () => {
 });
 
 describe('loop traversal (360° physics + layer switching)', () => {
-  it('runs through a whole loop and comes out the other side', () => {
-    // Layer 0: flat corridor straight through. Layer 1: the annulus channel.
-    const map = makeFlatMap(80, 30, 400);
+  /** Flat corridor on layer 0, the annulus channel on layer 1. */
+  function loopMap(floorY = 400) {
+    const innerR = LOOP.innerR;
+    const thickness = LOOP.thickness;
+    const cy = floorY - innerR;
+    const map = makeFlatMap(80, 34, floorY);
     map.copyLayer(0, 1);
-    stampLoop(map, 1, 400, 360, 40, 16);
-    const zone = makeLoopZone(400, 360, 40, 16);
-    const p = spawnOnGround(map, 200, 400);
+    stampLoop(map, 1, 400, cy, innerR, thickness, LOOP.flatHalf);
+    return { map, zone: makeLoopZone(400, cy, innerR, thickness), floorY };
+  }
 
-    // Spin dash at full charge into the loop.
-    p.update(map, input({ down: true, jump: true, jumpPressed: true }));
-    for (let i = 0; i < 5; i++) p.update(map, input({ down: true, jump: true, jumpPressed: true }));
-    p.update(map, input({ down: false }));
+  it('runs a full 360 through all four ground modes and exits the far side', () => {
+    const { map, zone, floorY } = loopMap();
+    const tracker = new LoopTracker([zone]);
+    const p = spawnOnGround(map, 200, floorY);
+    p.gsp = 6;
 
     const modes = new Set<number>();
+    let boosted = false;
     let exited = false;
     for (let i = 0; i < 600; i++) {
       const prevX = p.x;
       p.update(map, input({ right: true }));
-      p.layer = loopLayerAt(p.layer, prevX, p.x, p.y, [zone]);
+      const cross = tracker.update(prevX, p.x, p.y, p.gsp);
+      p.layer = cross.layer;
+      if (cross.entered !== 0) {
+        p.gsp = Math.max(p.gsp, LOOP.boost);
+        boosted = true;
+      }
+      if (tracker.current >= 0 && p.grounded && Math.abs(p.gsp) < LOOP.sustain) p.gsp = LOOP.sustain;
       modes.add(p.mode);
-      if (p.grounded && p.x > 460 && p.layer === 0) {
+      if (p.grounded && p.x > zone.cx + 120 && p.layer === 0) {
         exited = true;
         break;
       }
     }
+    expect(boosted).toBe(true);
     expect(exited).toBe(true);
     expect(modes.has(1)).toBe(true); // ran up the right wall
     expect(modes.has(2)).toBe(true); // ran across the ceiling
@@ -179,20 +191,20 @@ describe('loop traversal (360° physics + layer switching)', () => {
     expect(p.grounded).toBe(true);
   });
 
-  it('walks straight through the loop on layer 0 at low speed', () => {
-    const map = makeFlatMap(80, 30, 400);
-    map.copyLayer(0, 1);
-    stampLoop(map, 1, 400, 360, 40, 16);
-    const zone = makeLoopZone(400, 360, 40, 16);
-    const p = spawnOnGround(map, 200, 400);
+  it('walks straight past the loop on layer 0 when too slow to commit', () => {
+    const { map, zone, floorY } = loopMap();
+    const tracker = new LoopTracker([zone]);
+    const p = spawnOnGround(map, 340, floorY);
+    let everSwitched = false;
     for (let i = 0; i < 400; i++) {
       const prevX = p.x;
-      p.update(map, input({ right: true }));
-      p.layer = loopLayerAt(p.layer, prevX, p.x, p.y, [zone]);
+      p.update(map, NO_INPUT);
+      p.x += 1; // creep forward below LOOP.entryMin
+      p.layer = tracker.update(prevX, p.x, p.y, 1).layer;
+      if (p.layer === 1) everSwitched = true;
     }
-    // Too slow for the loop: switched to layer 1, slid back, escaped to layer 0.
-    expect(p.x).toBeGreaterThan(460);
-    expect(p.grounded).toBe(true);
+    expect(everSwitched).toBe(false);
+    expect(p.x).toBeGreaterThan(zone.cx + 100);
   });
 });
 

@@ -6,7 +6,8 @@ import { Camera } from '../core/Camera.ts';
 import { Level } from '../game/Level.ts';
 import { Player } from '../game/Player.ts';
 import { HUD } from '../game/HUD.ts';
-import { zone1 } from '../levels/zone1.ts';
+import { LEVELS } from '../levels/index.ts';
+import { STORY_ENDING } from '../game/story.ts';
 import {
   PAL,
   renderTerrain,
@@ -19,10 +20,19 @@ import {
   drawSpikes,
   drawCheckpoint,
   drawSnapCrab,
+  drawBuzzDrone,
+  drawDashPad,
+  drawBoardPad,
   drawGoal,
   drawBoss,
   drawHero,
+  drawAfterimage,
 } from '../render/painter.ts';
+import { FxSystem } from '../render/fx.ts';
+import { prefersReducedMotion } from '../core/prefs.ts';
+import { PauseMenu } from '../ui/PauseMenu.ts';
+import { SettingsPanel } from '../ui/SettingsPanel.ts';
+import { CutsceneScene } from './CutsceneScene.ts';
 import { TitleScene } from './TitleScene.ts';
 
 const W = 640;
@@ -40,34 +50,90 @@ export class LevelScene implements Scene {
   private game: Game;
   private input: Input;
   private sfx: Sfx;
+  private levelIndex: number;
+  private fx: FxSystem;
+  private skyFill: string;
+  private pause: PauseMenu | null = null;
+  private settings: SettingsPanel | null = null;
+  /** Recent hero positions for speed afterimages (newest first). */
+  private trail: { x: number; y: number; ball: boolean }[] = [];
 
-  constructor(game: Game, input: Input, sfx: Sfx) {
+  constructor(game: Game, input: Input, sfx: Sfx, levelIndex = 0) {
     this.game = game;
     this.input = input;
     this.sfx = sfx;
-    this.level = new Level(zone1);
+    this.levelIndex = levelIndex;
+    const def = LEVELS[levelIndex];
+    this.level = new Level(def);
     this.player = new Player(this.level.startPos.x, this.level.startPos.y);
     this.camera = new Camera(W, H);
     this.camera.snapTo(this.player.x, this.player.y, this.level.map.pixelW, this.level.map.pixelH);
-    // Pre-rendered art — built once, behind the scene fade.
-    this.terrain = renderTerrain(this.level.map);
+    this.fx = new FxSystem(prefersReducedMotion());
+    this.skyFill = def.theme === 'gear' ? '#0d0d16' : '#0b1026';
+    // Pre-rendered art — built once, behind the scene fade. The background is
+    // rendered taller than the view for vertical parallax headroom.
+    this.terrain = renderTerrain(this.level.map, def.theme);
     this.loopArts = this.level.loops.map((l) => ({
-      art: renderLoopArt(l),
+      art: renderLoopArt(l, def.theme),
       cx: l.cx,
       cy: l.cy,
       r: l.outerR + 8,
     }));
-    this.bg = renderBackground(W, H);
+    this.bg = renderBackground(W, H + 32, def.theme);
   }
 
   update(): void {
     this.frame++;
     const { level, player } = this;
 
-    if (level.results) {
-      if (this.input.uiWasPressed('Enter', 'Space', 'KeyZ')) {
-        this.game.changeScene(new TitleScene(this.game, this.input, this.sfx));
+    // --- Paused: menus run, the world is frozen ---
+    if (this.pause) {
+      if (this.settings) {
+        if (this.settings.update(this.input) === 'close') this.settings = null;
+        return;
       }
+      const choice = this.pause.update(this.input);
+      if (choice === 'resume') this.pause = null;
+      else if (choice === 'settings') this.settings = new SettingsPanel();
+      else if (choice === 'restart') {
+        this.game.changeScene(() => new LevelScene(this.game, this.input, this.sfx, this.levelIndex));
+      } else if (choice === 'quit') {
+        this.game.changeScene(() => new TitleScene(this.game, this.input, this.sfx));
+      }
+      return;
+    }
+
+    this.fx.update();
+
+    if (level.results) {
+      if (this.input.confirmPressed()) {
+        const next = this.levelIndex + 1;
+        if (next < LEVELS.length) {
+          // The next zone's intro cutscene doubles as its loading screen.
+          this.game.changeScene(
+            () =>
+              new CutsceneScene(
+                this.game,
+                this.input,
+                this.sfx,
+                LEVELS[next].intro,
+                () => new LevelScene(this.game, this.input, this.sfx, next),
+              ),
+          );
+        } else {
+          this.game.changeScene(
+            () =>
+              new CutsceneScene(this.game, this.input, this.sfx, STORY_ENDING, () =>
+                new TitleScene(this.game, this.input, this.sfx),
+              ),
+          );
+        }
+      }
+      return;
+    }
+
+    if (this.input.actionWasPressed('pause')) {
+      this.pause = new PauseMenu();
       return;
     }
 
@@ -75,8 +141,36 @@ export class LevelScene implements Scene {
     if (snap.jumpPressed) this.sfx.ensure();
     player.update(level.map, snap);
 
-    for (const ev of player.events) this.sfx.play(ev);
-    for (const ev of level.update(player)) this.sfx.play(ev);
+    for (const ev of player.events) {
+      this.sfx.play(ev);
+      this.fx.onEvent(ev, player.x, player.y + 8);
+    }
+    for (const ev of level.update(player)) {
+      this.sfx.play(ev);
+      // Boss events erupt at the boss; everything else at the hero.
+      const atBoss = ev.startsWith('boss') && level.boss;
+      this.fx.onEvent(ev, atBoss ? level.boss!.x : player.x, atBoss ? level.boss!.y + 18 : player.y);
+    }
+
+    // Continuous juice: run dust, spin-dash smoke, board wake, shoes trail.
+    if (!player.dead) {
+      if (player.grounded && Math.abs(player.gsp) > 4 && this.frame % 3 === 0) {
+        this.fx.emitRunDust(player.x - player.facing * 6, player.y + player.h, player.gsp);
+      }
+      if (player.spindashing && this.frame % 2 === 0) {
+        this.fx.emitSpindashSmoke(player.x, player.y + player.h - 4, player.facing);
+      }
+      if (player.board && this.frame % 2 === 0) {
+        this.fx.emitBoardTrail(player.x - 14, player.y + (player.ball ? 14 : 19));
+      }
+      if (player.shoes > 0 && this.frame % 2 === 1) {
+        this.fx.emitShoesTrail(player.x - player.facing * 10, player.y);
+      }
+    }
+    if (this.frame % 2 === 0) {
+      this.trail.unshift({ x: player.x, y: player.y, ball: player.ball });
+      if (this.trail.length > 8) this.trail.pop();
+    }
 
     // Camera: locked during the boss fight, classic follow otherwise.
     if (level.boss && !level.bossDefeated) {
@@ -94,13 +188,19 @@ export class LevelScene implements Scene {
     const { level, player, camera } = this;
     const camX = Math.round(camera.x);
     const camY = Math.round(camera.y);
+    const so = this.fx.shakeOffset(this.frame);
 
-    // Parallax background (two depths of the same strip).
-    this.tiledBg(ctx, camX * 0.2, 0);
-    this.tiledBg(ctx, camX * 0.45, 40, 0.6);
+    // Solid sky behind everything (covers shake/parallax overdraw).
+    ctx.fillStyle = this.skyFill;
+    ctx.fillRect(0, 0, W, H);
+
+    // Parallax background: two horizontal depths plus a slight vertical drift.
+    const bgY = -Math.round(camY * 0.12) + so.y;
+    this.tiledBg(ctx, camX * 0.2 - so.x, bgY);
+    this.tiledBg(ctx, camX * 0.45 - so.x, 40 + bgY, 0.6);
 
     ctx.save();
-    ctx.translate(-camX, -camY);
+    ctx.translate(-camX + so.x, -camY + so.y);
 
     // Loop art (decor).
     for (const l of this.loopArts) {
@@ -116,6 +216,8 @@ export class LevelScene implements Scene {
 
     const visible = (x: number) => x > camX - 40 && x < camX + W + 40;
 
+    for (const d of level.dashPads) if (visible(d.x)) drawDashPad(ctx, d.x, d.y, d.dir, d.cooldown, this.frame);
+    for (const bp of level.boardPads) if (visible(bp.x)) drawBoardPad(ctx, bp.x, bp.y, this.frame);
     for (const r of level.rings) if (!r.taken && visible(r.x)) drawRing(ctx, r.x, r.y, this.frame);
     for (const s of level.scattered) if (visible(s.x)) drawRing(ctx, s.x, s.y, this.frame);
     for (const c of level.crystals) if (!c.taken && visible(c.x)) drawCrystal(ctx, c.x, c.y, this.frame);
@@ -124,10 +226,21 @@ export class LevelScene implements Scene {
     for (const s of level.spikes) if (visible(s.x)) drawSpikes(ctx, s.x, s.y);
     for (const c of level.checkpoints) if (visible(c.x)) drawCheckpoint(ctx, c.x, c.y, c.active);
     for (const e of level.enemies) if (e.alive && visible(e.x)) drawSnapCrab(ctx, e.x, e.y, e.xsp);
+    for (const d of level.drones) if (d.alive && visible(d.x)) drawBuzzDrone(ctx, d.x, d.y, d.dir, this.frame);
     if (visible(level.goal.x)) drawGoal(ctx, level.goal.x, level.goal.y, level.goal.spinning, this.frame);
     if (level.boss && visible(level.boss.x)) drawBoss(ctx, level.boss, this.frame);
 
+    // Speed afterimages trail behind the hero at high speed.
+    const fast = Math.abs(player.gsp) > 7.5 || (player.shoes > 0 && Math.abs(player.gsp) > 5);
+    if (fast && !this.fx.reducedMotion && !player.dead) {
+      const tint = player.board ? PAL.board : player.shoes > 0 ? '#ffd94a' : PAL.heroBlue;
+      for (let i = 2; i >= 0; i--) {
+        const t = this.trail[(i + 1) * 2];
+        if (t) drawAfterimage(ctx, t.x, t.y, t.ball, 0.08 + (2 - i) * 0.05, tint);
+      }
+    }
     drawHero(ctx, player, this.frame);
+    this.fx.render(ctx);
     ctx.restore();
 
     // Boss intro banner.
@@ -135,15 +248,17 @@ export class LevelScene implements Scene {
       ctx.textAlign = 'center';
       ctx.fillStyle = PAL.yolk;
       ctx.font = 'bold 20px monospace';
-      ctx.fillText('DR. YOLK', W / 2, 60);
+      ctx.fillText(level.boss.title, W / 2, 60);
       ctx.fillStyle = '#9aa3b2';
       ctx.font = '11px monospace';
-      ctx.fillText('WRECKING POD', W / 2, 78);
+      ctx.fillText(level.boss.subtitle, W / 2, 78);
       ctx.textAlign = 'left';
     }
 
     this.hud.draw(ctx, level, player);
     if (level.results) this.hud.drawResults(ctx, level, player, this.frame);
+    if (this.pause) this.pause.render(ctx);
+    if (this.settings) this.settings.render(ctx, this.input);
   }
 
   private tiledBg(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number, alpha = 1): void {

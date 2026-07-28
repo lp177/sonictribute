@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (77 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (207 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -20,20 +20,47 @@ procedurally at boot.
 - `src/physics/sensors.ts` — ground/wall/ceiling sensor casts in 4 ground
   modes (floor/right wall/ceiling/left wall).
 - `src/game/Player.ts` — hero state machine: gsp/xsp/ysp model, rolling, spin
-  dash, slope factor, hurt/knockback, shield, speed shoes. Pure logic,
-  headless-testable.
-- `src/game/loops.ts` — Sonic 1-style layer switch triggers at loop bases.
-- `src/game/Level.ts` + `src/levels/zone1.ts` — LevelBuilder API
-  (floor/slope/carve/spring/secret/loop/boss…) and level data. Level owns
-  entities, score, secrets, checkpoints, boss, respawn.
-- `src/game/Boss.ts` — deterministic boss (timer-driven pattern, 8 HP).
-  Boss reports contacts; the LEVEL applies player damage (single damage path —
-  do not call `player.hurt()` from entities).
+  dash, slope factor, hurt/knockback, shield, speed shoes, Mag-Board vehicle
+  (`board`: enforced forward speed, absorbs one hit, no rolling/spindash while
+  riding; `BOARD` const, not SPG). Pure logic, headless-testable.
+- `src/game/loops.ts` — loop geometry tuning (`LOOP`) + `LoopTracker`, the
+  Sonic 1-style path swapper. Loops are a toy, not a skill check: entry grants
+  a boost and the channel enforces a floor speed, so any loop entered at a
+  running pace is always completed (a deliberate departure from raw SPG).
+- `src/game/Level.ts` + `src/levels/` — LevelBuilder API (floor/slope/carve/
+  spring/secret/loop/boss/dashPad/boardPad/boardEnd/drone…) and level data
+  (`zone1` Verdant Rush, `zone2` Cog Skyway, roster in `levels/index.ts`).
+  LevelDef carries `theme` ('verdant' | 'gear'), `bossKind` ('pod' | 'press')
+  and its `intro` cutscene. Level owns entities, score, secrets, checkpoints,
+  boss, respawn, board mount/dismount.
+- `src/game/Boss.ts` / `src/game/PressBoss.ts` — deterministic bosses
+  (timer-driven patterns, no RNG) behind the shared `BossLike` interface.
+  Bosses report contacts; the LEVEL applies player damage (single damage path —
+  do not call `player.hurt()` from entities). PressBoss is armoured except
+  during its post-slam 'open' window; its shockwaves hurt even a rolling player.
+- `src/game/story.ts` — background-story cutscene data (pure, tested):
+  intro → act2 → ending. The stolen Chrono Core threads the campaign; the
+  crystals are the per-zone recoverable parts.
 - `src/game/Score.ts` — score values, time bonus tiers, achievements (pure).
-- `src/render/painter.ts` — all procedural art (terrain chunks, hero, boss…).
-- `src/core/Game.ts` — fixed 60 Hz timestep + fade transitions (next scene is
-  built behind the fade = no loading screens).
-- `src/scenes/` — TitleScene, LevelScene.
+- `src/render/painter.ts` — all procedural art, themed per zone
+  (`TERRAIN_THEMES`: verdant grass vs gear steel; themed backgrounds).
+- `src/render/fx.ts` — game-juice layer: deterministic particles (run dust,
+  spin-dash smoke, board wake, sparks, explosions) + screen shake. Pure logic
+  apart from `render`; honours `prefers-reduced-motion` (no shake, fewer
+  particles, no afterimages).
+- `src/core/Game.ts` — fixed 60 Hz timestep + fade transitions. `changeScene`
+  takes a FACTORY and calls it only once the screen is fully black, so the
+  level build/pre-render never hitches a visible frame.
+- `src/core/bindings.ts` — remappable controls (primary + optional secondary
+  per action, conflict stealing, localStorage persistence). Pure/testable.
+- `src/core/Input.ts` — bindings-driven per-frame input + one-shot key capture
+  used by the settings panel.
+- `src/ui/` — canvas menus in a dark Material-ish language (`theme.ts`):
+  `SettingsPanel` (key remapping) and `PauseMenu`, both keyboard-only.
+- `src/scenes/` — TitleScene (START / SETTINGS) → CutsceneScene (story beat,
+  skippable, doubles as the loading screen) → LevelScene(levelIndex) → next
+  zone's cutscene → … → ending cutscene → title. ESC in a level opens the
+  pause menu (resume / settings / restart / quit).
 
 ## Design rules learned (don't regress)
 
@@ -46,6 +73,24 @@ procedurally at boot.
   arrays (see tile 2 in TILES).
 - Level geometry: `slopeUp`/`slopeDown` backfill below — carve rooms AFTER
   slopes, and make sure every corridor span has an explicit `floor()` call.
+- Vehicles are zone-specific and discovered progressively (dash pads first,
+  then the Mag-Board pad); falling off the fast route must cost time, not a
+  life (lower pits with spring escapes).
+- Sounds/FX triggered from `Level.update` must be pushed to the LEVEL's event
+  list. `player.events` is cleared at the start of the next `player.update`,
+  and the scene reads it BEFORE `level.update`, so anything raised during the
+  level update (hurt, 'shield-lost', 'board-lost') is invisible there — the
+  level re-emits those itself. Same rule for a boss: forward the array its
+  `update()` returns, don't drop it.
+- SPG acceleration applies only BELOW top speed. Never clamp `gsp` down to
+  `top` when the player holds the direction they are over-speeding in, or spin
+  dash, springs, dash pads and loop boosts all decay to a walk within a frame.
+- A loop's annulus must satisfy `thickness >= innerR * (sqrt(2) - 1)`, else
+  its lower quarters float above the corridor and headbutt the player instead
+  of curving up under their feet.
+- Loop entry and exit lines are the same two lines, so exiting is gated on a
+  lap actually being climbed (`LoopTracker.armed`). Without that, a fast
+  runner is ejected one frame after entering.
 
 ## Debug
 

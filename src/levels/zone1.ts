@@ -1,4 +1,5 @@
 import type { LevelDef, LevelBuilder } from '../game/Level.ts';
+import { STORY_INTRO } from '../game/story.ts';
 
 /**
  * ZONE 1 — VERDANT RUSH
@@ -9,6 +10,9 @@ import type { LevelDef, LevelBuilder } from '../game/Level.ts';
 export const zone1: LevelDef = {
   name: 'VERDANT RUSH',
   act: 'ACT 1',
+  theme: 'verdant',
+  bossKind: 'pod',
+  intro: STORY_INTRO,
   build(b: LevelBuilder): void {
     /* ---- Section A (0–45): start, first descent to the low corridor ---- */
     b.floor(0, 30, 21);
@@ -21,9 +25,8 @@ export const zone1: LevelDef = {
     b.enemy(34, 24, 4);
 
     /* ---- Section B (36–72): loop 1, spring, secret room 1 ---- */
-    b.loop(44, 24);
-    b.ringsH(36, 40, 21);
-    b.ringsH(41, 47, 17); // ring arc over the loop
+    b.loop(44, 24); // lays its own ring arc along the channel
+    b.ringsH(34, 38, 21); // approach rings, clear of the loop footprint
     b.ringsH(50, 54, 21);
     b.spring(58, 24, 10); // yellow spring up to the platform route
     b.slopeUp(69, 24, 3); // 24 -> 21 (done before carving, it backfills below)
@@ -55,8 +58,7 @@ export const zone1: LevelDef = {
     b.pit(103, 160, 21, 3); // low corridor resumes at row 24
     b.floor(103, 137, 24);
     b.loop(116, 24);
-    b.ringsH(108, 112, 21);
-    b.ringsH(113, 119, 17);
+    b.ringsH(105, 110, 21);
     b.ringsH(122, 126, 21);
     b.spring(130, 24, 10);
     b.platform(128, 134, 17);
@@ -92,8 +94,7 @@ export const zone1: LevelDef = {
 
     /* ---- Section G (185–235): loop 3, mesa with secret room 3 ---- */
     b.loop(192, 24);
-    b.ringsH(186, 190, 21);
-    b.ringsH(189, 195, 17);
+    b.ringsH(182, 186, 21);
     b.enemy(200, 24, 3);
     b.slopeUp(203, 24, 6); // 24 -> 18 mesa approach
     b.floor(209, 222, 18); // the mesa

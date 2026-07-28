@@ -1,6 +1,6 @@
 import { TileMap, stampLoop } from '../physics/TileMap.ts';
 import { PHYS } from '../physics/constants.ts';
-import { loopLayerAt, makeLoopZone, type LoopZone } from './loops.ts';
+import { LoopTracker, makeLoopZone, LOOP, type LoopZone } from './loops.ts';
 import { Player } from './Player.ts';
 import {
   Ring,
@@ -11,13 +11,21 @@ import {
   Crystal,
   Checkpoint,
   SnapCrab,
+  BuzzDrone,
+  DashPad,
+  BoardPad,
   GoalSign,
   tileCentre,
   type Rect,
   type MonitorKind,
 } from './entities.ts';
-import { Boss } from './Boss.ts';
+import { Boss, type BossLike } from './Boss.ts';
+import { PressBoss } from './PressBoss.ts';
 import { SCORE, type LevelStats } from './Score.ts';
+import type { Cutscene } from './story.ts';
+
+export type LevelTheme = 'verdant' | 'gear';
+export type BossKind = 'pod' | 'press';
 
 const T = PHYS.tile;
 
@@ -43,6 +51,10 @@ export class LevelBuilder {
   crystals: { x: number; y: number; id: number }[] = [];
   checkpoints: { x: number; y: number }[] = [];
   enemies: { x: number; y: number; x0: number; x1: number }[] = [];
+  droneDefs: { x: number; y: number; range: number }[] = [];
+  dashPadDefs: { x: number; y: number; dir: 1 | -1; power: number }[] = [];
+  boardPadDefs: { x: number; y: number }[] = [];
+  boardEndX = -1;
   loops: LoopZone[] = [];
   secretRects: Rect[] = [];
   playerStart = { x: 64, y: 64 };
@@ -151,6 +163,26 @@ export class LevelBuilder {
     });
   }
 
+  /** Flying BuzzDrone hovering around the centre of tile (x, row). */
+  drone(x: number, row: number, rangeTiles: number): void {
+    this.droneDefs.push({ x: tileCentre(x), y: tileCentre(row), range: rangeTiles * T });
+  }
+
+  /** Floor booster on the surface at `surfaceRow`. */
+  dashPad(x: number, surfaceRow: number, dir: 1 | -1 = 1, power = 10): void {
+    this.dashPadDefs.push({ x: tileCentre(x), y: surfaceRow * T - 6, dir, power });
+  }
+
+  /** Mag-Board pickup pad standing on the surface at `surfaceRow`. */
+  boardPad(x: number, surfaceRow: number): void {
+    this.boardPadDefs.push({ x: tileCentre(x), y: surfaceRow * T - 14 });
+  }
+
+  /** Dismount line: riding past this x ends the Mag-Board section. */
+  boardEnd(x: number): void {
+    this.boardEndX = x * T;
+  }
+
   start(x: number, surfaceRow: number): void {
     this.playerStart = { x: tileCentre(x), y: surfaceRow * T - PHYS.heightRadius - 2 };
   }
@@ -164,11 +196,23 @@ export class LevelBuilder {
     this.goalPos = { x: tileCentre(x), y: surfaceRow * T };
   }
 
-  loop(cxTile: number, surfaceRow: number, innerR = 40, thickness = 16): void {
+  /**
+   * A full 360° loop centred on tile `cxTile`, standing on `surfaceRow`. Also
+   * lays a ring arc along the inner channel (the reward line the player rides
+   * around), so loop rings can never drift out of the channel by hand-editing.
+   */
+  loop(cxTile: number, surfaceRow: number, innerR = LOOP.innerR, thickness = LOOP.thickness): void {
     const cx = cxTile * T + T / 2;
     const cy = surfaceRow * T - innerR;
     this.loops.push(makeLoopZone(cx, cy, innerR, thickness));
     this.loopStamps.push({ cx, cy, innerR, thickness });
+    // Ring arc over the top of the channel, at the radius a rolling hero rides.
+    const r = innerR - 13;
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const a = ((25 + (130 * i) / (n - 1)) * Math.PI) / 180;
+      this.rings.push({ x: cx + Math.cos(a) * r, y: cy - Math.sin(a) * r });
+    }
   }
 
   secret(x0: number, y0: number, x1: number, y1: number): void {
@@ -186,13 +230,22 @@ export class LevelBuilder {
 export interface LevelDef {
   name: string;
   act: string;
+  /** Visual theme for terrain/background procedural art. */
+  theme: LevelTheme;
+  /** Which end-of-zone boss guards the goal. */
+  bossKind: BossKind;
+  /** Story beat played (as a pseudo-loading cinematic) before this level. */
+  intro: Cutscene;
   build(b: LevelBuilder): void;
 }
 
 export class Level {
   readonly name: string;
+  readonly theme: LevelTheme;
+  readonly bossKind: BossKind;
   readonly map: TileMap;
   readonly loops: LoopZone[];
+  readonly loopTracker: LoopTracker;
   readonly secrets: (Rect & { found: boolean })[];
   rings: Ring[];
   scattered: ScatteredRing[] = [];
@@ -202,8 +255,12 @@ export class Level {
   crystals: Crystal[];
   checkpoints: Checkpoint[];
   enemies: SnapCrab[];
+  drones: BuzzDrone[];
+  dashPads: DashPad[];
+  boardPads: BoardPad[];
+  readonly boardEndX: number;
   goal: GoalSign;
-  boss: Boss | null = null;
+  boss: BossLike | null = null;
   bossDefeated = false;
 
   readonly startPos: { x: number; y: number };
@@ -222,6 +279,8 @@ export class Level {
 
   constructor(def: LevelDef) {
     this.name = def.name;
+    this.theme = def.theme;
+    this.bossKind = def.bossKind;
     const b = new LevelBuilder(320, 28);
     def.build(b);
 
@@ -234,9 +293,12 @@ export class Level {
     }
     // Layer 1 = same terrain, but loop corridors replaced by the annulus.
     this.map.copyLayer(0, 1);
-    for (const s of b.loopStamps) stampLoop(this.map, 1, s.cx, s.cy, s.innerR, s.thickness);
+    // The flattened channel base must match the trigger offset, so the layer
+    // switch happens where both floors line up (see LOOP.flatHalf).
+    for (const s of b.loopStamps) stampLoop(this.map, 1, s.cx, s.cy, s.innerR, s.thickness, LOOP.flatHalf);
 
     this.loops = b.loops;
+    this.loopTracker = new LoopTracker(this.loops);
     this.secrets = b.secretRects.map((r) => ({ ...r, found: false }));
     this.rings = b.rings.map((r) => new Ring(r.x, r.y));
     this.springs = b.springs.map((s) => new Spring(s.x, s.y, s.dir, s.power));
@@ -245,6 +307,10 @@ export class Level {
     this.crystals = b.crystals.map((c) => new Crystal(c.x, c.y, c.id));
     this.checkpoints = b.checkpoints.map((c) => new Checkpoint(c.x, c.y));
     this.enemies = b.enemies.map((e) => new SnapCrab(e.x, e.y, e.x0, e.x1));
+    this.drones = b.droneDefs.map((d) => new BuzzDrone(d.x, d.y, d.range));
+    this.dashPads = b.dashPadDefs.map((d) => new DashPad(d.x, d.y, d.dir, d.power));
+    this.boardPads = b.boardPadDefs.map((d) => new BoardPad(d.x, d.y));
+    this.boardEndX = b.boardEndX;
     this.goal = new GoalSign(b.goalPos.x, b.goalPos.y);
     this.startPos = b.playerStart;
     this.respawnPos = { ...b.playerStart };
@@ -258,8 +324,20 @@ export class Level {
     const events: string[] = [];
     if (!this.results) this.timeFrames++;
 
-    // Loop layer switching.
-    p.layer = loopLayerAt(p.layer, this.prevX, p.x, p.y, this.loops);
+    // Loop layer switching + speed assist. Entering a loop at any running
+    // pace grants the boost; inside the channel a floor speed is enforced so
+    // gravity can never stall the player upside-down. Loops are a toy here,
+    // not a skill check (see LOOP in loops.ts).
+    const cross = this.loopTracker.update(this.prevX, p.x, p.y, p.dead ? 0 : p.gsp);
+    p.layer = cross.layer;
+    if (cross.entered !== 0) {
+      if (Math.abs(p.gsp) < LOOP.boost) p.gsp = LOOP.boost * cross.entered;
+      p.facing = cross.entered;
+      events.push('loop-boost');
+    }
+    if (this.loopTracker.current >= 0 && p.grounded && !p.dead && Math.abs(p.gsp) < LOOP.sustain) {
+      p.gsp = LOOP.sustain * (p.gsp !== 0 ? Math.sign(p.gsp) : p.facing);
+    }
 
     // Rings.
     for (const r of this.rings) {
@@ -287,6 +365,19 @@ export class Level {
       }
     }
 
+    // Dash pads & Mag-Board (level-specific vehicle).
+    for (const d of this.dashPads) {
+      d.update();
+      if (d.tryTrigger(p)) events.push('dash-pad');
+    }
+    for (const bp of this.boardPads) {
+      if (bp.tryMount(p)) events.push('board');
+    }
+    if (p.board && this.boardEndX >= 0 && p.x >= this.boardEndX) {
+      p.dismountBoard();
+      events.push('board-end');
+    }
+
     // Hazards.
     if (!p.dead) {
       for (const s of this.spikes) {
@@ -300,6 +391,16 @@ export class Level {
           events.push('enemy');
         } else if (r === 'hurt') {
           this.damagePlayer(p, e.x, events);
+        }
+      }
+      for (const d of this.drones) {
+        d.update();
+        const r = d.interact(p);
+        if (r === 'kill') {
+          this.score += SCORE.enemy;
+          events.push('enemy');
+        } else if (r === 'hurt') {
+          this.damagePlayer(p, d.x, events);
         }
       }
     }
@@ -327,13 +428,19 @@ export class Level {
 
     // Boss.
     if (!this.boss && !this.bossDefeated && this.bossTriggerX >= 0 && p.x > this.bossTriggerX) {
-      this.boss = new Boss(this.arena.right - 96, this.groundAt(this.arena.right - 96), this.arena.left, this.arena.right);
+      const bx = this.arena.right - 96;
+      const gy = this.groundAt(bx);
+      this.boss =
+        this.bossKind === 'press'
+          ? new PressBoss(bx, gy, this.arena.left, this.arena.right)
+          : new Boss(bx, gy, this.arena.left, this.arena.right);
       events.push('boss');
     }
     if (this.boss) {
       if (!this.boss.defeated) {
         p.x = Math.max(this.arena.left + 12, Math.min(this.arena.right - 12, p.x));
-        this.boss.update(p);
+        // The boss's own events (telegraph, slam) drive sfx and screen shake.
+        events.push(...this.boss.update(p));
         const r = this.boss.interact(p);
         if (r === 'hit') {
           this.score += this.boss.hp <= 0 ? SCORE.bossDefeat : SCORE.bossHit;
@@ -362,6 +469,7 @@ export class Level {
     }
     if (p.dead && p.y > this.map.pixelH + 96) {
       p.respawn(this.respawnPos.x, this.respawnPos.y);
+      this.loopTracker.reset();
       this.prevX = p.x;
       events.push('respawn');
     }
@@ -376,8 +484,15 @@ export class Level {
       events.push('die');
       return;
     }
-    if (lost > 0 || p.events.includes('shield-lost')) {
+    const shieldLost = p.events.includes('shield-lost');
+    const boardLost = p.events.includes('board-lost');
+    if (lost > 0 || shieldLost || boardLost) {
       this.tookDamage = true;
+      // Emit the specific event too: `player.events` is refilled at the start
+      // of the next player update, so the scene can only ever see the level's
+      // event stream for anything raised during Level.update.
+      if (boardLost) events.push('board-lost');
+      else if (shieldLost) events.push('shield-lost');
       events.push('hurt');
       this.scatterRings(p, lost);
     }

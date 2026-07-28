@@ -256,6 +256,112 @@ export class SnapCrab {
   }
 }
 
+/* -------------------------------- Dash pad --------------------------------- */
+
+/** Floor booster: running over it slams ground speed to `power` in `dir`. */
+export class DashPad {
+  cooldown = 0;
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  power: number;
+  constructor(x: number, y: number, dir: 1 | -1, power: number) {
+    this.x = x;
+    this.y = y;
+    this.dir = dir;
+    this.power = power;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 12, y: this.y - 6, w: 24, h: 12 };
+  }
+
+  tryTrigger(p: Player): boolean {
+    if (this.cooldown > 0 || !p.grounded || !overlaps(playerBox(p), this.box)) return false;
+    if (this.dir === 1) p.gsp = Math.max(p.gsp, this.power);
+    else p.gsp = Math.min(p.gsp, -this.power);
+    p.facing = this.dir;
+    this.cooldown = 12;
+    return true;
+  }
+
+  update(): void {
+    if (this.cooldown > 0) this.cooldown--;
+  }
+}
+
+/* ---------------------------- Mag-Board mount pad --------------------------- */
+
+/**
+ * Vehicle pickup: walking through it puts the player on a Mag-Board. Reusable,
+ * so losing the board to a hit lets you walk back and grab another.
+ */
+export class BoardPad {
+  x: number;
+  y: number;
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 10, y: this.y - 14, w: 20, h: 28 };
+  }
+
+  tryMount(p: Player): boolean {
+    if (p.board || p.dead || !overlaps(playerBox(p), this.box)) return false;
+    p.mountBoard();
+    return true;
+  }
+}
+
+/* ------------------------------ BuzzDrone enemy ----------------------------- */
+
+/** Flying badnik: hovers in a deterministic figure around its home point. */
+export class BuzzDrone {
+  alive = true;
+  t = 0;
+  x: number;
+  y: number;
+  readonly homeX: number;
+  readonly homeY: number;
+  readonly rangeX: number;
+  constructor(x: number, y: number, rangeX: number) {
+    this.x = x;
+    this.y = y;
+    this.homeX = x;
+    this.homeY = y;
+    this.rangeX = rangeX;
+  }
+
+  /** Horizontal heading for the renderer. */
+  get dir(): 1 | -1 {
+    return Math.cos(this.t / 50) >= 0 ? 1 : -1;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 9, y: this.y - 6, w: 18, h: 12 };
+  }
+
+  update(): void {
+    if (!this.alive) return;
+    this.t++;
+    this.x = this.homeX + Math.sin(this.t / 50) * this.rangeX;
+    this.y = this.homeY + Math.sin(this.t / 21) * 5;
+  }
+
+  /** Returns 'kill' when destroyed by the player, 'hurt' when it hits them. */
+  interact(p: Player): 'kill' | 'hurt' | null {
+    if (!this.alive || !overlaps(playerBox(p), this.box)) return null;
+    if (p.attacking) {
+      this.alive = false;
+      if (!p.grounded) p.bounce();
+      return 'kill';
+    }
+    return 'hurt';
+  }
+}
+
 /* -------------------------------- Goal sign ------------------------------- */
 
 export class GoalSign {
