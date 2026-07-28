@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # docs/ is the published GitHub Pages site and is committed, so a PR
+      # that changes src/ without rebuilding would silently ship stale code.
+      - name: Fail if the published docs/ build is stale
+        run: |
+          if ! git diff --quiet -- docs; then
+            echo "::error::docs/ is out of date. Run 'npm run build' and commit the result."
+            git diff --stat -- docs
+            exit 1
+          fi

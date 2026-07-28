@@ -31,3 +31,21 @@ body {
   background: var(--surface);
   outline: none;
 }
+
+/* Keyboard users get a visible focus ring on the play surface. */
+#game:focus-visible {
+  outline: 2px solid #4be1ff;
+  outline-offset: 2px;
+}
+
+.fallback {
+  max-width: 42ch;
+  padding: 1.5rem;
+  color: #e7ebf2;
+  font: 400 1rem/1.6 system-ui, sans-serif;
+  text-align: center;
+}
+
+.fallback strong {
+  color: #4be1ff;
+}

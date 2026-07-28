@@ -1,20 +1,35 @@
 # BOLT — Chrono Rush
 
-A Sonic-tribute 2D platformer built with **vanilla TypeScript + Canvas 2D** —
-no game engine, no downloaded assets. Physics follow the
-[Sonic Physics Guide](https://info.sonicretro.org/Sonic_Physics_Guide)
-(ground-speed model, slope factors, rolling, spin dash, 360° loops via dual
-collision layers), and every sprite, background and sound is generated
-procedurally at boot.
+A free, open-source **Sonic-style platformer that runs in your browser**. No
+plugins, no downloads, no accounts, nothing to install — open the page and
+play.
+
+It is built with **vanilla TypeScript and Canvas 2D**: no game engine, no
+downloaded art or audio. Every sprite, background, sound effect and level is
+generated procedurally at boot, and the movement follows the community
+[Sonic Physics Guide](https://info.sonicretro.org/Sonic_Physics_Guide) — the
+ground-speed model, slope factors, rolling, spin dash and 360° loops built
+from dual collision layers.
 
 > Dr. Yolk has stolen the **Chrono Core** and time is stuttering. Chase him
 > through two zones, recover the scattered Chrono Crystals, and take the Core
 > back.
 
+## Play
+
+**Online:** once GitHub Pages is enabled (see [Deploying](#deploying)), the
+game lives at `https://<your-github-username>.github.io/<your-repo-name>/`.
+
+**Locally:** `npm install && npm run dev`, then open the printed URL.
+
+The whole game is about 25 kB gzipped and runs entirely on your device —
+there is no backend, no telemetry and no network traffic after the page
+loads.
+
 ## Features
 
-- **Authentic feel** — SPG constants at a fixed 60 Hz timestep: momentum,
-  slope physics, rolling and spin dash.
+- **Authentic feel** — Sonic Physics Guide constants at a fixed 60 Hz
+  timestep: momentum, slope physics, rolling and spin dash.
 - **Loops that always feel good** — full-height 360° loops built from a real
   annulus with dual collision layers. Running into one at any pace grants a
   speed boost and the channel holds you at speed, so you never stall
@@ -23,23 +38,22 @@ procedurally at boot.
   screens: the next level is built behind the fade while the cinematic plays.
   - *Verdant Rush* — hills, loops, stacked routes, Dr. Yolk's Wrecking Pod.
   - *Cog Skyway* — Yolk's sky-factory: dash pads, Buzz Drones, the
-    **Mag-Board** hoverboard (zone-exclusive vehicle that absorbs one hit),
+    **Mag-Board** hoverboard (a zone-exclusive vehicle that absorbs one hit),
     and the Piston Crusher boss (armoured except after its slam — jump the
     shockwaves, strike the open window).
 - **Exploration rewards** — 5 Chrono Crystals and 3 secret rooms per zone,
-  monitors, checkpoints, score/time-bonus results screen with achievements
-  (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring Master).
-- **Game juice** — parallax backgrounds (horizontal + vertical), run dust,
-  spin-dash smoke, board wake, explosion particles, speed afterimages and
-  screen shake. Honours `prefers-reduced-motion` (shake and afterimages off,
-  fewer particles).
-- **Procedural audio** — WebAudio synth, no audio files.
-- **Remappable controls** — primary + alternate key per action, with a
-  settings panel on the title screen and in the pause menu (see below).
+  monitors, checkpoints, and a score/time-bonus results screen with
+  achievements (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring
+  Master).
+- **Game juice** — parallax backgrounds, run dust, spin-dash smoke, board
+  wake, explosion particles, speed afterimages and screen shake.
+- **Accessible** — fully keyboard-driven, remappable controls, visible focus
+  states, and `prefers-reduced-motion` support (screen shake and afterimages
+  off, fewer particles).
+- **Procedural audio** — a small WebAudio synth, no audio files.
 - **207 unit tests** — physics sensors, player state machine, entities,
   bosses, key bindings, menus, scoring, level structure, flood-fill
-  reachability, simulated loop rides, and scripted bot runs through each zone
-  to prevent regressions.
+  reachability, simulated loop rides, and scripted bot runs through each zone.
 
 ## Controls
 
@@ -66,73 +80,106 @@ Requires **Node.js 20+** (any platform; developed on Debian Trixie).
 
 ```sh
 npm install
-npm run dev        # dev server with hot reload (Vite) — prints a local URL
-```
-
-### Tests & type checking
-
-```sh
-npx vitest run     # full unit-test suite (must stay green)
-npx tsc            # type check only
+npm run dev        # dev server with hot reload — prints a local URL
+npm test           # unit tests (must stay green)
+npm run typecheck  # tsc, no emit
+npm run build      # typecheck + production build into docs/
+npm run preview    # serve the production build locally to verify it
 ```
 
 The game logic is fully headless-testable: physics, entities, bosses and
 levels never touch the DOM, so tests run in plain Node without a browser.
 
-## Building & deployment
+## Deploying
 
-```sh
-npm run build      # tsc + vite build → static site in dist/
-npm run preview    # serve the production build locally to verify it
+`npm run build` writes a **fully static site into [`docs/`](docs/)** — one
+HTML file, one JS bundle (~25 kB gzipped), one CSS file and a favicon. There
+is no server-side code, no build step at runtime, no external requests and no
+secrets.
+
+### GitHub Pages (no CI required)
+
+`docs/` is committed precisely so GitHub can serve it directly:
+
+1. Run `npm run build` and commit the updated `docs/`.
+2. Push to GitHub.
+3. In the repository: **Settings → Pages → Build and deployment**, set
+   *Source* to **Deploy from a branch**, then choose branch `main` and folder
+   **`/docs`**, and save.
+4. The site goes live at
+   `https://<your-github-username>.github.io/<your-repo-name>/` within a
+   minute or two.
+
+Assets are referenced with **relative URLs** (`base: './'` in
+[vite.config.ts](vite.config.ts)), so the same build works at a project-site
+sub-path, at a user site, behind a custom domain, or opened from disk — you
+never have to hard-code the deploy URL. A `.nojekyll` file is included so
+GitHub serves the build verbatim.
+
+The [CI workflow](.github/workflows/ci.yml) typechecks, tests, builds, and
+fails if the committed `docs/` is stale — so the published site can't silently
+drift from `src/`.
+
+### Anywhere else
+
+Copy `docs/` to any static host — nginx, Apache, Caddy, Cloudflare Pages,
+Netlify, S3, or a container:
+
+```Dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/docs /usr/share/nginx/html
 ```
 
-The build output in `dist/` is a **fully static site** (one HTML file, one JS
-bundle ~21 kB gzipped, one CSS file, favicon). There is no server-side code,
-no external requests and no secrets — deploy it on any static host:
-
-- **Any web server** (nginx, Apache, Caddy): copy `dist/` to the document
-  root. No special configuration needed; it works from a sub-path too, if you
-  build with `vite build --base=/your/sub/path/`.
-- **Static platforms** (GitHub Pages, Cloudflare Pages, Netlify, …): publish
-  the `dist/` directory; build command `npm run build`.
-- **Container**: serve `dist/` with any static-file image, e.g.
-
-  ```Dockerfile
-  FROM node:22-alpine AS build
-  WORKDIR /app
-  COPY package*.json ./
-  RUN npm ci
-  COPY . .
-  RUN npm run build
-
-  FROM nginx:alpine
-  COPY --from=build /app/dist /usr/share/nginx/html
-  ```
-
-Cache policy: `dist/assets/*` filenames are content-hashed and safe to cache
-forever; serve `index.html` with a short/no-cache policy so updates roll out
-immediately.
+Cache policy: files under `docs/assets/` are content-hashed and safe to cache
+forever; serve `index.html` with a short or no-cache policy so updates reach
+players immediately.
 
 ## Project layout
 
-```
+```text
 src/
-  physics/    SPG constants, tile map (height/width arrays, 2 collision
-              layers, loop stamper), sensor casts
+  physics/    Sonic Physics Guide constants, tile map (height/width arrays,
+              2 collision layers, loop stamper), sensor casts
   game/       Player state machine, Level + LevelBuilder, entities, bosses,
-              scoring/achievements, story data
+              loop tracker, scoring/achievements, story data
   levels/     zone1 (Verdant Rush), zone2 (Cog Skyway), campaign roster
   render/     procedural art (themed terrain/backgrounds/sprites) and the
               FX layer (particles, screen shake)
+  ui/         canvas menus: settings (key remapping) and pause
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
-  core/       game shell (fixed timestep), input, camera
-  audio/      procedural WebAudio sfx
-tests/        Vitest suites (127 tests)
+  core/       game shell (fixed timestep), input, key bindings, camera
+  audio/      procedural WebAudio sound effects
+tests/        Vitest suites (207 tests)
+docs/         built site — this is what GitHub Pages serves
 ```
 
-More engine internals and level-design rules: see [AGENTS.md](AGENTS.md).
+Engine internals and the level-design rules that keep the physics honest are
+documented in [AGENTS.md](AGENTS.md).
 
 ## Debugging
 
 The running game is exposed as `window.__game` in the browser console for
-smoke testing (scene → level/player).
+smoke testing (scene → level / player).
+
+## License
+
+[MIT](LICENSE) — code, procedural art and audio alike.
+
+## A note on what this is
+
+BOLT — Chrono Rush is an **unofficial fan tribute**. It is **not affiliated
+with, endorsed by, or connected to SEGA** in any way. *Sonic the Hedgehog* and
+related marks are trademarks of SEGA.
+
+Nothing here is ripped from any commercial game. The characters (BOLT, Dr.
+Yolk), levels, music and artwork are original to this project and drawn
+procedurally in code. What *is* borrowed is the publicly documented movement
+model from the community-written Sonic Physics Guide — the constants and
+algorithms that make classic 2D platforming feel the way it does.

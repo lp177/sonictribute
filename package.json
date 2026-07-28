@@ -1,12 +1,26 @@
 {
-  "name": "sonictribute",
-  "private": true,
-  "version": "0.0.0",
+  "name": "bolt-chrono-rush",
+  "version": "1.0.0",
+  "private": false,
+  "description": "A free, open-source Sonic-style platformer for the browser: momentum physics, full 360° loops, hidden rooms and boss fights, with every sprite and sound generated procedurally.",
+  "license": "MIT",
   "type": "module",
+  "keywords": [
+    "game",
+    "platformer",
+    "canvas",
+    "typescript",
+    "vite",
+    "sonic-physics-guide",
+    "browser-game"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc"
   },
   "devDependencies": {
     "typescript": "~6.0.2",
