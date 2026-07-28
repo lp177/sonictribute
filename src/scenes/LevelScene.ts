@@ -158,7 +158,9 @@ export class LevelScene implements Scene {
     if (snap.jumpPressed) this.sfx.ensure();
     player.update(level.map, snap);
 
-    if (player.landImpact > 2) {
+    // Only a landing with real weight kicks dust. A low threshold puffs
+    // smoke on every micro-landing while the hero stands on a slope.
+    if (player.landImpact > 5) {
       this.fx.emitLandingDust(player.x, player.y + player.h, player.landImpact);
     }
 
@@ -168,9 +170,16 @@ export class LevelScene implements Scene {
     }
     for (const ev of level.update(player)) {
       this.sfx.play(ev);
-      // Boss events erupt at the boss; everything else at the hero.
-      const atBoss = ev.startsWith('boss') && level.boss;
-      this.fx.onEvent(ev, atBoss ? level.boss!.x : player.x, atBoss ? level.boss!.y + 18 : player.y);
+      // Effects belong to whatever caused them: the level reports a position
+      // for entity events, boss events erupt at the boss, and only what the
+      // hero actually did bursts out of the hero.
+      const src = level.eventSources.get(ev);
+      const atBoss = !src && ev.startsWith('boss') && level.boss;
+      this.fx.onEvent(
+        ev,
+        src ? src.x : atBoss ? level.boss!.x : player.x,
+        src ? src.y : atBoss ? level.boss!.y + 18 : player.y,
+      );
     }
 
     // Continuous juice: run dust, spin-dash smoke, board wake, shoes trail.

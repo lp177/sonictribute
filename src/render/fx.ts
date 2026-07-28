@@ -39,10 +39,16 @@ const SHAKES: Record<string, [number, number]> = {
 };
 
 /**
- * Hit-stop: how many frames the whole world freezes on impact. This is the
- * single most effective piece of juice — a few frozen frames read as WEIGHT,
- * making a stomp feel like it connected instead of passing through. Kept
- * short; anything over ~8 frames starts to feel like lag.
+ * Hit-stop: how many frames the whole world freezes on impact. A few frozen
+ * frames read as WEIGHT, making a stomp feel like it connected.
+ *
+ * ONLY hits the player LANDS freeze the world. Freezing while the player is
+ * being hurt steals reaction time exactly when they need it, and repeated
+ * damage would stack freezes into an unplayable stutter — so 'hurt' and
+ * 'die' get shake and a flash for feedback, never a freeze.
+ *
+ * Kept short: past ~12 frames a freeze stops reading as impact and starts
+ * reading as lag.
  */
 const HIT_STOP: Record<string, number> = {
   'boss-hit': 7,
@@ -50,10 +56,11 @@ const HIT_STOP: Record<string, number> = {
   'boss-slam': 5,
   enemy: 4,
   monitor: 3,
-  hurt: 6,
-  die: 8,
   crumble: 2,
 };
+
+/** Absolute ceiling, so no event or bug can ever hold the world still. */
+const MAX_HIT_STOP = 12;
 
 /** Full-screen colour flashes: [css colour, frames]. */
 const FLASHES: Record<string, [string, number]> = {
@@ -88,7 +95,7 @@ export class FxSystem {
     // Reduced motion still gets a token freeze: it reads as weight, not
     // motion, and removing it entirely makes hits feel unresponsive.
     const f = this.reducedMotion ? Math.min(2, frames) : frames;
-    this.hitStop = Math.max(this.hitStop, f);
+    this.hitStop = Math.min(MAX_HIT_STOP, Math.max(this.hitStop, f));
   }
 
   /**

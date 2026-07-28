@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (249 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (260 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -72,6 +72,21 @@ procedurally at boot.
 
 ## Design rules learned (don't regress)
 
+- **Hit-stop is for hits the player LANDS, never hits they take.** Freezing
+  the world while someone is being hurt steals the reaction time they need,
+  and repeated damage stacks freezes into an unplayable stutter. 'hurt' and
+  'die' get shake and a flash instead. `freeze()` is also hard-capped so no
+  event or bug can hold the world still.
+- **Never re-emit a state-transition event while the state persists.**
+  `damagePlayer` used to push 'die' every frame a dead player still
+  overlapped a hazard; each one re-armed hit-stop and the game froze solid.
+  Guard on the transition, and skip hazards entirely once `p.dead`.
+- **Entity events need a position and a range.** Hazards run on their own
+  clocks across the whole level. Without an `AMBIENT_RANGE` gate they chirp
+  at the player from half a zone away, and without `Level.eventSources` their
+  particles burst out of the hero instead of out of the hazard. Both read as
+  constant meaningless noise. `tests/feedback.test.ts` asserts an idle hero
+  triggers nothing at all.
 - **Springs and launchers must clear `player.jumping`.** The variable-jump
   cutoff clamps upward speed to `PHYS.jrel` the moment the jump button is not
   held, so every spring in the game was firing at a third of its power until

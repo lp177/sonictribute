@@ -41,6 +41,14 @@ const T = PHYS.tile;
  */
 const BACKTRACK_SLACK = 560;
 
+/**
+ * How close a scenery hazard must be to the player before it is allowed to
+ * make a noise. Traps run on their own clock all over the level; without
+ * this, every one of them chirps at the player from half a zone away and the
+ * result is meaningless repeating noise.
+ */
+const AMBIENT_RANGE = 420;
+
 /* ------------------------------- Level builder ----------------------------- */
 
 const TERRAIN: Record<string, number> = {
@@ -411,6 +419,12 @@ export class Level {
   tookDamage = false;
   /** Set when the goal sign is hit. */
   results: LevelStats | null = null;
+  /**
+   * Where this frame's positional events happened, so effects appear at the
+   * thing that caused them. Without it every spark from every entity in the
+   * level bursts out of the hero.
+   */
+  readonly eventSources = new Map<string, { x: number; y: number }>();
 
   private prevX = 0;
 
@@ -465,6 +479,7 @@ export class Level {
   /** Per-frame world update; the player has already been updated. */
   update(p: Player): string[] {
     const events: string[] = [];
+    this.eventSources.clear();
     if (!this.results) this.timeFrames++;
 
     // Loop layer switching + speed assist. Entering a loop at any running
@@ -532,8 +547,13 @@ export class Level {
       }
       for (const t of this.traps) {
         const ev = t.update();
-        if (ev === 'warn') events.push('spike-warn');
-        else if (ev === 'strike') events.push('spike-trap');
+        // Only traps the player could plausibly see or hear announce
+        // themselves, and they announce themselves AT the trap.
+        if (ev && Math.abs(t.x - p.x) < AMBIENT_RANGE) {
+          const name = ev === 'warn' ? 'spike-warn' : 'spike-trap';
+          events.push(name);
+          this.eventSources.set(name, { x: t.x, y: t.y });
+        }
         if (t.touches(p)) this.damagePlayer(p, t.x, events);
       }
       for (const s of this.swings) {
@@ -564,7 +584,10 @@ export class Level {
 
     // Crumbling ledges: they carry the player until they let go.
     for (const c of this.crumbles) {
-      if (c.update(p) === 'crumble') events.push('crumble');
+      if (c.update(p) === 'crumble') {
+        events.push('crumble');
+        this.eventSources.set('crumble', { x: c.x + c.w / 2, y: c.y });
+      }
       if (c.solid && !p.dead) this.standOn(p, c.x, c.y, c.w);
     }
 
@@ -611,7 +634,8 @@ export class Level {
       if (!this.boss.defeated) {
         // The boss's own events (telegraph, slam) drive sfx and screen shake.
         events.push(...this.boss.update(p));
-        const r = this.boss.interact(p);
+        // A dead player is not a target — same rule as every other hazard.
+        const r = p.dead ? null : this.boss.interact(p);
         if (r === 'hit') {
           this.score += this.boss.hp <= 0 ? SCORE.bossDefeat : SCORE.bossHit;
           events.push(this.boss.hp <= 0 ? 'boss-defeated' : 'boss-hit');
@@ -664,6 +688,10 @@ export class Level {
   }
 
   private damagePlayer(p: Player, fromX: number, events: string[]): void {
+    // Already dead: nothing more can happen to them. Re-emitting 'die' every
+    // frame the corpse still overlaps a hazard used to re-trigger hit-stop
+    // forever, freezing the game solid.
+    if (p.dead) return;
     const lost = p.hurt(fromX);
     if (p.dead) {
       events.push('die');

@@ -72,7 +72,7 @@ loads.
   states, and `prefers-reduced-motion` support (screen shake and afterimages
   off, fewer particles).
 - **Procedural audio** — a small WebAudio synth, no audio files.
-- **249 unit tests** — physics sensors, player state machine, entities,
+- **260 unit tests** — physics sensors, player state machine, entities,
   hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
   reachability, simulated loop rides, route-continuity contracts, and a flow
   test that fails if a bot holding right ever gets pinned by the terrain.
@@ -177,7 +177,7 @@ src/
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
   core/       game shell (fixed timestep), input, key bindings, camera
   audio/      procedural WebAudio sound effects
-tests/        Vitest suites (207 tests)
+tests/        Vitest suites (260 tests)
 docs/         built site — this is what GitHub Pages serves
 ```
 
