@@ -1,0 +1,399 @@
+import { PHYS } from '../physics/constants.ts';
+import {
+  castGround,
+  modeForAngle,
+  rotate,
+  sinDeg,
+  cosDeg,
+  norm360,
+  angleDiff,
+  MODE_FLOOR,
+  type GroundMode,
+} from '../physics/sensors.ts';
+import type { TileMap } from '../physics/TileMap.ts';
+
+export interface PlayerInput {
+  left: boolean;
+  right: boolean;
+  up: boolean;
+  down: boolean;
+  /** Jump button currently held. */
+  jump: boolean;
+  /** Jump button pressed this exact frame (edge trigger). */
+  jumpPressed: boolean;
+}
+
+export const NO_INPUT: PlayerInput = {
+  left: false,
+  right: false,
+  up: false,
+  down: false,
+  jump: false,
+  jumpPressed: false,
+};
+
+const sign = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);
+
+/**
+ * The hero. Movement follows the Sonic Physics Guide: ground speed (gsp) is
+ * the master variable while grounded; xsp/ysp are derived from it and the
+ * ground angle. Airborne, xsp/ysp are master and gsp is recomputed on landing
+ * by projecting the velocity onto the surface tangent.
+ */
+export class Player {
+  x: number;
+  y: number;
+  xsp = 0;
+  ysp = 0;
+  gsp = 0;
+  /** Degrees, 0 = flat floor, counter-clockwise positive (visual). */
+  angle = 0;
+  mode: GroundMode = MODE_FLOOR;
+  grounded = false;
+  rolling = false;
+  jumping = false;
+  spindashing = false;
+  spinRevs = 0;
+  facing: 1 | -1 = 1;
+  rings = 0;
+  invuln = 0;
+  /** Shield absorbs one hit without losing rings. */
+  shield = false;
+  /** Speed shoes timer (frames): raises top speed while active. */
+  shoes = 0;
+  dead = false;
+  finished = false;
+  /** Active collision layer (0 = normal, 1 = inside loops). */
+  layer = 0;
+  /** Events emitted during the last update (sound/FX hooks). */
+  events: string[] = [];
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  /** Body half-height: ball form (rolling/jumping) is shorter. */
+  get h(): number {
+    return this.ball ? PHYS.heightRadiusRoll : PHYS.heightRadius;
+  }
+  get w(): number {
+    return PHYS.widthRadius;
+  }
+  get ball(): boolean {
+    return this.rolling || this.jumping;
+  }
+  get attacking(): boolean {
+    return this.ball;
+  }
+
+  update(map: TileMap, input: PlayerInput): void {
+    this.events = [];
+    if (this.invuln > 0) this.invuln--;
+    if (this.shoes > 0) this.shoes--;
+    if (this.dead) {
+      this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
+      this.y += this.ysp;
+      return;
+    }
+    if (this.grounded) this.updateGround(map, input);
+    else this.updateAir(map, input);
+  }
+
+  /* ------------------------------- Grounded -------------------------------- */
+
+  private updateGround(map: TileMap, input: PlayerInput): void {
+    const prevY = this.y;
+
+    // --- Spin dash (charging or releasing) ---
+    if (this.spindashing) {
+      this.spinRevs = Math.max(0, this.spinRevs - PHYS.dashDecay);
+      if (input.jumpPressed) {
+        this.spinRevs = Math.min(this.spinRevs + PHYS.dashRev, PHYS.dashRevMax);
+        this.events.push('dash-rev');
+      }
+      if (!input.down) {
+        this.spindashing = false;
+        this.adjustHeight(true);
+        this.rolling = true;
+        this.gsp = (PHYS.dashBase + this.spinRevs) * this.facing;
+        this.events.push('dash');
+      }
+      this.groundStick(map, prevY);
+      return;
+    }
+
+    // --- Start rolling ---
+    if (!this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
+      this.adjustHeight(true);
+      this.rolling = true;
+      this.events.push('roll');
+    }
+    // --- Start spin dash ---
+    if (!this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
+      this.spindashing = true;
+      this.spinRevs = 0;
+      this.events.push('dash-charge');
+      return;
+    }
+
+    // --- Horizontal input & slope physics ---
+    if (this.rolling) {
+      // No direct control, only braking when pushing against the motion.
+      if (input.left && this.gsp > 0) this.gsp = Math.max(0, this.gsp - PHYS.dec);
+      else if (input.right && this.gsp < 0) this.gsp = Math.min(0, this.gsp + PHYS.dec);
+      this.gsp -= sign(this.gsp) * Math.min(Math.abs(this.gsp), PHYS.rfc);
+      const sf = sign(this.gsp) === -sign(sinDeg(this.angle)) ? PHYS.slpRollDown : PHYS.slpRollUp;
+      if (Math.abs(this.gsp) > 0.001) this.gsp -= sf * sinDeg(this.angle);
+      if (Math.abs(this.gsp) < PHYS.unrollSpeed && Math.abs(sinDeg(this.angle)) < 0.7) {
+        this.adjustHeight(false);
+        this.rolling = false;
+        this.gsp = 0;
+        this.events.push('unroll');
+      }
+    } else {
+      const top = PHYS.top + (this.shoes > 0 ? 2 : 0);
+      if (input.left) {
+        if (this.gsp > 0) this.gsp -= PHYS.dec;
+        else this.gsp = Math.max(this.gsp - PHYS.acc, -top);
+        this.facing = -1;
+      } else if (input.right) {
+        if (this.gsp < 0) this.gsp += PHYS.dec;
+        else this.gsp = Math.min(this.gsp + PHYS.acc, top);
+        this.facing = 1;
+      }
+      if (Math.abs(this.gsp) > 0.05 || Math.abs(sinDeg(this.angle)) > 0.719) {
+        this.gsp -= PHYS.slp * sinDeg(this.angle);
+      }
+      if (!input.left && !input.right) {
+        this.gsp -= sign(this.gsp) * Math.min(Math.abs(this.gsp), PHYS.frc);
+      }
+    }
+    this.gsp = Math.max(-PHYS.gspMax, Math.min(PHYS.gspMax, this.gsp));
+
+    // --- Derive xsp/ysp and move ---
+    this.xsp = this.gsp * cosDeg(this.angle);
+    this.ysp = -this.gsp * sinDeg(this.angle);
+
+    if (this.gsp !== 0) {
+      const dir = sign(this.gsp) as 1 | -1;
+      const off = rotate(this.mode, dir * (this.w + 1), 0);
+      const wallMode = ((this.mode + (dir === 1 ? 1 : 3)) % 4) as GroundMode;
+      const wall = castGround(map, this.x + this.xsp + off.x, this.y + off.y, wallMode, this.layer);
+      this.x += this.xsp;
+      // Only a near-perpendicular obstacle counts as a wall; a steepening
+      // curve ahead (e.g. entering a loop) is handled by the ground sensors.
+      if (wall && wall.depth > 0 && !wall.oneWay && angleDiff(wall.angle, this.angle) > 60) {
+        this.clipAlong(wallMode, wall.depth);
+        this.gsp = 0;
+        this.xsp = 0;
+        this.ysp = 0;
+      }
+    }
+    this.y += this.ysp;
+
+    this.groundStick(map, prevY);
+
+    // --- Jump (always possible from the ground, rolling or not) ---
+    if (this.grounded && input.jumpPressed) {
+      const a = this.angle;
+      this.xsp -= PHYS.jmp * sinDeg(a);
+      this.ysp -= PHYS.jmp * cosDeg(a);
+      this.grounded = false;
+      this.adjustHeight(true);
+      this.jumping = true;
+      this.events.push('jump');
+    }
+  }
+
+  /** Reposition onto the ground surface, or detach when walking off an edge. */
+  private groundStick(map: TileMap, prevY: number): void {
+    const offA = rotate(this.mode, -this.w, this.h);
+    const offB = rotate(this.mode, this.w, this.h);
+    const hitA = castGround(map, this.x + offA.x, this.y + offA.y, this.mode, this.layer);
+    const hitB = castGround(map, this.x + offB.x, this.y + offB.y, this.mode, this.layer);
+    const hit = !hitA ? hitB : !hitB ? hitA : hitA.depth >= hitB.depth ? hitA : hitB;
+
+    if (!hit || hit.depth < -PHYS.snapRange) {
+      this.grounded = false; // walked off an edge
+      return;
+    }
+    if (hit.oneWay && this.mode === MODE_FLOOR && prevY + this.h > hit.surface + 1) {
+      this.grounded = false; // came from below a one-way platform
+      return;
+    }
+
+    const groundDir = rotate(this.mode, 0, 1);
+    this.x -= groundDir.x * hit.depth;
+    this.y -= groundDir.y * hit.depth;
+
+    // Angle from the two contact points (18px baseline) when both sensors
+    // are on the same surface — much smoother than per-column tile slopes
+    // on curves. Falls back to the tile angle at edges/steps.
+    let angle = hit.angle;
+    if (hitA && hitB && Math.abs(hitA.depth - hitB.depth) <= 8) {
+      const ax = this.x + offA.x;
+      const ay = this.y + offA.y;
+      const bx = this.x + offB.x;
+      const by = this.y + offB.y;
+      const pa = this.mode === MODE_FLOOR || this.mode === 2 ? { x: ax, y: hitA.surface } : { x: hitA.surface, y: ay };
+      const pb = this.mode === MODE_FLOOR || this.mode === 2 ? { x: bx, y: hitB.surface } : { x: hitB.surface, y: by };
+      angle = norm360((Math.atan2(-(pb.y - pa.y), pb.x - pa.x) * 180) / Math.PI);
+    }
+    this.angle = angle;
+    this.mode = modeForAngle(angle);
+
+    // Slide off steep ground when too slow (SPG fall-off threshold, angle
+    // strictly steeper than 45° so a 45° slope doesn't trap us in a
+    // land/slide-off oscillation).
+    const steep = this.angle > 45.5 && this.angle < 314.5;
+    if (steep && Math.abs(this.gsp) < PHYS.fallSpeed) {
+      this.grounded = false;
+      this.events.push('slide-off');
+    }
+  }
+
+  private clipAlong(wallMode: GroundMode, depth: number): void {
+    const n = rotate(wallMode, 0, -1); // surface normal pointing out of the wall
+    this.x += n.x * depth;
+    this.y += n.y * depth;
+  }
+
+  /* ------------------------------- Airborne -------------------------------- */
+
+  private updateAir(map: TileMap, input: PlayerInput): void {
+    const prevY = this.y;
+
+    if (input.left) {
+      this.xsp = Math.max(this.xsp - PHYS.air, -PHYS.top);
+      this.facing = -1;
+    } else if (input.right) {
+      this.xsp = Math.min(this.xsp + PHYS.air, PHYS.top);
+      this.facing = 1;
+    }
+    if (this.jumping && !input.jump && this.ysp < -PHYS.jrel) this.ysp = -PHYS.jrel;
+    this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
+
+    // Horizontal move + wall clip (only genuinely wall-facing surfaces).
+    if (this.xsp !== 0) {
+      const dir = sign(this.xsp) as 1 | -1;
+      const wallMode: GroundMode = dir === 1 ? 1 : 3;
+      const wall = castGround(map, this.x + this.xsp + dir * (this.w + 1), this.y, wallMode, this.layer);
+      const wallish =
+        wall && (dir === 1 ? wall.angle > 45 && wall.angle < 135 : wall.angle > 225 && wall.angle < 315);
+      this.x += this.xsp;
+      if (wall && wall.depth > 0 && !wall.oneWay && wallish) {
+        this.clipAlong(wallMode, wall.depth);
+        this.xsp = 0;
+      }
+    }
+
+    // Vertical move.
+    this.y += this.ysp;
+
+    if (this.ysp < 0) {
+      const hL = castGround(map, this.x - this.w, this.y - this.h, 2, this.layer);
+      const hR = castGround(map, this.x + this.w, this.y - this.h, 2, this.layer);
+      const hit = !hL ? hR : !hR ? hL : hL.depth >= hR.depth ? hL : hR;
+      if (hit && hit.depth > 0 && !hit.oneWay) {
+        this.y += hit.depth;
+        this.ysp = 0;
+      }
+    } else {
+      const fL = castGround(map, this.x - this.w, this.y + this.h, 0, this.layer);
+      const fR = castGround(map, this.x + this.w, this.y + this.h, 0, this.layer);
+      const hit = !fL ? fR : !fR ? fL : fL.depth >= fR.depth ? fL : fR;
+      if (hit && hit.depth >= -8) {
+        if (hit.oneWay && prevY + this.h > hit.surface + 1) return;
+        this.land(hit.angle, hit.depth);
+      }
+    }
+  }
+
+  private land(angle: number, depth: number): void {
+    const a = norm360(angle);
+    this.y -= depth; // airborne body is always upright (floor mode)
+    this.grounded = true;
+    this.angle = a;
+    this.mode = modeForAngle(a);
+    // Project velocity onto the surface tangent t = (cos a, -sin a).
+    this.gsp = this.xsp * cosDeg(a) - this.ysp * sinDeg(a);
+    this.ysp = 0;
+    this.adjustHeight(this.rolling);
+    this.jumping = false;
+    this.events.push('land');
+  }
+
+  /* ------------------------------ Combat etc. ------------------------------ */
+
+  /** Returns rings lost (0 when the hit was absorbed by shield/invulnerability). */
+  hurt(fromX: number): number {
+    if (this.invuln > 0 || this.dead) return 0;
+    if (this.shield) {
+      this.shield = false;
+      this.invuln = 120;
+      this.adjustHeight(false);
+      this.grounded = false;
+      this.rolling = false;
+      this.jumping = false;
+      this.spindashing = false;
+      this.xsp = this.x < fromX ? -2 : 2;
+      this.ysp = -4;
+      this.events.push('shield-lost');
+      return 0;
+    }
+    if (this.rings === 0) {
+      this.die();
+      return 0;
+    }
+    const lost = this.rings;
+    this.rings = 0;
+    this.invuln = 120;
+    this.adjustHeight(false);
+    this.grounded = false;
+    this.rolling = false;
+    this.jumping = false;
+    this.spindashing = false;
+    this.xsp = this.x < fromX ? -2 : 2;
+    this.ysp = -4;
+    this.events.push('hurt');
+    return lost;
+  }
+
+  die(): void {
+    if (this.dead) return;
+    this.dead = true;
+    this.xsp = 0;
+    this.ysp = -7;
+    this.events.push('die');
+  }
+
+  /** Bounce after stomping something (enemy/boss from above). */
+  bounce(): void {
+    this.grounded = false;
+    this.ysp = -4;
+    this.adjustHeight(true);
+    this.jumping = true;
+  }
+
+  respawn(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+    this.xsp = this.ysp = this.gsp = 0;
+    this.angle = 0;
+    this.mode = MODE_FLOOR;
+    this.grounded = false;
+    this.rolling = this.jumping = this.spindashing = false;
+    this.dead = false;
+    this.invuln = 60;
+    this.rings = 0;
+  }
+
+  /** Keep the feet planted when the body switches between standing and ball. */
+  private adjustHeight(toBall: boolean): void {
+    if (this.ball === toBall) return;
+    this.y += toBall
+      ? PHYS.heightRadius - PHYS.heightRadiusRoll
+      : -(PHYS.heightRadius - PHYS.heightRadiusRoll);
+  }
+}

@@ -1,0 +1,33 @@
+:root {
+  color-scheme: dark;
+  --bg: #121216;
+  --surface: #1e1e24;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game {
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  image-rendering: pixelated;
+  background: var(--surface);
+  outline: none;
+}
