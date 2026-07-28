@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { PHYS } from '../src/physics/constants.ts';
-import { stampLoop, TileMap, TILE_FULL } from '../src/physics/TileMap.ts';
-import { Player, NO_INPUT } from '../src/game/Player.ts';
+import { stampLoop, TileMap, TILE_FULL, makeTile } from '../src/physics/TileMap.ts';
+import { Player, NO_INPUT, ROLL } from '../src/game/Player.ts';
+import { Camera } from '../src/core/Camera.ts';
 import { makeLoopZone, LoopTracker, LOOP } from '../src/game/loops.ts';
-import { makeFlatMap, fillRect, spawnOnGround, input, run, T } from './helpers.ts';
+import { makeFlatMap, fillRect, spawnOnGround, input, run, T, TILES } from './helpers.ts';
 
 describe('running physics (Sonic Physics Guide values)', () => {
   it('accelerates to the top speed of 6 px/frame', () => {
@@ -130,6 +131,72 @@ describe('rolling & spin dash', () => {
     run(map, p, 80, input({ right: true }));
     expect(p.rolling).toBe(true);
     expect(p.gsp).toBeGreaterThan(PHYS.top);
+  });
+
+  it('builds speed while rolling when the direction of travel is held', () => {
+    // Raw SPG has no rolling acceleration: curling up slow left you stuck slow.
+    const map = makeFlatMap();
+    const p = spawnOnGround(map, 100, 240);
+    run(map, p, 20, input({ right: true }));
+    p.update(map, input({ right: true, down: true }));
+    expect(p.rolling).toBe(true);
+    const before = p.gsp;
+    run(map, p, 120, input({ right: true }));
+    expect(p.rolling).toBe(true);
+    expect(p.gsp).toBeGreaterThan(before);
+    expect(p.gsp).toBeLessThanOrEqual(ROLL.top + 1e-6);
+  });
+
+  it('still uncurls when nothing is held (friction must keep winning)', () => {
+    // The ONLY route back to standing is gsp falling under unrollSpeed, so the
+    // rolling acceleration above must never apply without input.
+    const map = makeFlatMap();
+    const p = spawnOnGround(map, 100, 240);
+    run(map, p, 40, input({ right: true }));
+    p.update(map, input({ right: true, down: true }));
+    expect(p.rolling).toBe(true);
+    const seen: string[] = [];
+    for (let i = 0; i < 600; i++) {
+      p.update(map, NO_INPUT);
+      seen.push(...p.events);
+    }
+    expect(p.rolling).toBe(false);
+    expect(seen).toContain('unroll');
+  });
+
+  it('ploughs through a gentle rise instead of being stalled by it', () => {
+    // Gentle 26.5° ascent (tiles 4/5) after a long flat run-up, then a plateau.
+    const map = new TileMap(200, 26);
+    fillRect(map, 0, 14, 59, 25);
+    for (let i = 0; i < 6; i++) {
+      const row = 14 - i;
+      map.set(60 + i * 2, row, 4);
+      map.set(60 + i * 2 + 1, row, 5);
+      fillRect(map, 60 + i * 2, row + 1, 60 + i * 2 + 1, 25);
+    }
+    fillRect(map, 72, 9, 199, 25); // plateau flush with the ramp top
+    const p = spawnOnGround(map, 100, 14 * T);
+    run(map, p, 150, input({ right: true })); // reach running speed on the flat
+    p.update(map, input({ right: true, down: true }));
+    expect(p.rolling).toBe(true);
+    const before = p.gsp;
+    run(map, p, 140, input({ right: true })); // over the rise onto the plateau
+    expect(p.rolling).toBe(true);
+    expect(p.gsp).toBeGreaterThan(before * 0.5);
+  });
+
+  it('rides a small lip instead of being stopped dead by it', () => {
+    // A few px of tile-join rounding used to read as a perpendicular wall and
+    // zero gsp outright. 4px step here: well under ROLL.stepUp.
+    const map = makeFlatMap(120, 20, 240);
+    const step = makeTile(new Array(T).fill(4));
+    map.setTile(40, Math.floor(240 / T) - 1, step, 0); // surface 4px proud
+    const p = spawnOnGround(map, 100, 240);
+    run(map, p, 150, input({ right: true }));
+    const before = p.gsp;
+    expect(before).toBeGreaterThan(PHYS.top - 0.5);
+    run(map, p, 40, input({ right: true }));
+    expect(p.gsp).toBeGreaterThan(before * 0.5);
   });
 
   it('spin dash releases at 8 + revs', () => {
@@ -264,5 +331,72 @@ describe('world bounds', () => {
     const p = spawnOnGround(map, 38 * T, 240);
     run(map, p, 300, input({ right: true }));
     expect(p.x).toBeLessThan(map.pixelW);
+  });
+});
+
+describe('rounded ramp joins', () => {
+  it('eased tiles keep the linear endpoints (no level geometry shift)', () => {
+    const foot = TILES[9].heights;
+    const crest = TILES[10].heights;
+    const linLow = TILES[4].heights;
+    const linHigh = TILES[5].heights;
+    // Right edge of the foot tile and of the crest tile must match the linear
+    // ramp exactly — that is what keeps a pair rising exactly one tile.
+    expect(foot[T - 1]).toBeCloseTo(linLow[T - 1], 5); // 8
+    expect(crest[T - 1]).toBeCloseTo(linHigh[T - 1], 5); // 16
+  });
+
+  it('eased tiles are flatter at the join than the linear ones', () => {
+    const foot = TILES[9].heights;
+    const crest = TILES[10].heights;
+    // Foot starts nearly flat (tangent to the ground it leaves)...
+    expect(foot[0]).toBeLessThan(TILES[4].heights[0]);
+    expect(foot[1] - foot[0]).toBeLessThan(0.5);
+    // ...and the crest arrives nearly flat (tangent to the plateau above).
+    expect(crest[T - 1] - crest[T - 2]).toBeLessThan(0.5);
+    // Both stay monotonic: no dips for the player to catch on.
+    for (let c = 1; c < T; c++) {
+      expect(foot[c]).toBeGreaterThanOrEqual(foot[c - 1]);
+      expect(crest[c]).toBeGreaterThanOrEqual(crest[c - 1]);
+    }
+  });
+
+  it('mirrors the profiles for descents', () => {
+    for (let c = 0; c < T; c++) {
+      expect(TILES[11].heights[c]).toBeCloseTo(TILES[10].heights[T - 1 - c], 5);
+      expect(TILES[12].heights[c]).toBeCloseTo(TILES[9].heights[T - 1 - c], 5);
+    }
+  });
+});
+
+describe('look up / look down camera', () => {
+  it('pans up when up is held while standing still, and recentres on release', () => {
+    const cam = new Camera(640, 360);
+    cam.snapTo(400, 500, 4000, 2000);
+    const base = cam.viewY;
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, -1);
+    expect(cam.viewY).toBeLessThan(base); // looking up = view moves up
+    expect(base - cam.viewY).toBeCloseTo(cam.lookDist, 0);
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, 0);
+    expect(cam.viewY).toBeCloseTo(base, 0);
+  });
+
+  it('pans down for look-down and eases rather than snapping', () => {
+    const cam = new Camera(640, 360);
+    cam.snapTo(400, 500, 4000, 2000);
+    const base = cam.viewY;
+    cam.update(400, 500, 0, 1, 4000, 2000, 1);
+    const afterOne = cam.viewY - base;
+    expect(afterOne).toBeGreaterThan(0);
+    expect(afterOne).toBeLessThanOrEqual(cam.lookSpeed + 1e-6); // eased, not a snap
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, 1);
+    expect(cam.viewY - base).toBeCloseTo(cam.lookDist, 0);
+  });
+
+  it('never scrolls the glance outside the level', () => {
+    const cam = new Camera(640, 360);
+    cam.snapTo(320, 180, 640, 360); // level exactly one screen: no room to pan
+    for (let i = 0; i < 60; i++) cam.update(320, 180, 0, 1, 640, 360, 1);
+    expect(cam.viewY).toBe(0);
   });
 });

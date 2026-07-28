@@ -59,6 +59,11 @@ const TERRAIN: Record<string, number> = {
   ')': 5,
   '<': 6,
   '>': 7,
+  // rounded ramp joins (same endpoints as ( ) < > — see TileMap curveFoot/curveCrest)
+  '{': 9,
+  '}': 10,
+  '[': 11,
+  ']': 12,
   '=': 8,
 };
 
@@ -141,8 +146,11 @@ export class LevelBuilder {
   gentleUp(x: number, surfaceRow: number, pairs: number): void {
     for (let i = 0; i < pairs; i++) {
       const row = surfaceRow - i;
-      this.set(x + i * 2, row, '(');
-      this.set(x + i * 2 + 1, row, ')');
+      // Round the two ends so the ground eases out of / into the flat instead
+      // of kinking 0deg -> 26.5deg in one column. Endpoints are identical, so
+      // the ramp still tops out flush with `surfaceRow - pairs`.
+      this.set(x + i * 2, row, i === 0 ? '{' : '(');
+      this.set(x + i * 2 + 1, row, i === pairs - 1 ? '}' : ')');
       for (let y = row + 1; y < this.h; y++) {
         this.set(x + i * 2, y, '#');
         this.set(x + i * 2 + 1, y, '#');
@@ -160,8 +168,8 @@ export class LevelBuilder {
       const row = surfaceRow + i;
       // '>' is the upper half of the descent (16 -> 8.5), '<' the lower
       // (8 -> 0.5): together one pair drops the surface exactly one tile.
-      this.set(x + i * 2, row, '>');
-      this.set(x + i * 2 + 1, row, '<');
+      this.set(x + i * 2, row, i === 0 ? '[' : '>');
+      this.set(x + i * 2 + 1, row, i === pairs - 1 ? ']' : '<');
       for (let y = row + 1; y < this.h; y++) {
         this.set(x + i * 2, y, '#');
         this.set(x + i * 2 + 1, y, '#');

@@ -38,6 +38,29 @@ const range = (n: number, fn: (i: number) => number) =>
 export const TILE_EMPTY = 0;
 export const TILE_FULL = 1;
 
+/**
+ * Rounded-join profiles for the gentle (~26.5°) ramps.
+ *
+ * A linear ramp changes the ground angle from 0° to 26.5° in a single pixel
+ * column, and the player feels that as a kink — a corner to be bumped over
+ * rather than a hill to be run up. These two cubics spread the change across a
+ * whole tile while KEEPING the endpoints of the tile they replace (0/8 and
+ * 8/16), so a ramp still rises exactly one tile per column pair: the level
+ * geometry, jump distances and spring arcs are untouched.
+ *
+ * `curveFoot`  0 -> 8 : flat where it leaves the ground, 26.5° where it meets
+ *                       the rest of the ramp.
+ * `curveCrest` 8 -> 16: 26.5° where the ramp arrives, flat at the top.
+ */
+const curveFoot = (c: number): number => {
+  const t = (c + 1) / T; // 0..1 across the tile
+  return 16 * t * t - 8 * t * t * t; // h'(0)=0, h'(1)=0.5 px/px
+};
+const curveCrest = (c: number): number => {
+  const u = (c + 1) / T;
+  return 8 + 8 * u + 8 * u * u - 8 * u * u * u; // h'(0)=0.5 px/px, h'(1)=0
+};
+
 export const TILES: Tile[] = [
   makeTile(range(T, () => 0), range(T, () => 0)), // 0 empty
   makeTile(range(T, () => T)), // 1 full
@@ -50,6 +73,13 @@ export const TILES: Tile[] = [
   makeTile(range(T, (c) => (T - c) / 2)), // 6 gentle down-right (8..0.5)
   makeTile(range(T, (c) => 8 + (T - c) / 2)), // 7 gentle down-right high (16..8.5)
   makeTile(range(T, () => T), range(T, () => T), true), // 8 one-way platform
+  // 9..12 — ROUNDED JOINS for gentle ramps. Same endpoints as the linear
+  // tiles they replace (0/8/16), so a ramp's total rise and length are
+  // unchanged and no level geometry shifts; only the kink is spread out.
+  makeTile(range(T, (c) => curveFoot(c))), // 9  up-right, eased out of flat (ramp foot)
+  makeTile(range(T, (c) => curveCrest(c))), // 10 up-right, eased into flat (crest)
+  makeTile(range(T, (c) => curveCrest(T - 1 - c))), // 11 down-right crest (mirror of 10)
+  makeTile(range(T, (c) => curveFoot(T - 1 - c))), // 12 down-right foot (mirror of 9)
 ];
 
 const clampT = (v: number) => Math.max(0, Math.min(T, Math.round(v)));

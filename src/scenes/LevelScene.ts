@@ -210,14 +210,34 @@ export class LevelScene implements Scene {
       this.camera.update(player.x, player.y, 0, player.facing, level.map.pixelW, level.map.pixelH);
       this.camera.x = Math.max(level.arena.left - 80, Math.min(level.arena.right + 80 - W, this.camera.x));
     } else {
-      this.camera.update(player.x, player.y, player.gsp, player.facing, level.map.pixelW, level.map.pixelH);
+      // Look up / down: only while standing still, so it never fights the
+      // follow camera mid-run. Down doubles as the spin-dash charge posture,
+      // which is fine — the glance and the charge are both "planted".
+      const still = player.grounded && Math.abs(player.gsp) < 0.2;
+      const look: -1 | 0 | 1 = !still ? 0 : snap.up ? -1 : snap.down ? 1 : 0;
+      this.camera.update(
+        player.x,
+        player.y,
+        player.gsp,
+        player.facing,
+        level.map.pixelW,
+        level.map.pixelH,
+        look,
+      );
+      // Never show ground the player is no longer allowed to reach. Without
+      // this the backtrack limit is a world-space slab that the camera happily
+      // scrolls past, so it lands wherever the camera settled — an invisible
+      // wall in mid-screen. Pinning the view to the limit makes the two the
+      // same line: you stop at the left edge because the camera stopped, which
+      // is how the classics read.
+      this.camera.x = Math.max(this.camera.x, level.backLimitX - player.w);
     }
   }
 
   render(ctx: CanvasRenderingContext2D): void {
     const { level, player, camera } = this;
     const camX = Math.round(camera.x);
-    const camY = Math.round(camera.y);
+    const camY = Math.round(camera.viewY);
     const so = this.fx.shakeOffset(this.frame);
 
     // Solid sky behind everything (covers shake/parallax overdraw).

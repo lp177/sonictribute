@@ -47,6 +47,39 @@ export const BOARD = {
 } as const;
 
 /**
+ * Arcade-feel departures from raw SPG (same spirit as LOOP: this is a quick
+ * action game, not a physics exam). Three complaints motivated each value:
+ *
+ *  - `stepUp`: the wall sensor used to zero gsp for ANY obstacle, however
+ *    small. Terrain here is generated from a fixed tile vocabulary (0°, 26.5°,
+ *    45°), so joins leave lips a few pixels tall — enough to read as a
+ *    perpendicular wall and brake a running or rolling player to a dead stop.
+ *    The ground sensors already snap over such lips (`snapRange`), so anything
+ *    the feet can climb must not be treated as a wall.
+ *  - `plow`: SPG bleeds speed uphill while rolling (`slpRollUp`) no matter how
+ *    fast the ball is going. Combined with the lips above, a gentle rise could
+ *    stall a full-speed ball. Drag now fades out with speed: full at a crawl,
+ *    none at `plow` and beyond, so a ball with momentum ploughs through
+ *    gradients. Downhill acceleration is untouched — that part already feels
+ *    right.
+ *  - `acc`/`top`: raw SPG has NO rolling acceleration, so curling up while slow
+ *    left you stuck slow with no way to recover. Holding the direction of
+ *    travel now accelerates the ball up to running top speed. Deliberately
+ *    gated on input: with no input, friction still wins and the ball uncurls,
+ *    which is the only way back to standing.
+ */
+export const ROLL = {
+  /** Max lip (px) ridden over instead of stopping dead. */
+  stepUp: 8,
+  /** Ground speed at/above which uphill slope drag is fully cancelled. */
+  plow: 4,
+  /** Acceleration while rolling and holding the direction of travel. */
+  acc: PHYS.acc,
+  /** Ceiling for that acceleration (the speed you would reach running). */
+  top: PHYS.top,
+} as const;
+
+/**
  * The hero. Movement follows the Sonic Physics Guide: ground speed (gsp) is
  * the master variable while grounded; xsp/ysp are derived from it and the
  * ground angle. Airborne, xsp/ysp are master and gsp is recomputed on landing
@@ -173,8 +206,25 @@ export class Player {
       if (input.left && this.gsp > 0) this.gsp = Math.max(0, this.gsp - PHYS.dec);
       else if (input.right && this.gsp < 0) this.gsp = Math.min(0, this.gsp + PHYS.dec);
       this.gsp -= sign(this.gsp) * Math.min(Math.abs(this.gsp), PHYS.rfc);
-      const sf = sign(this.gsp) === -sign(sinDeg(this.angle)) ? PHYS.slpRollDown : PHYS.slpRollUp;
-      if (Math.abs(this.gsp) > 0.001) this.gsp -= sf * sinDeg(this.angle);
+      // Holding the way you are already rolling builds speed up to running top
+      // speed (see ROLL). Gated on input on purpose: with nothing held, friction
+      // still wins and the ball uncurls below `unrollSpeed`, which is the only
+      // route back to standing.
+      const rollDir = sign(this.gsp);
+      if (rollDir !== 0 && ((input.right && rollDir > 0) || (input.left && rollDir < 0))) {
+        if (Math.abs(this.gsp) < ROLL.top) {
+          this.gsp = rollDir * Math.min(ROLL.top, Math.abs(this.gsp) + ROLL.acc);
+        }
+      }
+      const sinA = sinDeg(this.angle);
+      const downhill = sign(this.gsp) === -sign(sinA);
+      let sf = downhill ? PHYS.slpRollDown : PHYS.slpRollUp;
+      if (!downhill) {
+        // Uphill drag fades out with speed, so a little gradient can no longer
+        // stall a ball that has real momentum. Downhill gain is untouched.
+        sf *= 1 - Math.min(1, Math.abs(this.gsp) / ROLL.plow);
+      }
+      if (Math.abs(this.gsp) > 0.001) this.gsp -= sf * sinA;
       if (Math.abs(this.gsp) < PHYS.unrollSpeed && Math.abs(sinDeg(this.angle)) < 0.7) {
         this.adjustHeight(false);
         this.rolling = false;
@@ -223,10 +273,20 @@ export class Player {
       // Only a near-perpendicular obstacle counts as a wall; a steepening
       // curve ahead (e.g. entering a loop) is handled by the ground sensors.
       if (wall && wall.depth > 0 && !wall.oneWay && angleDiff(wall.angle, this.angle) > 60) {
-        this.clipAlong(wallMode, wall.depth);
-        this.gsp = 0;
-        this.xsp = 0;
-        this.ysp = 0;
+        // ...but a lip only a few pixels tall is a STEP, not a wall. The tile
+        // vocabulary (0°/26.5°/45°) leaves such lips at slope joins, and
+        // stopping dead on them is what made rolling feel like it kept getting
+        // caught on pebbles. groundStick() snaps over anything this small on
+        // the very next frame, so ride it instead of zeroing all speed.
+        const footOff = rotate(this.mode, dir * this.w, this.h);
+        const ahead = castGround(map, this.x + footOff.x, this.y + footOff.y, this.mode, this.layer);
+        const climbable = !!ahead && ahead.depth > 0 && ahead.depth <= ROLL.stepUp;
+        if (!climbable) {
+          this.clipAlong(wallMode, wall.depth);
+          this.gsp = 0;
+          this.xsp = 0;
+          this.ysp = 0;
+        }
       }
     }
     this.y += this.ysp;
