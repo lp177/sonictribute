@@ -184,6 +184,97 @@ export class Launcher {
   }
 }
 
+/* ------------------------------- Grind rail -------------------------------- */
+
+/** Grind rail tuning (game feel, not SPG). */
+export const RAIL = {
+  /** Speed you are carried at, at minimum, once locked on. */
+  min: 9,
+  /** How much a downhill rail adds per frame (uphill subtracts). */
+  gravity: 0.09,
+  /** Ceiling so a long drop-rail cannot fling you absurdly fast. */
+  max: 15,
+  /** How close the feet must pass to snap on. */
+  catch: 14,
+} as const;
+
+/**
+ * A grind rail: land on it from above and you lock on and ride it, following
+ * its slope, until it ends or you jump off. The third zone's signature toy —
+ * it turns a gap into a high-speed line rather than an obstacle.
+ *
+ * Deterministic and purely geometric: the rail is a straight segment and the
+ * player's position along it is derived from x, so there is no hidden state
+ * to desync.
+ */
+export class Rail {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+
+  constructor(x0: number, y0: number, x1: number, y1: number) {
+    // Always stored left-to-right so `yAt` is unambiguous.
+    if (x0 <= x1) {
+      this.x0 = x0;
+      this.y0 = y0;
+      this.x1 = x1;
+      this.y1 = y1;
+    } else {
+      this.x0 = x1;
+      this.y0 = y1;
+      this.x1 = x0;
+      this.y1 = y0;
+    }
+  }
+
+  get slope(): number {
+    return (this.y1 - this.y0) / Math.max(1e-6, this.x1 - this.x0);
+  }
+
+  /** Rail height at x, or null when x is off the ends. */
+  yAt(x: number): number | null {
+    if (x < this.x0 || x > this.x1) return null;
+    return this.y0 + (x - this.x0) * this.slope;
+  }
+
+  /**
+   * Try to lock the player on. Only catches feet arriving from above (or
+   * already sliding along), never from underneath.
+   */
+  tryCatch(p: Player): boolean {
+    if (p.dead || p.railing) return false;
+    if (p.ysp < 0) return false; // rising: pass through
+    const y = this.yAt(p.x);
+    if (y === null) return false;
+    const feet = p.y + p.h;
+    if (feet < y - RAIL.catch || feet > y + RAIL.catch) return false;
+    p.mountRail(Math.sign(p.xsp || p.gsp || 1) as 1 | -1);
+    return true;
+  }
+
+  /** Carries a locked-on player one frame. Returns false when the rail ends. */
+  carry(p: Player): boolean {
+    if (this.yAt(p.x) === null) return false;
+    const dir = p.railDir;
+    // Screen y grows downward, so `slope * dir > 0` means travelling downhill.
+    // Downhill accelerates, uphill bleeds — the slope IS the gameplay.
+    const downhill = this.slope * dir > 0;
+    const change = RAIL.gravity * Math.abs(this.slope) * (downhill ? 1 : -1);
+    const speed = Math.max(RAIL.min, Math.min(RAIL.max, Math.abs(p.gsp) + change));
+    p.gsp = speed * dir;
+    p.xsp = p.gsp;
+    p.ysp = 0;
+    p.x += p.xsp;
+    const ny = this.yAt(p.x);
+    if (ny === null) return false;
+    p.y = ny - p.h;
+    p.grounded = true;
+    p.angle = 0;
+    return true;
+  }
+}
+
 /* -------------------------------- Monitors -------------------------------- */
 
 export type MonitorKind = 'rings10' | 'shield' | 'shoes';

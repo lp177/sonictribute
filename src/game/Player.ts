@@ -127,6 +127,10 @@ export class Player {
    */
   lookUp = false;
   crouch = false;
+  /** Locked onto a grind rail (zone 3's vehicle). */
+  railing = false;
+  /** Which way along the rail the ride is going. */
+  railDir: 1 | -1 = 1;
   /** Events emitted during the last update (sound/FX hooks). */
   events: string[] = [];
 
@@ -166,6 +170,11 @@ export class Player {
     if (this.dead) {
       this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
       this.y += this.ysp;
+      return;
+    }
+    // On a rail the level drives movement; jumping is the only control.
+    if (this.railing) {
+      if (input.jumpPressed) this.dismountRail(true);
       return;
     }
     if (this.grounded) this.updateGround(map, input);
@@ -508,6 +517,35 @@ export class Player {
     this.jumping = true;
   }
 
+  /** Lock onto a grind rail. */
+  mountRail(dir: 1 | -1): void {
+    if (this.dead) return;
+    this.railing = true;
+    this.railDir = dir;
+    this.facing = dir;
+    this.ysp = 0;
+    this.jumping = false;
+    this.spindashing = false;
+    if (this.rolling) {
+      this.adjustHeight(false);
+      this.rolling = false;
+    }
+    this.events.push('rail-on');
+  }
+
+  /** Leave the rail — at the end of it, or by jumping. */
+  dismountRail(jump = false): void {
+    if (!this.railing) return;
+    this.railing = false;
+    this.grounded = false;
+    this.xsp = this.gsp;
+    if (jump) {
+      this.ysp = -PHYS.jmp;
+      this.jumping = true;
+      this.events.push('jump');
+    }
+  }
+
   /** Step onto a Mag-Board (no-op if already riding). */
   mountBoard(): void {
     if (this.board || this.dead) return;
@@ -537,6 +575,7 @@ export class Player {
     this.grounded = false;
     this.rolling = this.jumping = this.spindashing = false;
     this.board = false;
+    this.railing = false;
     this.layer = 0;
     this.dead = false;
     this.invuln = 60;

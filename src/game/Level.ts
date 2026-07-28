@@ -15,6 +15,7 @@ import {
   DashPad,
   BoardPad,
   Launcher,
+  Rail,
   SpikeTrap,
   CrumblePlatform,
   SwingBall,
@@ -80,6 +81,7 @@ export class LevelBuilder {
   dashPadDefs: { x: number; y: number; dir: 1 | -1; power: number }[] = [];
   boardPadDefs: { x: number; y: number }[] = [];
   launcherDefs: { x: number; y: number; dir: 1 | -1; power: number; angle: number }[] = [];
+  railDefs: { x0: number; y0: number; x1: number; y1: number }[] = [];
   trapDefs: { x: number; y: number; period: number; offset: number }[] = [];
   crumbleDefs: { x: number; y: number; w: number }[] = [];
   swingDefs: { x: number; y: number; len: number; period: number; offset: number }[] = [];
@@ -290,6 +292,14 @@ export class LevelBuilder {
     this.launcherDefs.push({ x: tileCentre(x), y: surfaceRow * T - 8, dir, power, angle });
   }
 
+  /**
+   * A grind rail between two tile corners. Land on it and you ride it: the
+   * slope decides whether you gain or bleed speed.
+   */
+  rail(x0: number, row0: number, x1: number, row1: number): void {
+    this.railDefs.push({ x0: x0 * T, y0: row0 * T, x1: x1 * T, y1: row1 * T });
+  }
+
   /** Telegraphed pop-up spikes flush with the surface at `surfaceRow`. */
   spikeTrap(x: number, surfaceRow: number, period = 150, offset = 0): void {
     this.trapDefs.push({ x: tileCentre(x), y: surfaceRow * T, period, offset });
@@ -394,6 +404,9 @@ export class Level {
   dashPads: DashPad[];
   boardPads: BoardPad[];
   launchers: Launcher[];
+  rails: Rail[];
+  /** The rail currently being ridden, if any. */
+  private onRail: Rail | null = null;
   traps: SpikeTrap[];
   crumbles: CrumblePlatform[];
   swings: SwingBall[];
@@ -470,6 +483,7 @@ export class Level {
     this.dashPads = b.dashPadDefs.map((d) => new DashPad(d.x, d.y, d.dir, d.power));
     this.boardPads = b.boardPadDefs.map((d) => new BoardPad(d.x, d.y));
     this.launchers = b.launcherDefs.map((d) => new Launcher(d.x, d.y, d.dir, d.power, d.angle));
+    this.rails = b.railDefs.map((d) => new Rail(d.x0, d.y0, d.x1, d.y1));
     this.traps = b.trapDefs.map((d) => new SpikeTrap(d.x, d.y, d.period, d.offset));
     this.crumbles = b.crumbleDefs.map((d) => new CrumblePlatform(d.x, d.y, d.w));
     this.swings = b.swingDefs.map((d) => new SwingBall(d.x, d.y, d.len, d.period, d.offset));
@@ -539,6 +553,24 @@ export class Level {
     for (const l of this.launchers) {
       l.update();
       if (l.tryLaunch(p)) events.push('launch');
+    }
+
+    // Grind rails: ride one until it ends or the player jumps off.
+    if (p.railing) {
+      if (!this.onRail || !this.onRail.carry(p)) {
+        p.dismountRail();
+        this.onRail = null;
+        events.push('rail-off');
+      }
+    } else {
+      this.onRail = null;
+      for (const r of this.rails) {
+        if (r.tryCatch(p)) {
+          this.onRail = r;
+          events.push('rail-on');
+          break;
+        }
+      }
     }
     for (const bp of this.boardPads) {
       if (bp.tryMount(p)) events.push('board');

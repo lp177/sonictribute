@@ -47,6 +47,14 @@ export class Boss implements BossLike {
   readonly maxX: number;
   /** Mace swing angle. */
   maceAngle = 0;
+  /**
+   * Animation clock for the mace. Deliberately SEPARATE from `timer`, which
+   * is reset on every phase change: driving the swing off `timer` made the
+   * mace teleport the instant the pod was hit, and teleport again when the
+   * stun ended. A weapon that jumps position is unreadable and unfair, so its
+   * arc runs on its own clock and never resets.
+   */
+  private animT = 0;
   private diveFromX = 0;
   private diveTargetX = 0;
   private swayDir: 1 | -1 = 1;
@@ -84,8 +92,9 @@ export class Boss implements BossLike {
   update(player: Player): string[] {
     const events: string[] = [];
     this.timer++;
+    this.animT++;
     if (this.invuln > 0) this.invuln--;
-    this.maceAngle = Math.sin(this.timer / 30) * 0.9;
+    this.maceAngle = Math.sin(this.animT / 30) * 0.9;
 
     switch (this.phase) {
       case 'intro':
@@ -96,6 +105,9 @@ export class Boss implements BossLike {
         }
         break;
       case 'sway':
+        // Safety net: whatever interrupted the pattern, settle back to hover
+        // height rather than drifting at the wrong altitude.
+        if (Math.abs(this.y - this.homeY) > 0.5) this.y += (this.homeY - this.y) * 0.12;
         this.x += 1.1 * this.swayDir;
         if (this.x > this.maxX) this.swayDir = -1;
         else if (this.x < this.minX) this.swayDir = 1;
@@ -133,6 +145,10 @@ export class Boss implements BossLike {
         break;
       }
       case 'stunned':
+        // Reel back to the hover height. Being hit mid-dive used to strand
+        // the pod at whatever height it had reached, because only 'retreat'
+        // ever restored it.
+        this.y += (this.homeY - this.y) * 0.12;
         if (this.timer > 50) {
           this.phase = 'sway';
           this.timer = 0;

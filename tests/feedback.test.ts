@@ -114,13 +114,36 @@ describe('Damage and death never spiral', () => {
   });
 
   it('gives full invulnerability frames between hits', () => {
-    const r = sceneLoop(300, (p, level) => {
-      const m = (level.boss as unknown as { macePos(): { x: number; y: number } }).macePos();
+    // What matters is the SPACING, not the count: parked in a hazard, the
+    // player may be hurt repeatedly over a long run (and may re-collect
+    // scattered rings in between), but never twice inside the i-frame window.
+    const level = new Level(zone1);
+    const fx = new FxSystem();
+    const p = new Player(level.bossTriggerX + 4, 300);
+    level.update(p);
+    const boss = level.boss!;
+    boss.phase = 'sway';
+    p.rings = 20;
+    p.invuln = 0;
+
+    const hurtAt: number[] = [];
+    for (let f = 0; f < 600; f++) {
+      if (fx.tickFreeze()) continue;
+      fx.update();
+      p.update(level.map, NO_INPUT);
+      const m = (boss as unknown as { macePos(): { x: number; y: number } }).macePos();
       p.x = m.x;
       p.y = m.y;
-    });
-    // One ring loss, then the i-frames must hold until they run out.
-    expect(r.tally['hurt'] ?? 0).toBe(1);
+      for (const ev of level.update(p)) {
+        if (ev === 'hurt') hurtAt.push(f);
+        fx.onEvent(ev, p.x, p.y);
+      }
+      if (p.dead) break;
+    }
+    expect(hurtAt.length).toBeGreaterThan(0);
+    for (let i = 1; i < hurtAt.length; i++) {
+      expect(hurtAt[i] - hurtAt[i - 1], `two hits only ${hurtAt[i] - hurtAt[i - 1]} frames apart`).toBeGreaterThanOrEqual(110);
+    }
   });
 });
 
