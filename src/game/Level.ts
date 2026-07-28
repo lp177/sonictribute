@@ -14,11 +14,16 @@ import {
   BuzzDrone,
   DashPad,
   BoardPad,
+  Launcher,
+  SpikeTrap,
+  CrumblePlatform,
+  SwingBall,
   GoalSign,
   tileCentre,
   type Rect,
   type MonitorKind,
 } from './entities.ts';
+import { BossArena } from './BossArena.ts';
 import { Boss, type BossLike } from './Boss.ts';
 import { PressBoss } from './PressBoss.ts';
 import { SCORE, type LevelStats } from './Score.ts';
@@ -28,6 +33,13 @@ export type LevelTheme = 'verdant' | 'gear';
 export type BossKind = 'pod' | 'press';
 
 const T = PHYS.tile;
+
+/**
+ * How far behind the player's furthest progress the world stays walkable.
+ * A bit under one screen: enough to nip back for a missed ring or a secret,
+ * not enough to re-run the level backwards.
+ */
+const BACKTRACK_SLACK = 560;
 
 /* ------------------------------- Level builder ----------------------------- */
 
@@ -54,6 +66,10 @@ export class LevelBuilder {
   droneDefs: { x: number; y: number; range: number }[] = [];
   dashPadDefs: { x: number; y: number; dir: 1 | -1; power: number }[] = [];
   boardPadDefs: { x: number; y: number }[] = [];
+  launcherDefs: { x: number; y: number; dir: 1 | -1; power: number; angle: number }[] = [];
+  trapDefs: { x: number; y: number; period: number; offset: number }[] = [];
+  crumbleDefs: { x: number; y: number; w: number }[] = [];
+  swingDefs: { x: number; y: number; len: number; period: number; offset: number }[] = [];
   boardEndX = -1;
   loops: LoopZone[] = [];
   secretRects: Rect[] = [];
@@ -80,6 +96,17 @@ export class LevelBuilder {
   /** Solid ground from `surfaceRow` down to the bottom of the map. */
   floor(x0: number, x1: number, surfaceRow: number): void {
     for (let x = x0; x <= x1; x++) for (let y = surfaceRow; y < this.h; y++) this.set(x, y, '#');
+  }
+
+  /**
+   * A deck of finite thickness, leaving open space underneath. This is what
+   * makes a layered world possible: run along the top, or drop through a hole
+   * and explore the gallery below.
+   */
+  slab(x0: number, x1: number, surfaceRow: number, thickness = 4): void {
+    for (let x = x0; x <= x1; x++) {
+      for (let y = surfaceRow; y < Math.min(this.h, surfaceRow + thickness); y++) this.set(x, y, '#');
+    }
   }
 
   /** 45° descent to the right starting at (x, surfaceRow). */
@@ -113,6 +140,52 @@ export class LevelBuilder {
         this.set(x + i * 2 + 1, y, '#');
       }
     }
+  }
+
+  /**
+   * Gentle (~26.5°) descent to the right, the mirror of `gentleUp`. Each pair
+   * of columns drops one tile; the ramp spans 2*pairs columns and bottoms out
+   * flush with `surfaceRow + pairs`.
+   */
+  gentleDown(x: number, surfaceRow: number, pairs: number): void {
+    for (let i = 0; i < pairs; i++) {
+      const row = surfaceRow + i;
+      // '>' is the upper half of the descent (16 -> 8.5), '<' the lower
+      // (8 -> 0.5): together one pair drops the surface exactly one tile.
+      this.set(x + i * 2, row, '>');
+      this.set(x + i * 2 + 1, row, '<');
+      for (let y = row + 1; y < this.h; y++) {
+        this.set(x + i * 2, y, '#');
+        this.set(x + i * 2 + 1, y, '#');
+      }
+    }
+  }
+
+  /**
+   * A rolling hill: gentle up, flat crown, gentle down. Returns the surface
+   * row of the crown. This is the preferred way to change height on the main
+   * running route — 45° steps kill momentum and read as walls.
+   */
+  hill(x: number, baseRow: number, rise: number, crownLen: number): number {
+    const crown = baseRow - rise;
+    this.gentleUp(x, baseRow - 1, rise);
+    const crownX = x + rise * 2;
+    this.floor(crownX, crownX + crownLen - 1, crown);
+    this.gentleDown(crownX + crownLen, crown, rise);
+    return crown;
+  }
+
+  /**
+   * A shallow dip: gentle down into a basin, then gentle back up. Great for
+   * carrying rolling speed — you lose height and get it straight back.
+   */
+  dip(x: number, baseRow: number, depth: number, floorLen: number): number {
+    const bottom = baseRow + depth;
+    this.gentleDown(x, baseRow, depth);
+    const flatX = x + depth * 2;
+    this.floor(flatX, flatX + floorLen - 1, bottom);
+    this.gentleUp(flatX + floorLen, bottom - 1, depth);
+    return bottom;
   }
 
   /** Empty pit in the ground (caller ensures there is a floor elsewhere). */
@@ -183,6 +256,45 @@ export class LevelBuilder {
     this.boardEndX = x * T;
   }
 
+  /**
+   * A run-up ramp that ends in a springboard: gentle climb, then a diagonal
+   * launch high across the sky. Returns the row the ramp tops out on.
+   */
+  launchRamp(x: number, baseRow: number, rise = 3, power = 12, angle = 56): number {
+    this.gentleUp(x, baseRow - 1, rise);
+    const top = baseRow - rise;
+    const padX = x + rise * 2;
+    this.floor(padX, padX + 1, top);
+    this.launcher(padX + 1, top, 1, power, angle);
+    return top;
+  }
+
+  /** Standalone diagonal springboard sitting on `surfaceRow`. */
+  launcher(x: number, surfaceRow: number, dir: 1 | -1 = 1, power = 12, angle = 56): void {
+    this.launcherDefs.push({ x: tileCentre(x), y: surfaceRow * T - 8, dir, power, angle });
+  }
+
+  /** Telegraphed pop-up spikes flush with the surface at `surfaceRow`. */
+  spikeTrap(x: number, surfaceRow: number, period = 150, offset = 0): void {
+    this.trapDefs.push({ x: tileCentre(x), y: surfaceRow * T, period, offset });
+  }
+
+  /** Crumbling ledge spanning tiles [x0, x1] whose top sits on `row`. */
+  crumble(x0: number, x1: number, row: number): void {
+    this.crumbleDefs.push({ x: x0 * T, y: row * T, w: (x1 - x0 + 1) * T });
+  }
+
+  /** Spiked ball swinging from a ceiling pivot at tile (x, row). */
+  swingBall(x: number, row: number, lengthTiles: number, period = 150, offset = 0): void {
+    this.swingDefs.push({
+      x: tileCentre(x),
+      y: row * T,
+      len: lengthTiles * T,
+      period,
+      offset,
+    });
+  }
+
   start(x: number, surfaceRow: number): void {
     this.playerStart = { x: tileCentre(x), y: surfaceRow * T - PHYS.heightRadius - 2 };
   }
@@ -227,9 +339,16 @@ export class LevelBuilder {
 
 /* ---------------------------------- Level ---------------------------------- */
 
+/** Default world size in tiles: wide, and deep enough for a real underworld. */
+export const WORLD_W = 320;
+export const WORLD_H = 40;
+
 export interface LevelDef {
   name: string;
   act: string;
+  /** World size in tiles; defaults to WORLD_W x WORLD_H. */
+  width?: number;
+  height?: number;
   /** Visual theme for terrain/background procedural art. */
   theme: LevelTheme;
   /** Which end-of-zone boss guards the goal. */
@@ -258,10 +377,28 @@ export class Level {
   drones: BuzzDrone[];
   dashPads: DashPad[];
   boardPads: BoardPad[];
+  launchers: Launcher[];
+  traps: SpikeTrap[];
+  crumbles: CrumblePlatform[];
+  swings: SwingBall[];
   readonly boardEndX: number;
   goal: GoalSign;
   boss: BossLike | null = null;
   bossDefeated = false;
+  /** Gates that seal the boss arena; null until the level defines one. */
+  arenaGates: BossArena | null = null;
+  /**
+   * Hard left limit that follows the player, like the classic games' screen
+   * edge. Backtracking a little is fine (secrets, missed rings); wandering
+   * back a whole screen is not.
+   */
+  backLimitX: number;
+  /**
+   * Falling past this kills. It sits below the deepest route, so the void
+   * only ever catches a genuinely bottomless fall — it exists to end an
+   * endless drop, not to punish using the underworld.
+   */
+  readonly voidY: number;
 
   readonly startPos: { x: number; y: number };
   respawnPos: { x: number; y: number };
@@ -281,7 +418,7 @@ export class Level {
     this.name = def.name;
     this.theme = def.theme;
     this.bossKind = def.bossKind;
-    const b = new LevelBuilder(320, 28);
+    const b = new LevelBuilder(def.width ?? WORLD_W, def.height ?? WORLD_H);
     def.build(b);
 
     this.map = new TileMap(b.w, b.h);
@@ -310,6 +447,10 @@ export class Level {
     this.drones = b.droneDefs.map((d) => new BuzzDrone(d.x, d.y, d.range));
     this.dashPads = b.dashPadDefs.map((d) => new DashPad(d.x, d.y, d.dir, d.power));
     this.boardPads = b.boardPadDefs.map((d) => new BoardPad(d.x, d.y));
+    this.launchers = b.launcherDefs.map((d) => new Launcher(d.x, d.y, d.dir, d.power, d.angle));
+    this.traps = b.trapDefs.map((d) => new SpikeTrap(d.x, d.y, d.period, d.offset));
+    this.crumbles = b.crumbleDefs.map((d) => new CrumblePlatform(d.x, d.y, d.w));
+    this.swings = b.swingDefs.map((d) => new SwingBall(d.x, d.y, d.len, d.period, d.offset));
     this.boardEndX = b.boardEndX;
     this.goal = new GoalSign(b.goalPos.x, b.goalPos.y);
     this.startPos = b.playerStart;
@@ -317,6 +458,8 @@ export class Level {
     this.bossTriggerX = b.bossTriggerX;
     this.arena = b.arena;
     this.prevX = this.startPos.x;
+    this.backLimitX = this.startPos.x - BACKTRACK_SLACK;
+    this.voidY = this.map.pixelH + 32;
   }
 
   /** Per-frame world update; the player has already been updated. */
@@ -370,6 +513,10 @@ export class Level {
       d.update();
       if (d.tryTrigger(p)) events.push('dash-pad');
     }
+    for (const l of this.launchers) {
+      l.update();
+      if (l.tryLaunch(p)) events.push('launch');
+    }
     for (const bp of this.boardPads) {
       if (bp.tryMount(p)) events.push('board');
     }
@@ -381,6 +528,16 @@ export class Level {
     // Hazards.
     if (!p.dead) {
       for (const s of this.spikes) {
+        if (s.touches(p)) this.damagePlayer(p, s.x, events);
+      }
+      for (const t of this.traps) {
+        const ev = t.update();
+        if (ev === 'warn') events.push('spike-warn');
+        else if (ev === 'strike') events.push('spike-trap');
+        if (t.touches(p)) this.damagePlayer(p, t.x, events);
+      }
+      for (const s of this.swings) {
+        s.update();
         if (s.touches(p)) this.damagePlayer(p, s.x, events);
       }
       for (const e of this.enemies) {
@@ -405,6 +562,12 @@ export class Level {
       }
     }
 
+    // Crumbling ledges: they carry the player until they let go.
+    for (const c of this.crumbles) {
+      if (c.update(p) === 'crumble') events.push('crumble');
+      if (c.solid && !p.dead) this.standOn(p, c.x, c.y, c.w);
+    }
+
     // Collectibles & progression.
     for (const c of this.crystals) {
       if (c.tryCollect(p)) {
@@ -426,7 +589,8 @@ export class Level {
       }
     }
 
-    // Boss.
+    // Boss: crossing the trigger slams the arena gates shut behind and ahead
+    // of the player — the only way out is through the fight.
     if (!this.boss && !this.bossDefeated && this.bossTriggerX >= 0 && p.x > this.bossTriggerX) {
       const bx = this.arena.right - 96;
       const gy = this.groundAt(bx);
@@ -434,11 +598,17 @@ export class Level {
         this.bossKind === 'press'
           ? new PressBoss(bx, gy, this.arena.left, this.arena.right)
           : new Boss(bx, gy, this.arena.left, this.arena.right);
+      this.arenaGates = new BossArena(this.arena.left, this.arena.right, this.groundAt(this.arena.left + 40));
+      const ev = this.arenaGates.lock();
+      if (ev) events.push(ev);
       events.push('boss');
+    }
+    if (this.arenaGates) {
+      this.arenaGates.update();
+      if (this.arenaGates.confine(p)) events.push('gate-bump');
     }
     if (this.boss) {
       if (!this.boss.defeated) {
-        p.x = Math.max(this.arena.left + 12, Math.min(this.arena.right - 12, p.x));
         // The boss's own events (telegraph, slam) drive sfx and screen shake.
         events.push(...this.boss.update(p));
         const r = this.boss.interact(p);
@@ -451,6 +621,9 @@ export class Level {
       }
       if (this.boss.defeated && !this.bossDefeated) {
         this.bossDefeated = true;
+        // Victory: the gates grind back up and the goal is reachable again.
+        const ev = this.arenaGates?.release();
+        if (ev) events.push(ev);
         events.push('boss-defeated');
       }
     }
@@ -462,8 +635,20 @@ export class Level {
     }
     this.goal.update();
 
-    // Death / falling out of the world.
-    if (!p.dead && p.y > this.map.pixelH + 32) {
+    // Backtrack limit: the world closes behind you, exactly like the classic
+    // games' screen edge. It only ever advances, and never during the boss
+    // lock-in (the gates own confinement there).
+    if (!this.arenaGates) {
+      this.backLimitX = Math.max(this.backLimitX, p.x - BACKTRACK_SLACK);
+      if (!p.dead && p.x < this.backLimitX) {
+        p.x = this.backLimitX;
+        if (p.gsp < 0) p.gsp = 0;
+        if (p.xsp < 0) p.xsp = 0;
+      }
+    }
+
+    // Death / falling into the void below every route.
+    if (!p.dead && p.y > this.voidY) {
       p.die();
       events.push('die');
     }
@@ -495,6 +680,26 @@ export class Level {
       else if (shieldLost) events.push('shield-lost');
       events.push('hurt');
       this.scatterRings(p, lost);
+    }
+  }
+
+  /**
+   * Carries the player on a moving/temporary surface the tile map knows
+   * nothing about (crumbling ledges). Behaves like a one-way platform: only
+   * catches feet arriving from above.
+   */
+  private standOn(p: Player, x: number, y: number, w: number): void {
+    if (p.ysp < 0) return;
+    if (p.x < x - 4 || p.x > x + w + 4) return;
+    const feet = p.y + p.h;
+    if (feet < y - 2 || feet > y + 14) return;
+    p.y = y - p.h;
+    p.ysp = 0;
+    if (!p.grounded) {
+      p.grounded = true;
+      p.angle = 0;
+      p.gsp = p.xsp;
+      p.events.push('land');
     }
   }
 

@@ -3,9 +3,23 @@ import { STORY_INTRO } from '../game/story.ts';
 
 /**
  * ZONE 1 — VERDANT RUSH
- * Three stacked routes (low corridor at row 24, hills/mesas, one-way
- * platforms above), 3 loops, 3 secret rooms, 5 Chrono Crystals, boss arena
- * at the far right. Built with the LevelBuilder API; coordinates are tiles.
+ *
+ * THREE ROUTES, all of which run the length of the zone:
+ *   SKY    (rows 3–12)  — entered off the launch ramp or a strong spring,
+ *                         then a chain of precise platform hops.
+ *   GROUND (rows 18–26) — the default road: hills, loops, hazards.
+ *   UNDER  (rows 28–34) — a gallery carved beneath the bedrock, entered by
+ *                         falling through visible shafts, exited by springs.
+ * One Chrono Crystal sits on each route, so no single lane can collect them
+ * all — you have to learn the whole zone.
+ *
+ * TERRAIN RULE: height changes on a running route use `hill`, `dip`,
+ * `gentleUp`/`gentleDown` (~26.5°), never 45° steps. A 45° face reads as a
+ * wall at speed and kills momentum, which is the opposite of the point.
+ *
+ * BUILD ORDER: ground first (floors fill to bedrock), then the sky
+ * platforms, then the underworld is CARVED out of the bedrock and given its
+ * own floor. Carving last is what keeps the gallery from being back-filled.
  */
 export const zone1: LevelDef = {
   name: 'VERDANT RUSH',
@@ -14,111 +28,145 @@ export const zone1: LevelDef = {
   bossKind: 'pod',
   intro: STORY_INTRO,
   build(b: LevelBuilder): void {
-    /* ---- Section A (0–45): start, first descent to the low corridor ---- */
-    b.floor(0, 30, 21);
+    /* ============================ GROUND ROUTE ============================ */
+    b.floor(0, 12, 21);
     b.start(4, 21);
-    b.ringsH(8, 13, 18);
-    b.slopeDown(20, 21, 3); // rolling descent 21 -> 24
-    b.pit(23, 72, 21, 3); // open the low corridor (surface row 24)
-    b.floor(23, 72, 24); // low corridor ground
-    b.ringsH(24, 29, 21);
-    b.enemy(34, 24, 4);
+    b.ringsH(7, 11, 18);
+    b.hill(13, 21, 2, 5); // 13–25, crown row 19
+    b.ringsH(17, 21, 16);
+    b.floor(26, 32, 21);
+    b.enemy(29, 21, 3);
 
-    /* ---- Section B (36–72): loop 1, spring, secret room 1 ---- */
-    b.loop(44, 24); // lays its own ring arc along the channel
-    b.ringsH(34, 38, 21); // approach rings, clear of the loop footprint
-    b.ringsH(50, 54, 21);
-    b.spring(58, 24, 10); // yellow spring up to the platform route
-    b.slopeUp(69, 24, 3); // 24 -> 21 (done before carving, it backfills below)
-    // Secret room 1: hidden shaft in the floor.
-    b.carve(64, 24, 65, 27); // entrance shaft (2 wide)
-    b.carve(64, 25, 72, 27); // room
-    b.secret(64, 24, 72, 27);
-    b.crystal(68, 26);
-    b.ringBox(66, 26, 2, 1);
-    b.monitor(70, 28, 'rings10');
-    b.spring(64, 28, 12); // way back up (covers the whole shaft)
-    b.spring(65, 28, 12);
+    b.gentleDown(33, 21, 3); // 33–38, down to row 24
+    b.floor(39, 84, 24);
+    b.ringsH(35, 39, 21);
+    b.loop(46, 24);
+    b.ringsH(56, 60, 21);
+    b.spring(62, 24, 12); // a second way up to the sky route
+    b.enemy(74, 24, 4);
+    b.spikeTrap(79, 24, 150, 0); // telegraphed: it rattles before it strikes
+    b.spikeTrap(80, 24, 150, 0);
+    // Secret room 1, tucked under the corridor floor.
+    b.carve(70, 24, 71, 27);
+    b.carve(70, 25, 78, 27);
+    b.secret(70, 24, 78, 27);
+    b.crystal(75, 26); // CRYSTAL — ground secret
+    b.ringBox(72, 26, 2, 1);
+    b.monitor(77, 27, 'rings10');
+    b.spring(70, 28, 12);
+    b.spring(71, 28, 12);
 
-    /* ---- Section C (69–100): hill + high platform route ---- */
-    b.floor(72, 100, 21); // the hill
-    b.platform(74, 82, 18);
-    b.platform(84, 92, 15);
-    b.platform(94, 99, 18);
-    b.ringsH(75, 81, 17);
-    b.ringsH(85, 91, 14);
-    b.crystal(96, 17); // crystal on the high route
-    b.spring(72, 21, 14); // red spring onto the platforms
-    b.enemy(78, 21, 4);
-    b.enemy(90, 21, 4);
-    b.monitor(96, 21, 'rings10');
+    b.gentleUp(85, 23, 3); // 85–90, back to row 21
+    b.floor(91, 96, 21);
+    b.checkpoint(93, 21);
+    b.hill(97, 21, 3, 6); // 97–114, crown row 18
+    b.ringsH(103, 108, 15);
+    b.enemy(105, 18, 3);
+    b.floor(115, 120, 21);
+    b.monitor(117, 21, 'shield');
+    b.launchRamp(121, 21, 3); // 121–128: run-up, then a shot into the sky
+    b.floor(129, 140, 21);
 
-    /* ---- Section D (100–135): valley, loop 2, high ledge, checkpoint ---- */
-    b.slopeDown(100, 21, 3);
-    b.pit(103, 160, 21, 3); // low corridor resumes at row 24
-    b.floor(103, 137, 24);
-    b.loop(116, 24);
-    b.ringsH(105, 110, 21);
-    b.ringsH(122, 126, 21);
-    b.spring(130, 24, 10);
-    b.platform(128, 134, 17);
-    b.crystal(131, 16); // above the ledge
-    b.checkpoint(134, 24);
+    b.gentleDown(141, 21, 3); // 141–146, down to row 24
+    b.floor(147, 200, 24);
+    b.loop(154, 24);
+    b.ringsH(164, 168, 21);
+    b.swingBall(172, 14, 9, 150, 0); // visible pendulum: time the run under it
+    b.crumble(176, 178, 20); // ledge that gives way after a beat
+    b.ringsH(176, 178, 18);
+    b.enemy(186, 24, 4);
+    b.spikeTrap(196, 24, 150, 60);
 
-    /* ---- Section E (137–160): spike hollow, secret room 2 ---- */
-    b.slopeDown(137, 24, 2); // 24 -> 26
-    b.pit(139, 160, 24, 2);
-    b.floor(139, 160, 26);
-    b.spikes(144, 145, 26);
-    b.ringsH(143, 146, 23);
-    b.monitor(140, 26, 'shield');
-    b.enemy(150, 26, 5);
-    b.carve(152, 26, 153, 28); // hidden shaft
-    b.carve(154, 27, 158, 28); // room 2
-    b.secret(152, 26, 158, 28);
-    b.crystal(156, 27);
-    b.spring(153, 29, 12); // way back up
+    b.gentleDown(201, 24, 2); // 201–204, down into the hollow
+    b.floor(205, 224, 26);
+    b.spikes(209, 211, 26);
+    b.platform(207, 213, 22);
+    b.ringsH(208, 212, 20);
+    b.monitor(206, 26, 'rings10');
+    b.enemy(215, 26, 4);
+    b.spikeTrap(218, 26, 140, 70);
+    // Secret room 2, below the hollow.
+    b.carve(220, 26, 221, 29);
+    b.carve(220, 27, 224, 29);
+    b.secret(220, 26, 224, 29);
+    b.crystal(223, 28); // CRYSTAL — ground secret 2
+    b.ringBox(221, 28, 2, 1);
+    b.spring(220, 30, 11);
+    b.spring(221, 30, 11);
 
-    /* ---- Section F (160–200): pit crossing over a spike floor ---- */
-    b.slopeUp(160, 26, 2); // back to 24
-    b.floor(162, 203, 24);
-    b.pit(170, 181, 24, 4); // open pit
-    b.floor(170, 181, 28); // pit floor
-    b.spikes(173, 175, 28);
-    b.spring(171, 28, 10); // escape if you fall in
-    b.gentleUp(176, 27, 4); // gentle climb-out ramp, tops out flush at row 24
-    b.platform(169, 172, 20);
-    b.platform(174, 177, 17);
-    b.platform(179, 182, 20);
-    b.ringsH(174, 177, 16);
+    b.gentleUp(225, 25, 2); // 225–228, back to row 24
+    b.floor(229, 266, 24);
+    b.loop(236, 24);
+    b.ringsH(246, 250, 21);
+    b.checkpoint(243, 24);
+    b.monitor(252, 24, 'shoes');
+    b.enemy(255, 24, 3);
+    b.swingBall(248, 14, 9, 160, 80);
+    // Mesa with secret room 3 inside it.
+    b.platform(246, 254, 18);
+    b.ringsH(247, 253, 16);
 
-    /* ---- Section G (185–235): loop 3, mesa with secret room 3 ---- */
-    b.loop(192, 24);
-    b.ringsH(182, 186, 21);
-    b.enemy(200, 24, 3);
-    b.slopeUp(203, 24, 6); // 24 -> 18 mesa approach
-    b.floor(209, 222, 18); // the mesa
-    b.carve(210, 20, 218, 23); // room 3 inside the mesa
-    b.carve(216, 18, 217, 20); // hidden shaft through the top
-    b.secret(210, 19, 218, 23);
-    b.crystal(213, 21);
-    b.ringBox(211, 20, 3, 1);
-    b.spring(216, 24, 12); // way back up through the shaft
-    b.slopeDown(222, 18, 6); // 18 -> 24
-    b.floor(228, 250, 24);
+    b.gentleUp(267, 23, 3); // 267–272, up to row 21
+    b.floor(273, 319, 21);
+    b.ringsH(274, 279, 18);
+    b.boss(282, 276, 314);
+    b.goal(310, 21);
 
-    /* ---- Section H (228–250): final stretch ---- */
-    b.ringsH(230, 236, 21);
-    b.monitor(238, 24, 'shoes');
-    b.checkpoint(240, 24);
-    b.enemy(244, 24, 4);
-    b.ringsH(242, 246, 20);
+    /* ============================= SKY ROUTE ==============================
+     * A chain of one-way platforms, never more than ~6 tiles apart, running
+     * from the launch ramp to the arena approach. Falling off drops you onto
+     * the ground route rather than killing you.
+     */
+    b.platform(136, 146, 7);
+    b.ringsH(137, 145, 5);
+    b.platform(152, 160, 5);
+    b.ringsH(153, 159, 3);
+    b.crystal(156, 3); // CRYSTAL — sky route
+    b.platform(166, 174, 8);
+    b.ringsH(167, 173, 6);
+    b.platform(180, 188, 6);
+    b.monitor(184, 6, 'rings10');
+    b.platform(194, 202, 9);
+    b.ringsH(195, 201, 7);
+    b.platform(208, 216, 6);
+    b.ringsH(209, 215, 4);
+    b.platform(222, 230, 9);
+    b.platform(236, 244, 6);
+    b.ringsH(237, 243, 4);
+    b.platform(250, 258, 9);
+    b.ringsH(251, 257, 7);
+    b.platform(264, 272, 12); // last step down to the arena approach
 
-    /* ---- Section I (250–319): boss arena & goal ---- */
-    b.slopeUp(250, 24, 3); // 24 -> 21
-    b.floor(253, 319, 21); // arena floor to the map edge
-    b.boss(258, 252, 292);
-    b.goal(288, 21);
-    b.ringsH(254, 257, 18);
+    /* =========================== UNDER ROUTE =============================
+     * Carved out of the bedrock AFTER the surface exists, with visible drop
+     * shafts in and spring lifts out. Falling in costs time, never a life.
+     */
+    b.carve(150, 28, 262, 33);
+    b.floor(150, 262, 34);
+    // Drop shafts must clear every loop footprint, or they punch a hole in
+    // the loop's run-up corridor.
+    b.carve(190, 24, 193, 33); // drop shaft 1, through the corridor deck
+    b.carve(244, 24, 247, 33); // drop shaft 2, past loop 3
+    b.carve(256, 24, 259, 33); // exit shaft
+    b.ringsH(196, 206, 31);
+    b.monitor(200, 34, 'rings10');
+    b.enemy(210, 34, 5);
+    b.crystal(214, 31); // CRYSTAL — underworld
+    b.ringBox(220, 30, 4, 2);
+    b.enemy(240, 34, 5);
+    b.spikes(246, 248, 34);
+    b.ringsH(250, 255, 31);
+    b.spring(191, 34, 11); // lifts back through drop shaft 1
+    b.spring(192, 34, 11);
+    b.spring(245, 34, 11);
+    b.spring(246, 34, 11);
+    b.spring(257, 34, 11); // and out again near the mesa
+    b.spring(258, 34, 11);
+    // Secret room 3: a low crawl off the far end of the gallery.
+    b.carve(263, 31, 270, 33);
+    b.floor(263, 270, 34);
+    b.secret(263, 31, 270, 33);
+    b.crystal(267, 32); // CRYSTAL — deep secret
+    b.ringBox(265, 32, 2, 1);
   },
 };

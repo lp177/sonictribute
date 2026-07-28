@@ -66,17 +66,68 @@ describe('Zone 2 — Cog Skyway (structure)', () => {
     }
   });
 
-  it('every skyway gap has an escape spring', () => {
-    // Gaps are the pits between the upper floor segments (surface row 21,
-    // pit floor row 26): each must contain an upward spring.
-    const gaps: [number, number][] = [
-      [101, 107],
-      [116, 122],
-      [131, 137],
-    ];
+  it('every drop below the skyway has a way back up', () => {
+    // Derived from the map, not hardcoded: any run of columns along the board
+    // section whose surface sits below the skyway deck is a place the player
+    // can fall into, and every one of them must offer an escape (a spring, or
+    // ground that climbs back out). A new gap added without an exit fails
+    // here, which a fixed coordinate list would silently miss.
+    const deckRow = 21;
+    const from = Math.floor(level.boardPads[0].x / T);
+    const to = Math.floor(level.boardEndX / T);
+    const surfaceRow = (tx: number): number | null => {
+      for (let ty = 0; ty < level.map.h; ty++) {
+        const t = level.map.get(tx, ty, 0);
+        if (!t.oneWay && t.heights.some((h) => h > 0)) return ty;
+      }
+      return null;
+    };
+
+    const gaps: [number, number][] = [];
+    let runStart: number | null = null;
+    for (let tx = from; tx <= to; tx++) {
+      const row = surfaceRow(tx);
+      const isGap = row === null || row > deckRow;
+      if (isGap && runStart === null) runStart = tx;
+      if (!isGap && runStart !== null) {
+        gaps.push([runStart, tx - 1]);
+        runStart = null;
+      }
+    }
+    if (runStart !== null) gaps.push([runStart, to]);
+
+    expect(gaps.length).toBeGreaterThanOrEqual(3); // the skyway is a gauntlet
+
+    // Falling is allowed to cost time, never a life: from wherever you land,
+    // an escape spring must be reachable on foot through the chamber below.
+    const w = level.map.w;
+    const walkable = (tx: number, ty: number) => {
+      if (!level.map.inBounds(tx, ty)) return false;
+      const t = level.map.get(tx, ty, 0);
+      return !t.heights.some((h) => h > 0) || t.oneWay;
+    };
     for (const [x0, x1] of gaps) {
-      const has = level.springs.some((s) => s.dir === 'up' && s.x > x0 * T && s.x < (x1 + 1) * T && s.y > 24 * T);
-      expect(has).toBe(true);
+      const landRow = surfaceRow(Math.floor((x0 + x1) / 2));
+      expect(landRow, `gap ${x0}-${x1} is bottomless`).not.toBeNull();
+      const seen = new Set<number>();
+      const queue = [{ x: Math.floor((x0 + x1) / 2), y: landRow! - 1 }];
+      seen.add(queue[0].y * w + queue[0].x);
+      while (queue.length) {
+        const { x, y } = queue.pop()!;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const key = ny * w + nx;
+          if (!seen.has(key) && walkable(nx, ny)) {
+            seen.add(key);
+            queue.push({ x: nx, y: ny });
+          }
+        }
+      }
+      const escape = level.springs.some(
+        (s) => s.dir === 'up' && s.y > deckRow * T && seen.has(Math.floor(s.y / T) * w + Math.floor(s.x / T)),
+      );
+      expect(escape, `nothing gets the player out of the gap at ${x0}-${x1}`).toBe(true);
     }
   });
 });

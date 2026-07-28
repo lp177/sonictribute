@@ -90,6 +90,16 @@ export function renderTerrain(map: TileMap, theme: LevelTheme = 'verdant'): HTML
         if (id !== TILE_EMPTY) drawTile(ctx, map, id, (tx - cx) * T, ty * T, tx, ty, pal);
       }
     }
+    // Depth shading: the world is deep, and an unshaded slab of bedrock
+    // filling the lower screen reads as a flat wall. Darkening with depth
+    // turns it into distance instead.
+    const shade = ctx.createLinearGradient(0, map.pixelH * 0.42, 0, map.pixelH);
+    shade.addColorStop(0, 'rgba(0,0,0,0)');
+    shade.addColorStop(1, 'rgba(0,0,0,0.62)');
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.globalCompositeOperation = 'source-over';
     chunks.push(cv);
   }
   return chunks;
@@ -531,6 +541,171 @@ export function drawBuzzDrone(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.restore();
 }
 
+export function drawSpikeTrap(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  extension: number,
+  warning: boolean,
+  frame: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  // Base plate always visible, so the hazard is readable even when retracted.
+  ctx.fillStyle = warning ? '#7c4a52' : '#3d4452';
+  ctx.fillRect(-8, -3, 16, 5);
+  ctx.fillStyle = '#23262e';
+  for (let i = -1; i <= 1; i++) ctx.fillRect(i * 5 - 1, -3, 2, 5);
+  if (warning) {
+    // Rattle + amber tell: this is your cue to move.
+    const j = Math.sin(frame * 1.9) * 1.4;
+    ctx.fillStyle = `rgba(255,190,60,${0.5 + 0.4 * Math.sin(frame / 2)})`;
+    ctx.fillRect(-8 + j, -5, 16, 2);
+  }
+  if (extension > 0) {
+    const h = 14 * extension;
+    ctx.fillStyle = PAL.spike;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 5 - 2.5, -2);
+      ctx.lineTo(i * 5 + 2.5, -2);
+      ctx.lineTo(i * 5, -2 - h);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    for (let i = -1; i <= 1; i++) ctx.fillRect(i * 5 - 0.6, -2 - h * 0.75, 1.2, h * 0.5);
+  }
+  ctx.restore();
+}
+
+export function drawCrumble(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  state: string,
+  shake: number,
+  fallY: number,
+  theme: LevelTheme,
+): void {
+  if (state === 'gone') return;
+  const pal = TERRAIN_THEMES[theme];
+  ctx.save();
+  ctx.translate(x + shake, y + fallY);
+  ctx.globalAlpha = state === 'falling' ? Math.max(0, 1 - fallY / 90) : 1;
+  ctx.fillStyle = pal.platBody;
+  ctx.fillRect(0, 4, w, 5);
+  ctx.fillStyle = pal.platTop;
+  ctx.fillRect(0, 0, w, 5);
+  // Fracture lines make it obvious this ledge is not permanent.
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 3; i++) {
+    const fx = (w / 3) * i;
+    ctx.beginPath();
+    ctx.moveTo(fx, 0);
+    ctx.lineTo(fx + (i % 2 ? 2 : -2), 9);
+    ctx.stroke();
+  }
+  if (state === 'shaking') {
+    ctx.fillStyle = 'rgba(255,190,60,0.35)';
+    ctx.fillRect(0, 0, w, 2);
+  }
+  ctx.restore();
+}
+
+export function drawSwingBall(
+  ctx: CanvasRenderingContext2D,
+  pivotX: number,
+  pivotY: number,
+  x: number,
+  y: number,
+  frame: number,
+): void {
+  ctx.save();
+  // Chain.
+  ctx.strokeStyle = '#565d6e';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(pivotX, pivotY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+  ctx.strokeStyle = '#3d4452';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Pivot mount.
+  ctx.fillStyle = '#3d4452';
+  ctx.beginPath();
+  ctx.arc(pivotX, pivotY, 5, 0, Math.PI * 2);
+  ctx.fill();
+  // Spiked ball.
+  ctx.fillStyle = '#707a8c';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + frame / 60;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * 6, y + Math.sin(a) * 6);
+    ctx.lineTo(x + Math.cos(a + 0.3) * 7, y + Math.sin(a + 0.3) * 7);
+    ctx.lineTo(x + Math.cos(a + 0.15) * 12, y + Math.sin(a + 0.15) * 12);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#3d4452';
+  ctx.beginPath();
+  ctx.arc(x, y, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#565d6e';
+  ctx.beginPath();
+  ctx.arc(x - 2.5, y - 2.5, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The arena gates that seal the boss fight in. */
+export function drawBossGate(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  top: number,
+  w: number,
+  h: number,
+  frame: number,
+): void {
+  if (h <= 0) return;
+  ctx.save();
+  ctx.translate(x - w / 2, top);
+  ctx.fillStyle = '#4a4f5c';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#343947';
+  for (let y = 0; y < h; y += 14) ctx.fillRect(0, y, w, 3);
+  // Hazard stripes on the leading edge.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, h - 12, w, 12);
+  ctx.clip();
+  for (let i = -2; i < w / 6 + 2; i++) {
+    ctx.fillStyle = i % 2 ? '#e8c832' : '#23262e';
+    ctx.beginPath();
+    ctx.moveTo(i * 8, h - 12);
+    ctx.lineTo(i * 8 + 8, h - 12);
+    ctx.lineTo(i * 8 + 2, h);
+    ctx.lineTo(i * 8 - 6, h);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  // Rivets and a warning light.
+  ctx.fillStyle = '#6b7280';
+  for (let y = 8; y < h - 12; y += 22) {
+    ctx.fillRect(3, y, 2, 2);
+    ctx.fillRect(w - 5, y, 2, 2);
+  }
+  ctx.fillStyle = `rgba(232,56,79,${0.45 + 0.45 * Math.sin(frame / 6)})`;
+  ctx.beginPath();
+  ctx.arc(w / 2, 10, 3.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function drawGoal(ctx: CanvasRenderingContext2D, x: number, y: number, spinning: number, frame: number): void {
   ctx.save();
   ctx.translate(x, y);
@@ -682,6 +857,13 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
   ctx.save();
   ctx.translate(p.x, p.y);
   if (p.grounded) ctx.rotate((-p.angle * Math.PI) / 180);
+  // Squash and stretch: land hard and the body compresses, rise fast and it
+  // elongates. Volume is roughly preserved so it reads as weight, not scale.
+  if (p.squash !== 0) {
+    const sy = 1 - p.squash * 0.28;
+    ctx.translate(0, (1 - sy) * p.h);
+    ctx.scale(1 / sy, sy);
+  }
   ctx.scale(p.facing, 1);
 
   // Mag-Board deck under the rider (vehicle, zone-specific).

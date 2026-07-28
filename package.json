@@ -5,6 +5,14 @@
   "description": "A free, open-source Sonic-style platformer for the browser: momentum physics, full 360° loops, hidden rooms and boss fights, with every sprite and sound generated procedurally.",
   "license": "MIT",
   "type": "module",
+  "homepage": "https://lp177.github.io/sonictribute/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lp177/sonictribute.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lp177/sonictribute/issues"
+  },
   "keywords": [
     "game",
     "platformer",

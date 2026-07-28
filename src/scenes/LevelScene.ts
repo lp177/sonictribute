@@ -4,7 +4,7 @@ import type { Input } from '../core/Input.ts';
 import type { Sfx } from '../audio/sfx.ts';
 import { Camera } from '../core/Camera.ts';
 import { Level } from '../game/Level.ts';
-import { Player } from '../game/Player.ts';
+import { Player, NO_INPUT } from '../game/Player.ts';
 import { HUD } from '../game/HUD.ts';
 import { LEVELS } from '../levels/index.ts';
 import { STORY_ENDING } from '../game/story.ts';
@@ -23,12 +23,18 @@ import {
   drawBuzzDrone,
   drawDashPad,
   drawBoardPad,
+  drawSpikeTrap,
+  drawCrumble,
+  drawSwingBall,
+  drawBossGate,
   drawGoal,
   drawBoss,
   drawHero,
   drawAfterimage,
 } from '../render/painter.ts';
 import { FxSystem } from '../render/fx.ts';
+import { buildDecor, drawDecor, drawClouds, type DecorSet } from '../render/decor.ts';
+import { BossArena } from '../game/BossArena.ts';
 import { prefersReducedMotion } from '../core/prefs.ts';
 import { PauseMenu } from '../ui/PauseMenu.ts';
 import { SettingsPanel } from '../ui/SettingsPanel.ts';
@@ -55,6 +61,9 @@ export class LevelScene implements Scene {
   private skyFill: string;
   private pause: PauseMenu | null = null;
   private settings: SettingsPanel | null = null;
+  private decor: DecorSet;
+  private theme: 'verdant' | 'gear';
+  private animate: boolean;
   /** Recent hero positions for speed afterimages (newest first). */
   private trail: { x: number; y: number; ball: boolean }[] = [];
 
@@ -69,7 +78,10 @@ export class LevelScene implements Scene {
     this.camera = new Camera(W, H);
     this.camera.snapTo(this.player.x, this.player.y, this.level.map.pixelW, this.level.map.pixelH);
     this.fx = new FxSystem(prefersReducedMotion());
+    this.animate = !prefersReducedMotion();
+    this.theme = def.theme;
     this.skyFill = def.theme === 'gear' ? '#0d0d16' : '#0b1026';
+    this.decor = buildDecor(this.level.map, def.theme, W, H);
     // Pre-rendered art — built once, behind the scene fade. The background is
     // rendered taller than the view for vertical parallax headroom.
     this.terrain = renderTerrain(this.level.map, def.theme);
@@ -102,6 +114,10 @@ export class LevelScene implements Scene {
       }
       return;
     }
+
+    // Hit-stop: the whole world holds still for a few frames on impact. This
+    // is what gives a stomp weight, so it must gate physics AND particles.
+    if (this.fx.tickFreeze()) return;
 
     this.fx.update();
 
@@ -137,9 +153,14 @@ export class LevelScene implements Scene {
       return;
     }
 
-    const snap = this.input.snapshot();
+    // During the gate slam the player watches; control returns once locked in.
+    const snap = level.arenaGates?.cinematic ? NO_INPUT : this.input.snapshot();
     if (snap.jumpPressed) this.sfx.ensure();
     player.update(level.map, snap);
+
+    if (player.landImpact > 2) {
+      this.fx.emitLandingDust(player.x, player.y + player.h, player.landImpact);
+    }
 
     for (const ev of player.events) {
       this.sfx.play(ev);
@@ -197,6 +218,8 @@ export class LevelScene implements Scene {
     // Parallax background: two horizontal depths plus a slight vertical drift.
     const bgY = -Math.round(camY * 0.12) + so.y;
     this.tiledBg(ctx, camX * 0.2 - so.x, bgY);
+    // Clouds drift between the two parallax depths so the sky is never still.
+    drawClouds(ctx, this.decor, this.frame, camX, W, this.theme, this.animate);
     this.tiledBg(ctx, camX * 0.45 - so.x, 40 + bgY, 0.6);
 
     ctx.save();
@@ -216,6 +239,19 @@ export class LevelScene implements Scene {
 
     const visible = (x: number) => x > camX - 40 && x < camX + W + 40;
 
+    // Living scenery: grass and flowers bending in the wind, torches
+    // guttering, vents puffing, cogs turning.
+    drawDecor(ctx, this.decor, this.frame, camX, W, this.animate);
+
+    for (const c of level.crumbles) {
+      if (visible(c.x)) drawCrumble(ctx, c.x, c.y, c.w, c.state, c.shakeOffset, c.fallY, this.theme);
+    }
+    for (const t of level.traps) {
+      if (visible(t.x)) drawSpikeTrap(ctx, t.x, t.y, t.extension, t.phase === 'warning', this.frame);
+    }
+    for (const s of level.swings) {
+      if (visible(s.pivotX)) drawSwingBall(ctx, s.pivotX, s.pivotY, s.x, s.y, this.frame);
+    }
     for (const d of level.dashPads) if (visible(d.x)) drawDashPad(ctx, d.x, d.y, d.dir, d.cooldown, this.frame);
     for (const bp of level.boardPads) if (visible(bp.x)) drawBoardPad(ctx, bp.x, bp.y, this.frame);
     for (const r of level.rings) if (!r.taken && visible(r.x)) drawRing(ctx, r.x, r.y, this.frame);
@@ -240,8 +276,20 @@ export class LevelScene implements Scene {
       }
     }
     drawHero(ctx, player, this.frame);
+
+    // Arena gates in front of the hero, so being sealed in reads clearly.
+    const gates = level.arenaGates;
+    if (gates && gates.closed > 0) {
+      const h = BossArena.HEIGHT * gates.closed;
+      drawBossGate(ctx, gates.leftX, gates.gateTop(), BossArena.WIDTH, h, this.frame);
+      drawBossGate(ctx, gates.rightX, gates.gateTop(), BossArena.WIDTH, h, this.frame);
+    }
+
     this.fx.render(ctx);
     ctx.restore();
+
+    // Screen-space juice: speed streaks, vignette, impact flash.
+    this.fx.renderScreen(ctx, W, H, Math.abs(player.gsp), this.frame);
 
     // Boss intro banner.
     if (level.boss && level.boss.phase === 'intro') {

@@ -79,6 +79,14 @@ export class Player {
   finished = false;
   /** Active collision layer (0 = normal, 1 = inside loops). */
   layer = 0;
+  /**
+   * Squash-and-stretch amount, +1 = fully squashed (just landed hard),
+   * -1 = fully stretched (rising fast). Decays every frame; purely cosmetic,
+   * read by the renderer.
+   */
+  squash = 0;
+  /** Vertical speed of the last landing — drives impact dust and sound. */
+  landImpact = 0;
   /** Events emitted during the last update (sound/FX hooks). */
   events: string[] = [];
 
@@ -103,8 +111,16 @@ export class Player {
 
   update(map: TileMap, input: PlayerInput): void {
     this.events = [];
+    this.landImpact = 0;
     if (this.invuln > 0) this.invuln--;
     if (this.shoes > 0) this.shoes--;
+    // Squash relaxes back to neutral; airborne rise stretches the body.
+    this.squash *= 0.82;
+    if (Math.abs(this.squash) < 0.01) this.squash = 0;
+    if (!this.grounded && !this.dead) {
+      const stretch = Math.max(-1, Math.min(0, this.ysp / 12));
+      if (stretch < this.squash) this.squash = stretch;
+    }
     if (this.dead) {
       this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
       this.y += this.ysp;
@@ -335,6 +351,9 @@ export class Player {
 
   private land(angle: number, depth: number): void {
     const a = norm360(angle);
+    this.landImpact = Math.max(0, this.ysp);
+    // Hard landings squash the body and are worth extra dust/sound.
+    this.squash = Math.min(1, this.landImpact / 10);
     this.y -= depth; // airborne body is always upright (floor mode)
     this.grounded = true;
     this.angle = a;
@@ -344,7 +363,7 @@ export class Player {
     this.ysp = 0;
     this.adjustHeight(this.rolling);
     this.jumping = false;
-    this.events.push('land');
+    this.events.push(this.landImpact > 7 ? 'land-hard' : 'land');
   }
 
   /* ------------------------------ Combat etc. ------------------------------ */

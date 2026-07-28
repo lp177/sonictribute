@@ -1,5 +1,9 @@
 # BOLT — Chrono Rush
 
+[![CI](https://github.com/lp177/sonictribute/actions/workflows/ci.yml/badge.svg)](https://github.com/lp177/sonictribute/actions/workflows/ci.yml)
+[![Play](https://img.shields.io/badge/play-online-4be1ff)](https://lp177.github.io/sonictribute/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 A free, open-source **Sonic-style platformer that runs in your browser**. No
 plugins, no downloads, no accounts, nothing to install — open the page and
 play.
@@ -17,8 +21,8 @@ from dual collision layers.
 
 ## Play
 
-**Online:** once GitHub Pages is enabled (see [Deploying](#deploying)), the
-game lives at `https://<your-github-username>.github.io/<your-repo-name>/`.
+**▶ [Play it in your browser](https://lp177.github.io/sonictribute/)** — no
+install, no sign-up.
 
 **Locally:** `npm install && npm run dev`, then open the printed URL.
 
@@ -45,15 +49,33 @@ loads.
   monitors, checkpoints, and a score/time-bonus results screen with
   achievements (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring
   Master).
-- **Game juice** — parallax backgrounds, run dust, spin-dash smoke, board
-  wake, explosion particles, speed afterimages and screen shake.
+- **Three routes through every zone** — a sky route of precise platform hops
+  reached off a launch ramp, the ground road, and an underground gallery you
+  drop into through visible shafts and spring back out of. The Chrono
+  Crystals are spread across all three, so no single lane collects them all.
+- **A world with depth** — run-up ramps that fling you into the sky, holes
+  that drop you into the underworks rather than killing you, and a void far
+  below that only ever catches a genuinely bottomless fall.
+- **Game juice** — hit-stop on impact, screen shake, impact flashes, speed
+  streaks and a tunnel vignette at pace, squash-and-stretch, run dust,
+  spin-dash smoke, board wake, explosion particles and speed afterimages.
+  Audio is dynamic too: chained ring pickups climb a pitch ladder, spin-dash
+  revs wind up, and impacts are bass-heavy.
+- **Living scenery** — grass and flowers bending in the wind, fireflies,
+  guttering torches, steam vents, turning cogs and drifting clouds.
+- **Hazards you can read** — pop-up spikes that rattle a warning first,
+  ledges that visibly crumble before they drop, and swinging wrecking balls
+  on a readable arc. Every one is dodgeable on sight.
+- **A boss arena that locks** — gates slam down at both ends when the fight
+  starts and grind back up when it ends.
 - **Accessible** — fully keyboard-driven, remappable controls, visible focus
   states, and `prefers-reduced-motion` support (screen shake and afterimages
   off, fewer particles).
 - **Procedural audio** — a small WebAudio synth, no audio files.
-- **207 unit tests** — physics sensors, player state machine, entities,
-  bosses, key bindings, menus, scoring, level structure, flood-fill
-  reachability, simulated loop rides, and scripted bot runs through each zone.
+- **249 unit tests** — physics sensors, player state machine, entities,
+  hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
+  reachability, simulated loop rides, route-continuity contracts, and a flow
+  test that fails if a bot holding right ever gets pinned by the terrain.
 
 ## Controls
 
@@ -106,8 +128,7 @@ secrets.
 3. In the repository: **Settings → Pages → Build and deployment**, set
    *Source* to **Deploy from a branch**, then choose branch `main` and folder
    **`/docs`**, and save.
-4. The site goes live at
-   `https://<your-github-username>.github.io/<your-repo-name>/` within a
+4. The site goes live at <https://lp177.github.io/sonictribute/> within a
    minute or two.
 
 Assets are referenced with **relative URLs** (`base: './'` in

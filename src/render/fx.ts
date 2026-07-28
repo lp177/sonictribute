@@ -24,20 +24,91 @@ export interface Particle {
 const SHAKES: Record<string, [number, number]> = {
   hurt: [4, 14],
   die: [5, 18],
-  'boss-hit': [2, 8],
+  enemy: [1.5, 5],
+  monitor: [1.5, 5],
+  'loop-boost': [2, 6],
+  spring: [1.5, 5],
+  'dash-pad': [2, 6],
+  dash: [2, 8],
+  'boss-hit': [3, 10],
   'boss-slam': [5, 20],
   'boss-defeated': [6, 30],
+  'gate-slam': [5, 18],
+  crumble: [2, 8],
+  'spike-trap': [2, 8],
+};
+
+/**
+ * Hit-stop: how many frames the whole world freezes on impact. This is the
+ * single most effective piece of juice — a few frozen frames read as WEIGHT,
+ * making a stomp feel like it connected instead of passing through. Kept
+ * short; anything over ~8 frames starts to feel like lag.
+ */
+const HIT_STOP: Record<string, number> = {
+  'boss-hit': 7,
+  'boss-defeated': 12,
+  'boss-slam': 5,
+  enemy: 4,
+  monitor: 3,
+  hurt: 6,
+  die: 8,
+  crumble: 2,
+};
+
+/** Full-screen colour flashes: [css colour, frames]. */
+const FLASHES: Record<string, [string, number]> = {
+  'boss-hit': ['rgba(255,255,255,0.30)', 5],
+  'boss-defeated': ['rgba(255,220,150,0.55)', 14],
+  hurt: ['rgba(232,56,79,0.28)', 7],
+  die: ['rgba(232,56,79,0.38)', 10],
+  crystal: ['rgba(75,225,255,0.22)', 8],
+  'loop-boost': ['rgba(180,240,255,0.16)', 5],
 };
 
 export class FxSystem {
   particles: Particle[] = [];
   shakeMag = 0;
   shakeFrames = 0;
+  /** Frames the world stays frozen for impact weight. */
+  hitStop = 0;
+  flashColor = '';
+  flashFrames = 0;
+  flashTotal = 0;
   readonly reducedMotion: boolean;
   private seed = 1234567;
 
   constructor(reducedMotion = false) {
     this.reducedMotion = reducedMotion;
+  }
+
+  /* -------------------------------- Hit-stop ------------------------------- */
+
+  /** Freeze the world for `frames` to sell an impact. Longest wins. */
+  freeze(frames: number): void {
+    // Reduced motion still gets a token freeze: it reads as weight, not
+    // motion, and removing it entirely makes hits feel unresponsive.
+    const f = this.reducedMotion ? Math.min(2, frames) : frames;
+    this.hitStop = Math.max(this.hitStop, f);
+  }
+
+  /**
+   * Consumes one frame of hit-stop. Returns true while the world should stay
+   * frozen — the caller skips physics AND particle updates for that frame.
+   */
+  tickFreeze(): boolean {
+    if (this.hitStop <= 0) return false;
+    this.hitStop--;
+    return true;
+  }
+
+  /* --------------------------------- Flash --------------------------------- */
+
+  flash(color: string, frames: number): void {
+    if (frames >= this.flashFrames) {
+      this.flashColor = color;
+      this.flashFrames = frames;
+      this.flashTotal = frames;
+    }
   }
 
   private rnd(): number {
@@ -96,6 +167,10 @@ export class FxSystem {
   onEvent(ev: string, x: number, y: number): void {
     const s = SHAKES[ev];
     if (s) this.shake(s[0], s[1]);
+    const hs = HIT_STOP[ev];
+    if (hs) this.freeze(hs);
+    const fl = FLASHES[ev];
+    if (fl) this.flash(fl[0], fl[1]);
     switch (ev) {
       case 'ring':
         this.emit(x, y, 3, { colors: ['#ffd94a', '#fff3b0'], speed: 1.2, life: 18, size: 2, kind: 'spark' });
@@ -150,9 +225,34 @@ export class FxSystem {
       case 'goal':
         this.emit(x, y - 20, 20, { colors: ['#4be1ff', '#ffd94a', '#e8384f', '#fff'], speed: 3, life: 55, size: 3, kind: 'spark', grav: 0.05 });
         break;
+      case 'gate-slam':
+        this.emit(x, y, 14, { colors: ['#9aa3b2', '#6b7280', '#cfd6e4'], speed: 2.4, life: 30, size: 5, kind: 'smoke', up: 0.8 });
+        this.emit(x, y, 8, { colors: ['#ffd94a', '#fff'], speed: 2.8, life: 18, size: 2, kind: 'spark', grav: 0.1 });
+        break;
+      case 'crumble':
+        this.emit(x, y, 10, { colors: ['#8a5a32', '#6e4525', '#4a4f5c'], speed: 1.8, life: 34, size: 3, kind: 'dot', grav: 0.16 });
+        break;
+      case 'spike-trap':
+        this.emit(x, y, 6, { colors: ['#9aa3b2', '#cfd6e4'], speed: 1.6, life: 16, size: 2, kind: 'spark' });
+        break;
       default:
         break;
     }
+  }
+
+  /** Impact dust when landing, scaled by how hard the landing was. */
+  emitLandingDust(x: number, y: number, impact: number): void {
+    const n = Math.min(10, Math.round(impact));
+    if (n <= 0) return;
+    this.emit(x, y, n, {
+      colors: ['#cfd6e4', '#9aa3b2'],
+      speed: 1 + impact * 0.15,
+      life: 20,
+      size: 3,
+      kind: 'smoke',
+      up: 0.2,
+    });
+    if (impact > 7) this.shake(1.5, 5);
   }
 
   /* ------------------------- Continuous state emitters ----------------------- */
@@ -204,6 +304,7 @@ export class FxSystem {
   update(): void {
     if (this.shakeFrames > 0) this.shakeFrames--;
     if (this.shakeFrames === 0) this.shakeMag = 0;
+    if (this.flashFrames > 0) this.flashFrames--;
     for (const p of this.particles) {
       p.age++;
       p.ysp += p.grav;
@@ -241,5 +342,45 @@ export class FxSystem {
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Screen-space pass drawn after the world: speed streaks that build with
+   * velocity, then the impact flash on top. `speed` is |gsp| in px/frame.
+   */
+  renderScreen(ctx: CanvasRenderingContext2D, w: number, h: number, speed: number, frame: number): void {
+    if (!this.reducedMotion && speed > 8) {
+      const intensity = Math.min(1, (speed - 8) / 6);
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,255,255,${0.10 * intensity})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 9; i++) {
+        // Deterministic lane placement; the streak slides each frame so the
+        // lines read as motion rather than a static overlay.
+        const lane = (i * 2654435761) % 1000;
+        const y = (lane / 1000) * h;
+        const len = 40 + ((lane % 7) + 1) * 14 * intensity;
+        const x = w - (((frame * (14 + (lane % 5) * 4)) + lane) % (w + 260));
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + len, y);
+        ctx.stroke();
+      }
+      // Tunnel vignette tightens the frame at speed.
+      const vig = ctx.createRadialGradient(w / 2, h / 2, h * 0.34, w / 2, h / 2, h * 0.78);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, `rgba(0,0,0,${0.30 * intensity})`);
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+
+    if (this.flashFrames > 0 && this.flashTotal > 0) {
+      ctx.save();
+      ctx.globalAlpha = this.flashFrames / this.flashTotal;
+      ctx.fillStyle = this.flashColor;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
   }
 }

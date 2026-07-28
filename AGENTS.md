@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (207 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (249 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -44,10 +44,18 @@ procedurally at boot.
 - `src/game/Score.ts` — score values, time bonus tiers, achievements (pure).
 - `src/render/painter.ts` — all procedural art, themed per zone
   (`TERRAIN_THEMES`: verdant grass vs gear steel; themed backgrounds).
-- `src/render/fx.ts` — game-juice layer: deterministic particles (run dust,
-  spin-dash smoke, board wake, sparks, explosions) + screen shake. Pure logic
-  apart from `render`; honours `prefers-reduced-motion` (no shake, fewer
-  particles, no afterimages).
+- `src/render/fx.ts` — game-juice layer: deterministic particles, screen
+  shake, **hit-stop** (the world freezes a few frames on impact — the single
+  most effective piece of juice), impact flashes, speed streaks and a
+  tunnel vignette. Pure logic apart from `render`; honours
+  `prefers-reduced-motion` (no shake/afterimages, halved particles, and only
+  a 2-frame token hit-stop, since freeze reads as weight rather than motion).
+- `src/render/decor.ts` — animated scenery placed by walking the terrain
+  surface at load: wind-blown grass and flowers, fireflies, guttering
+  torches, steam vents, turning cogs, drifting clouds. Decoration only.
+- `src/game/BossArena.ts` — the arena lock-in: gates slam down at both ends
+  when the boss spawns, a short cinematic holds control, and they grind back
+  up when he falls.
 - `src/core/Game.ts` — fixed 60 Hz timestep + fade transitions. `changeScene`
   takes a FACTORY and calls it only once the screen is fully black, so the
   level build/pre-render never hitches a visible frame.
@@ -64,6 +72,25 @@ procedurally at boot.
 
 ## Design rules learned (don't regress)
 
+- **Springs and launchers must clear `player.jumping`.** The variable-jump
+  cutoff clamps upward speed to `PHYS.jrel` the moment the jump button is not
+  held, so every spring in the game was firing at a third of its power until
+  this was fixed. A launch's power belongs to the launcher, not the player.
+- **Acceleration applies only BELOW top speed** (SPG). Clamping `gsp` down to
+  `top` while the player holds the direction they are over-speeding in makes
+  spin dash, springs, dash pads and loop boosts decay within a frame.
+- Height changes on a running route use `hill`/`dip`/`gentleUp`/`gentleDown`
+  (~26.5°). A 45° face reads as a wall at speed; keep those for deliberate
+  obstacles only. The flow test in `tests/routes.test.ts` fails if a bot
+  holding right gets pinned for more than 150 frames anywhere.
+- Level build order: ground first (`floor` fills to bedrock), then sky
+  platforms, then CARVE the underworld and give it a floor. Carving last is
+  what stops the gallery being back-filled. `slab` builds a deck with space
+  underneath.
+- Drop shafts must clear every loop footprint, or they punch a hole in the
+  loop's run-up corridor.
+- Each zone owes three full-length routes (sky / ground / underground) with
+  crystals spread across them, enforced by `tests/routes.test.ts`.
 - Climb-out slopes must top out flush with the destination floor, and pits
   need an escape (spring) — a parked player cannot climb a 45° slope from
   standstill (authentic SPG slope factor).
@@ -82,9 +109,6 @@ procedurally at boot.
   level update (hurt, 'shield-lost', 'board-lost') is invisible there — the
   level re-emits those itself. Same rule for a boss: forward the array its
   `update()` returns, don't drop it.
-- SPG acceleration applies only BELOW top speed. Never clamp `gsp` down to
-  `top` when the player holds the direction they are over-speeding in, or spin
-  dash, springs, dash pads and loop boosts all decay to a walk within a frame.
 - A loop's annulus must satisfy `thickness >= innerR * (sqrt(2) - 1)`, else
   its lower quarters float above the corridor and headbutt the player instead
   of curving up under their feet.

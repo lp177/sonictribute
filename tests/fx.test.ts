@@ -45,6 +45,71 @@ describe('FxSystem — screen shake', () => {
   });
 });
 
+describe('FxSystem — hit-stop', () => {
+  it('freezes the world on a heavy impact, briefly', () => {
+    const fx = new FxSystem();
+    fx.onEvent('boss-hit', 0, 0);
+    expect(fx.hitStop).toBeGreaterThan(0);
+    // Long enough to read as weight, short enough not to feel like lag.
+    expect(fx.hitStop).toBeLessThanOrEqual(12);
+    let frozen = 0;
+    while (fx.tickFreeze()) frozen++;
+    expect(frozen).toBeGreaterThan(0);
+    expect(fx.tickFreeze()).toBe(false); // and it always ends
+  });
+
+  it('does not freeze on trivial events', () => {
+    const fx = new FxSystem();
+    fx.onEvent('ring', 0, 0);
+    fx.onEvent('checkpoint', 0, 0);
+    expect(fx.hitStop).toBe(0);
+    expect(fx.tickFreeze()).toBe(false);
+  });
+
+  it('keeps the longest freeze when impacts stack', () => {
+    const fx = new FxSystem();
+    fx.onEvent('enemy', 0, 0);
+    const small = fx.hitStop;
+    fx.onEvent('boss-defeated', 0, 0);
+    expect(fx.hitStop).toBeGreaterThan(small);
+  });
+
+  it('still gives a token freeze under reduced motion', () => {
+    // Removing it entirely makes hits feel unresponsive; it is weight, not
+    // motion, so a couple of frames is the accessible compromise.
+    const fx = new FxSystem(true);
+    fx.onEvent('boss-defeated', 0, 0);
+    expect(fx.hitStop).toBeGreaterThan(0);
+    expect(fx.hitStop).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('FxSystem — impact flash', () => {
+  it('flashes on damage and fades out', () => {
+    const fx = new FxSystem();
+    fx.onEvent('hurt', 0, 0);
+    expect(fx.flashFrames).toBeGreaterThan(0);
+    for (let i = 0; i < 60; i++) fx.update();
+    expect(fx.flashFrames).toBe(0);
+  });
+
+  it('does not flash on ordinary pickups', () => {
+    const fx = new FxSystem();
+    fx.onEvent('ring', 0, 0);
+    expect(fx.flashFrames).toBe(0);
+  });
+
+  it('scales landing dust with the impact', () => {
+    const soft = new FxSystem();
+    soft.emitLandingDust(0, 0, 3);
+    const hard = new FxSystem();
+    hard.emitLandingDust(0, 0, 10);
+    expect(hard.particles.length).toBeGreaterThan(soft.particles.length);
+    expect(hard.shakeMag).toBeGreaterThan(0); // a hard landing is felt
+    expect(soft.shakeMag).toBe(0);
+  });
+});
+
 describe('FxSystem — particles', () => {
   it('events spawn particles near their world position', () => {
     const fx = new FxSystem();

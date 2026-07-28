@@ -108,6 +108,10 @@ export class Spring {
       if (p.ysp < 0) return false; // must be falling onto it
       p.grounded = false;
       p.ysp = -this.power;
+      // Clear `jumping`, or the variable-jump-height cutoff would truncate
+      // the launch to PHYS.jrel the moment the jump button is not held —
+      // a spring's power is the spring's, not the player's.
+      p.jumping = false;
     } else {
       const sign = this.dir === 'right' ? 1 : -1;
       p.gsp = this.power * sign;
@@ -115,6 +119,63 @@ export class Spring {
       p.facing = sign;
     }
     this.cooldown = 16;
+    return true;
+  }
+
+  update(): void {
+    if (this.cooldown > 0) this.cooldown--;
+  }
+}
+
+/* -------------------------------- Launcher -------------------------------- */
+
+/**
+ * Ramp-end springboard: hit it with speed and it flings you up and forward on
+ * a long diagonal arc — the "shot into the sky" moment. Deliberately requires
+ * momentum, so it rewards a clean fast approach instead of a standing hop.
+ */
+export class Launcher {
+  cooldown = 0;
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  power: number;
+  /** Launch angle above the horizon, in degrees. */
+  angle: number;
+  /** Minimum ground speed in `dir` needed to fire it. */
+  minSpeed: number;
+
+  constructor(x: number, y: number, dir: 1 | -1 = 1, power = 12, angle = 56, minSpeed = 3.5) {
+    this.x = x;
+    this.y = y;
+    this.dir = dir;
+    this.power = power;
+    this.angle = angle;
+    this.minSpeed = minSpeed;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 12, y: this.y - 14, w: 24, h: 22 };
+  }
+
+  /** True while the board is charged and ready (drives the art). */
+  get ready(): boolean {
+    return this.cooldown === 0;
+  }
+
+  tryLaunch(p: Player): boolean {
+    if (this.cooldown > 0 || p.dead || !overlaps(playerBox(p), this.box)) return false;
+    if (p.gsp * this.dir < this.minSpeed) return false;
+    const rad = (this.angle * Math.PI) / 180;
+    p.grounded = false;
+    p.rolling = false;
+    p.spindashing = false;
+    p.jumping = false; // the arc is the board's, not a cuttable player jump
+    p.xsp = Math.cos(rad) * this.power * this.dir;
+    p.ysp = -Math.sin(rad) * this.power;
+    p.gsp = p.xsp;
+    p.facing = this.dir;
+    this.cooldown = 22;
     return true;
   }
 
@@ -166,6 +227,200 @@ export class Spikes {
   get box(): Rect {
     return { x: this.x - 8, y: this.y - 4, w: 16, h: 8 };
   }
+  touches(p: Player): boolean {
+    return overlaps(playerBox(p), this.box);
+  }
+}
+
+/* ------------------------------ Spike trap -------------------------------- */
+
+export type TrapPhase = 'hidden' | 'warning' | 'out' | 'sinking';
+
+/**
+ * Pop-up spikes on a fixed cycle. Always telegraphed: the plate rattles for a
+ * warning beat before the spikes emerge, and the whole cycle is deterministic
+ * so the hazard is learnable and dodgeable rather than a coin flip. Safe to
+ * stand on while hidden or sinking.
+ */
+export class SpikeTrap {
+  t: number;
+  x: number;
+  y: number;
+  /** Frames per full cycle; the trap is dangerous for a fraction of it. */
+  readonly period: number;
+  private readonly warnAt: number;
+  private readonly outAt: number;
+  private readonly sinkAt: number;
+
+  constructor(x: number, y: number, period = 150, offset = 0) {
+    this.x = x;
+    this.y = y;
+    this.period = period;
+    this.t = ((offset % period) + period) % period;
+    this.warnAt = period - 46; // rattle
+    this.outAt = period - 30; // spikes up
+    this.sinkAt = period - 8; // retracting
+  }
+
+  get phase(): TrapPhase {
+    if (this.t >= this.sinkAt) return 'sinking';
+    if (this.t >= this.outAt) return 'out';
+    if (this.t >= this.warnAt) return 'warning';
+    return 'hidden';
+  }
+
+  /** 0 = flush with the floor, 1 = fully extended. */
+  get extension(): number {
+    const p = this.phase;
+    if (p === 'out') return Math.min(1, (this.t - this.outAt) / 6);
+    if (p === 'sinking') return Math.max(0, 1 - (this.t - this.sinkAt) / 8);
+    return 0;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 8, y: this.y - 14 * this.extension, w: 16, h: 14 * this.extension };
+  }
+
+  /** Returns 'warn' on the frame the tell starts, so it can be heard. */
+  update(): 'warn' | 'strike' | null {
+    this.t = (this.t + 1) % this.period;
+    if (this.t === this.warnAt) return 'warn';
+    if (this.t === this.outAt) return 'strike';
+    return null;
+  }
+
+  touches(p: Player): boolean {
+    return this.extension > 0.35 && overlaps(playerBox(p), this.box);
+  }
+}
+
+/* --------------------------- Crumbling platform ---------------------------- */
+
+/**
+ * A ledge that gives way. Standing on it starts a visible shake, then it
+ * drops and respawns after a while — the player can see it react and keep
+ * moving instead of being punished without warning.
+ */
+export class CrumblePlatform {
+  /** Frames of shaking before it lets go. */
+  static readonly SHAKE = 34;
+  static readonly RESPAWN = 220;
+  x: number;
+  y: number;
+  readonly w: number;
+  state: 'solid' | 'shaking' | 'falling' | 'gone' = 'solid';
+  timer = 0;
+  fallY = 0;
+
+  constructor(x: number, y: number, w: number) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+  }
+
+  get box(): Rect {
+    return { x: this.x, y: this.y, w: this.w, h: 8 };
+  }
+
+  /** True while it should carry the player. */
+  get solid(): boolean {
+    return this.state === 'solid' || this.state === 'shaking';
+  }
+
+  /** Visual jitter offset while shaking. */
+  get shakeOffset(): number {
+    return this.state === 'shaking' ? Math.sin(this.timer * 1.7) * 1.6 : 0;
+  }
+
+  /** Returns 'crumble' on the frame it lets go. */
+  update(p: Player): 'crumble' | null {
+    switch (this.state) {
+      case 'solid': {
+        // Triggered by feet resting on the plank.
+        const feet = p.y + p.h;
+        const on = p.grounded && feet >= this.y - 6 && feet <= this.y + 10 && p.x > this.x - 4 && p.x < this.x + this.w + 4;
+        if (on) {
+          this.state = 'shaking';
+          this.timer = 0;
+        }
+        break;
+      }
+      case 'shaking':
+        this.timer++;
+        if (this.timer >= CrumblePlatform.SHAKE) {
+          this.state = 'falling';
+          this.timer = 0;
+          this.fallY = 0;
+          return 'crumble';
+        }
+        break;
+      case 'falling':
+        this.timer++;
+        this.fallY += 0.6 + this.timer * 0.12;
+        if (this.timer > 60) {
+          this.state = 'gone';
+          this.timer = 0;
+        }
+        break;
+      case 'gone':
+        this.timer++;
+        if (this.timer >= CrumblePlatform.RESPAWN) {
+          this.state = 'solid';
+          this.timer = 0;
+          this.fallY = 0;
+        }
+        break;
+    }
+    return null;
+  }
+}
+
+/* ---------------------------- Swinging spike ball --------------------------- */
+
+/**
+ * A spiked wrecking ball on a chain, swinging on a fixed sine. Deterministic
+ * and slow enough to read, so timing the run underneath is a skill check the
+ * player can actually see coming.
+ */
+export class SwingBall {
+  t = 0;
+  readonly pivotX: number;
+  readonly pivotY: number;
+  readonly length: number;
+  readonly period: number;
+  readonly arc: number;
+  private readonly offset: number;
+
+  constructor(pivotX: number, pivotY: number, length: number, period = 150, offset = 0, arcDeg = 62) {
+    this.pivotX = pivotX;
+    this.pivotY = pivotY;
+    this.length = length;
+    this.period = period;
+    this.offset = offset;
+    this.arc = (arcDeg * Math.PI) / 180;
+  }
+
+  get angle(): number {
+    return Math.sin(((this.t + this.offset) / this.period) * Math.PI * 2) * this.arc;
+  }
+
+  get x(): number {
+    return this.pivotX + Math.sin(this.angle) * this.length;
+  }
+
+  get y(): number {
+    return this.pivotY + Math.cos(this.angle) * this.length;
+  }
+
+  get box(): Rect {
+    return { x: this.x - 11, y: this.y - 11, w: 22, h: 22 };
+  }
+
+  update(): void {
+    this.t++;
+  }
+
+  /** The ball always hurts — rolling does not save you, you have to time it. */
   touches(p: Player): boolean {
     return overlaps(playerBox(p), this.box);
   }
