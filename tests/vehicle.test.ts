@@ -37,22 +37,35 @@ describe('Mag-Board (vehicle)', () => {
     expect(p.facing).toBe(1);
   });
 
-  it('keeps rolling and spin dash available while riding', () => {
-    // The board is a pickup, not a downgrade: it must never remove a core
-    // ability. Rolling is how the hero attacks and ducks.
+  it('cannot roll or spin dash while riding', () => {
+    // Riding IS the move: the board replaces the ball rather than stacking
+    // with it.
     const map = makeFlatMap(200, 20, 240);
     const p = spawnOnGround(map, 200, 240);
     p.mountBoard();
     run(map, p, 20, input({ down: true }));
-    expect(p.rolling).toBe(true);
-    expect(p.board).toBe(true); // and you are still on the board
-    expect(p.attacking).toBe(true);
+    expect(p.rolling).toBe(false);
+    p.update(map, input({ down: true, jump: true, jumpPressed: true }));
+    expect(p.spindashing).toBe(false);
+  });
 
-    const q = spawnOnGround(map, 200, 240);
-    q.mountBoard();
-    q.gsp = 0;
-    q.update(map, input({ down: true, jump: true, jumpPressed: true }));
-    expect(q.spindashing).toBe(true);
+  it('a dash pad never takes the ball away', () => {
+    // Reported as "the booster disables roll". It does not: a rolling player
+    // keeps rolling through a pad, and a walking player can curl up straight
+    // after one. The pads that sit inside the skyway are on the board
+    // section, where riding is what blocks the ball.
+    const map = makeFlatMap(200, 20, 240);
+    const p = spawnOnGround(map, 100, 240);
+    run(map, p, 140, input({ right: true }));
+    p.update(map, input({ right: true, down: true }));
+    expect(p.rolling).toBe(true);
+    const pad = new DashPad(p.x, 240 - 6, 1, 11);
+    expect(pad.tryTrigger(p)).toBe(true);
+    expect(p.rolling).toBe(true);
+    expect(p.gsp).toBe(11);
+    run(map, p, 60, input({ right: true }));
+    expect(p.rolling).toBe(true);
+    expect(p.gsp).toBeGreaterThan(PHYS.top); // and the boost survives the roll
   });
 
   it('keeps the board through a jump and landing', () => {

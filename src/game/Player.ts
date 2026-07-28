@@ -202,16 +202,14 @@ export class Player {
       this.crouch = input.down;
     }
 
-    // --- Start rolling. The Mag-Board does NOT take this away: rolling is a
-    // core ability (it is how you attack and duck), and a vehicle that
-    // removes it feels like a downgrade rather than a pickup. ---
-    if (!this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
+    // --- Start rolling (not from a board: the board IS the ride) ---
+    if (!this.board && !this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
       this.adjustHeight(true);
       this.rolling = true;
       this.events.push('roll');
     }
-    // --- Start spin dash (also available on the board) ---
-    if (!this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
+    // --- Start spin dash ---
+    if (!this.board && !this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
       this.spindashing = true;
       this.spinRevs = 0;
       this.events.push('dash-charge');
