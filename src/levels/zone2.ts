@@ -34,10 +34,13 @@ export const zone2: LevelDef = {
     b.drone(35, 17, 3); // first flyer, telegraphed above the path
 
     /* ---- B (41–92): descent, loop 1, ledge route, secret room 1 ---- */
-    b.gentleDown(41, 21, 3); // 41–46, down to row 24
-    b.floor(47, 92, 24);
-    b.dashPad(49, 24, 1, 11); // launches you into the loop
-    b.loop(56, 24);
+    // Ease off the launch pad first: a straight drop from the pad row to the
+    // base row is a 3-tile cliff for anyone too slow to fire the board.
+    b.gentleDown(41, 18, 3); // 41–46, pad row 18 back down to 21
+    b.gentleDown(47, 21, 3); // 47–52, on down to the corridor at row 24
+    b.floor(53, 92, 24);
+    b.dashPad(54, 24, 1, 11); // launches you into the loop
+    b.loop(60, 24);
     b.ringsH(66, 70, 21);
     b.spring(72, 24, 11);
     b.platform(74, 80, 17);

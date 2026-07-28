@@ -65,7 +65,11 @@ export const zone1: LevelDef = {
     b.floor(115, 120, 21);
     b.monitor(117, 21, 'shield');
     b.launchRamp(121, 21, 3); // 121–128: run-up, then a shot into the sky
-    b.floor(129, 140, 21);
+    // Ease back down off the launch pad. Dropping straight from the pad row
+    // to the base row leaves a 3-tile cliff for anyone who arrives too slow
+    // to fire the board — exactly the kind of hard step this zone avoids.
+    b.gentleDown(129, 18, 3); // 129–134, back to row 21
+    b.floor(135, 140, 21);
 
     b.gentleDown(141, 21, 3); // 141–146, down to row 24
     b.floor(147, 200, 24);

@@ -864,6 +864,11 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
     ctx.translate(0, (1 - sy) * p.h);
     ctx.scale(1 / sy, sy);
   }
+  // Crouching compresses the whole body, not just the head.
+  if (p.crouch) {
+    ctx.translate(0, p.h * 0.22);
+    ctx.scale(1.08, 0.78);
+  }
   ctx.scale(p.facing, 1);
 
   // Mag-Board deck under the rider (vehicle, zone-specific).
@@ -952,7 +957,17 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
     ctx.beginPath();
     ctx.roundRect(-4, -2, 8, 9, 3);
     ctx.fill();
-    // Head with ears (swift fox).
+    // Head with ears (swift fox). Looking up tilts it back and lifts the
+    // muzzle; crouching tucks it down — the pose has to read at a glance,
+    // because it is the only confirmation the input did anything.
+    ctx.save();
+    if (p.lookUp) {
+      ctx.translate(0, -2);
+      ctx.rotate(-0.26);
+    } else if (p.crouch) {
+      ctx.translate(-1, 5);
+      ctx.rotate(0.16);
+    }
     ctx.fillStyle = PAL.heroBlue;
     ctx.beginPath();
     ctx.roundRect(-7, -18, 15, 13, 5);
@@ -973,7 +988,8 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
     ctx.fillStyle = '#fff';
     ctx.fillRect(2, -16, 4, 5);
     ctx.fillStyle = '#111';
-    ctx.fillRect(4, -15, 2, 3);
+    ctx.fillRect(4, p.lookUp ? -16 : -15, 2, 3);
+    ctx.restore();
     // Shield bubble.
     if (p.shield) {
       ctx.strokeStyle = 'rgba(90,169,255,0.8)';

@@ -120,6 +120,13 @@ export class Player {
   squash = 0;
   /** Vertical speed of the last landing — drives impact dust and sound. */
   landImpact = 0;
+  /**
+   * Standing still and holding up / down. Classic behaviour: the hero looks
+   * that way and, after a beat, the camera pans so you can scout the route
+   * above or the drop below before committing.
+   */
+  lookUp = false;
+  crouch = false;
   /** Events emitted during the last update (sound/FX hooks). */
   events: string[] = [];
 
@@ -145,6 +152,8 @@ export class Player {
   update(map: TileMap, input: PlayerInput): void {
     this.events = [];
     this.landImpact = 0;
+    this.lookUp = false;
+    this.crouch = false;
     if (this.invuln > 0) this.invuln--;
     if (this.shoes > 0) this.shoes--;
     // Squash relaxes back to neutral; airborne rise stretches the body.
@@ -186,14 +195,23 @@ export class Player {
       return;
     }
 
-    // --- Start rolling (not from a board: the board IS the ride) ---
-    if (!this.board && !this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
+    // --- Look up / crouch (only while genuinely stopped) ---
+    const stopped = Math.abs(this.gsp) < PHYS.unrollSpeed;
+    if (stopped && !this.rolling && !this.spindashing) {
+      this.lookUp = input.up;
+      this.crouch = input.down;
+    }
+
+    // --- Start rolling. The Mag-Board does NOT take this away: rolling is a
+    // core ability (it is how you attack and duck), and a vehicle that
+    // removes it feels like a downgrade rather than a pickup. ---
+    if (!this.rolling && input.down && Math.abs(this.gsp) >= PHYS.unrollSpeed) {
       this.adjustHeight(true);
       this.rolling = true;
       this.events.push('roll');
     }
-    // --- Start spin dash ---
-    if (!this.board && !this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
+    // --- Start spin dash (also available on the board) ---
+    if (!this.rolling && input.down && input.jumpPressed && Math.abs(this.gsp) < PHYS.unrollSpeed) {
       this.spindashing = true;
       this.spinRevs = 0;
       this.events.push('dash-charge');
