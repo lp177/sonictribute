@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (260 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (326 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -29,11 +29,13 @@ procedurally at boot.
   running pace is always completed (a deliberate departure from raw SPG).
 - `src/game/Level.ts` + `src/levels/` — LevelBuilder API (floor/slope/carve/
   spring/secret/loop/boss/dashPad/boardPad/boardEnd/drone…) and level data
-  (`zone1` Verdant Rush, `zone2` Cog Skyway, roster in `levels/index.ts`).
+  (`zone1` Verdant Rush, `zone2` Cog Skyway, `zone3` The Chrono Vault; roster
+  in `levels/index.ts`).
   LevelDef carries `theme` ('verdant' | 'gear'), `bossKind` ('pod' | 'press')
   and its `intro` cutscene. Level owns entities, score, secrets, checkpoints,
   boss, respawn, board mount/dismount.
-- `src/game/Boss.ts` / `src/game/PressBoss.ts` — deterministic bosses
+- `src/game/Boss.ts` / `src/game/PressBoss.ts` / `src/game/CrystalBoss.ts` —
+  deterministic bosses
   (timer-driven patterns, no RNG) behind the shared `BossLike` interface.
   Bosses report contacts; the LEVEL applies player damage (single damage path —
   do not call `player.hurt()` from entities). PressBoss is armoured except
@@ -106,6 +108,14 @@ procedurally at boot.
   loop's run-up corridor.
 - Each zone owes three full-length routes (sky / ground / underground) with
   crystals spread across them, enforced by `tests/routes.test.ts`.
+- A boss's ANIMATION clock must be separate from its phase timer. Phase
+  changes reset `timer`, so anything drawn from it (the Wrecking Pod's mace)
+  teleports the instant the boss is hit. Same rule for intangibility: gate it
+  on real depth/state, not on the phase name, or a rig that is still visibly
+  above the floor becomes unhittable.
+- A vehicle that carries the player (rail, board) must set them down at a
+  DEFINED position when the ride ends. Bailing out and leaving last frame's
+  y is how riders end up inside whatever the ride finished against.
 - Climb-out slopes must top out flush with the destination floor, and pits
   need an escape (spring) — a parked player cannot climb a 45° slope from
   standstill (authentic SPG slope factor).

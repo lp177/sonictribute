@@ -98,6 +98,18 @@ describe('Grind rail', () => {
     expect(Math.abs(p.gsp)).toBeGreaterThanOrEqual(RAIL.min);
   });
 
+  it('sets the rider down exactly on the tip when the rail runs out', () => {
+    // Regression: `carry` used to advance x past the end and bail without
+    // touching y, launching the player from last frame's height — which, on a
+    // rail ending flush with a one-way platform, put them inside it.
+    const r = new Rail(100, 300, 260, 380);
+    const { p } = faller(r, 240);
+    r.tryCatch(p);
+    while (r.carry(p)) { /* ride to the end */ }
+    expect(p.x).toBe(r.x1);
+    expect(p.y + p.h).toBeCloseTo(r.y1, 6);
+  });
+
   it('ends the ride when the rail runs out', () => {
     const r = new Rail(100, 300, 260, 300);
     const { p } = faller(r, 240);

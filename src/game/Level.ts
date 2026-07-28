@@ -27,11 +27,12 @@ import {
 import { BossArena } from './BossArena.ts';
 import { Boss, type BossLike } from './Boss.ts';
 import { PressBoss } from './PressBoss.ts';
+import { CrystalBoss } from './CrystalBoss.ts';
 import { SCORE, type LevelStats } from './Score.ts';
 import type { Cutscene } from './story.ts';
 
-export type LevelTheme = 'verdant' | 'gear';
-export type BossKind = 'pod' | 'press';
+export type LevelTheme = 'verdant' | 'gear' | 'crystal';
+export type BossKind = 'pod' | 'press' | 'shard';
 
 const T = PHYS.tile;
 
@@ -660,7 +661,9 @@ export class Level {
       this.boss =
         this.bossKind === 'press'
           ? new PressBoss(bx, gy, this.arena.left, this.arena.right)
-          : new Boss(bx, gy, this.arena.left, this.arena.right);
+          : this.bossKind === 'shard'
+            ? new CrystalBoss(bx, gy, this.arena.left, this.arena.right)
+            : new Boss(bx, gy, this.arena.left, this.arena.right);
       this.arenaGates = new BossArena(this.arena.left, this.arena.right, this.groundAt(this.arena.left + 40));
       const ev = this.arenaGates.lock();
       if (ev) events.push(ev);

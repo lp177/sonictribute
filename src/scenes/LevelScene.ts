@@ -3,7 +3,7 @@ import type { Game } from '../core/Game.ts';
 import type { Input } from '../core/Input.ts';
 import type { Sfx } from '../audio/sfx.ts';
 import { Camera } from '../core/Camera.ts';
-import { Level } from '../game/Level.ts';
+import { Level, type LevelTheme } from '../game/Level.ts';
 import { Player, NO_INPUT } from '../game/Player.ts';
 import { HUD } from '../game/HUD.ts';
 import { LEVELS } from '../levels/index.ts';
@@ -23,6 +23,7 @@ import {
   drawBuzzDrone,
   drawDashPad,
   drawBoardPad,
+  drawRail,
   drawSpikeTrap,
   drawCrumble,
   drawSwingBall,
@@ -62,7 +63,7 @@ export class LevelScene implements Scene {
   private pause: PauseMenu | null = null;
   private settings: SettingsPanel | null = null;
   private decor: DecorSet;
-  private theme: 'verdant' | 'gear';
+  private theme: LevelTheme;
   private animate: boolean;
   /** Recent hero positions for speed afterimages (newest first). */
   private trail: { x: number; y: number; ball: boolean }[] = [];
@@ -80,7 +81,7 @@ export class LevelScene implements Scene {
     this.fx = new FxSystem(prefersReducedMotion());
     this.animate = !prefersReducedMotion();
     this.theme = def.theme;
-    this.skyFill = def.theme === 'gear' ? '#0d0d16' : '#0b1026';
+    this.skyFill = def.theme === 'gear' ? '#0d0d16' : def.theme === 'crystal' ? '#080513' : '#0b1026';
     this.decor = buildDecor(this.level.map, def.theme, W, H);
     // Pre-rendered art — built once, behind the scene fade. The background is
     // rendered taller than the view for vertical parallax headroom.
@@ -272,6 +273,9 @@ export class LevelScene implements Scene {
     // guttering, vents puffing, cogs turning.
     drawDecor(ctx, this.decor, this.frame, camX, W, this.animate);
 
+    for (const r of level.rails) {
+      if (r.x1 > camX - 40 && r.x0 < camX + W + 40) drawRail(ctx, r.x0, r.y0, r.x1, r.y1, this.frame);
+    }
     for (const c of level.crumbles) {
       if (visible(c.x)) drawCrumble(ctx, c.x, c.y, c.w, c.state, c.shakeOffset, c.fallY, this.theme);
     }

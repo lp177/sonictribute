@@ -267,7 +267,14 @@ export class Rail {
     p.ysp = 0;
     p.x += p.xsp;
     const ny = this.yAt(p.x);
-    if (ny === null) return false;
+    if (ny === null) {
+      // Ran off the end: place the rider exactly on the tip before releasing
+      // them. Leaving them at last frame's height launches them from inside
+      // whatever the rail ended against.
+      p.x = dir > 0 ? this.x1 : this.x0;
+      p.y = (dir > 0 ? this.y1 : this.y0) - p.h;
+      return false;
+    }
     p.y = ny - p.h;
     p.grounded = true;
     p.angle = 0;

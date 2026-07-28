@@ -37,6 +37,19 @@ export const STORY_ACT2: Cutscene = {
   ],
 };
 
+/** Between Zone 2 and Zone 3: down into the vault the Core came from. */
+export const STORY_ACT3: Cutscene = {
+  id: 'act3',
+  art: 'chase',
+  lines: [
+    'The sky-factory falls quiet — but the Core is still cold.',
+    'Its light points down, into the earth.',
+    'THE CHRONO VAULT: where the Core was cut, ages ago.',
+    'Yolk got here first. He is already digging.',
+    'Grind the old rails. Do not let him finish.',
+  ],
+};
+
 /** After the last zone (this build): the Core is recovered. */
 export const STORY_ENDING: Cutscene = {
   id: 'ending',

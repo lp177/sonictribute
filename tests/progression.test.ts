@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { LEVELS } from '../src/levels/index.ts';
 import { zone1 } from '../src/levels/zone1.ts';
 import { zone2 } from '../src/levels/zone2.ts';
+import { zone3 } from '../src/levels/zone3.ts';
 import { STORY_INTRO, STORY_ACT2, STORY_ENDING } from '../src/game/story.ts';
 import { Level } from '../src/game/Level.ts';
 import { Game, type Scene } from '../src/core/Game.ts';
@@ -48,10 +49,11 @@ describe('Scene transitions', () => {
 });
 
 describe('Campaign progression', () => {
-  it('runs Verdant Rush then Cog Skyway', () => {
-    expect(LEVELS).toHaveLength(2);
+  it('runs Verdant Rush, then Cog Skyway, then the Chrono Vault', () => {
+    expect(LEVELS).toHaveLength(3);
     expect(LEVELS[0]).toBe(zone1);
     expect(LEVELS[1]).toBe(zone2);
+    expect(LEVELS[2]).toBe(zone3);
   });
 
   it('gives each zone its own look and its own boss', () => {
@@ -61,13 +63,15 @@ describe('Campaign progression', () => {
     expect(zone1.bossKind).toBe('pod');
     expect(zone2.theme).toBe('gear');
     expect(zone2.bossKind).toBe('press');
+    expect(zone3.theme).toBe('crystal');
+    expect(zone3.bossKind).toBe('shard');
     expect(new Set(LEVELS.map((d) => d.theme)).size).toBe(LEVELS.length);
   });
 
   it('every level declares a theme, a boss and an intro cutscene', () => {
     for (const def of LEVELS) {
-      expect(['verdant', 'gear']).toContain(def.theme);
-      expect(['pod', 'press']).toContain(def.bossKind);
+      expect(['verdant', 'gear', 'crystal']).toContain(def.theme);
+      expect(['pod', 'press', 'shard']).toContain(def.bossKind);
       expect(def.intro.lines.length).toBeGreaterThanOrEqual(3);
       expect(['steal', 'chase', 'ending']).toContain(def.intro.art);
     }

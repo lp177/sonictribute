@@ -32,6 +32,9 @@ const SHAKES: Record<string, [number, number]> = {
   dash: [2, 8],
   'boss-hit': [3, 10],
   'boss-slam': [5, 20],
+  'boss-telegraph': [1.5, 8],
+  'boss-dig': [2.5, 16],
+  'boss-burst': [6, 24],
   'boss-defeated': [6, 30],
   'gate-slam': [5, 18],
   crumble: [2, 8],
@@ -54,6 +57,7 @@ const HIT_STOP: Record<string, number> = {
   'boss-hit': 7,
   'boss-defeated': 12,
   'boss-slam': 5,
+  'boss-burst': 6,
   enemy: 4,
   monitor: 3,
   crumble: 2,
@@ -202,6 +206,9 @@ export class FxSystem {
       case 'loop-boost':
         this.emit(x, y, 14, { colors: ['#fff', '#4be1ff', '#ffd94a'], speed: 3, life: 26, size: 3, kind: 'spark' });
         break;
+      case 'rail-on':
+        this.emit(x, y, 8, { colors: ['#fff', '#b7f3ff', '#ffd94a'], speed: 2, life: 20, size: 2, kind: 'spark', grav: 0.12 });
+        break;
       case 'dash':
       case 'dash-pad':
         this.emit(x, y, 8, { colors: ['#cfd6e4', '#9aa3b2'], speed: 1.6, life: 26, size: 4, kind: 'smoke', up: 0.4 });
@@ -220,6 +227,16 @@ export class FxSystem {
         break;
       case 'boss-hit':
         this.emit(x, y, 8, { colors: ['#fff', '#ffd94a'], speed: 2.4, life: 20, size: 3, kind: 'spark' });
+        break;
+      case 'boss-dig':
+        this.emit(x, y, 10, { colors: ['#3a2b5e', '#6b5a9e', '#9aa3b2'], speed: 1.8, life: 30, size: 4, kind: 'smoke', up: 0.5 });
+        break;
+      case 'boss-burst':
+        this.emit(x, y, 20, { colors: ['#4be1ff', '#b7f3ff', '#ff6bd6', '#fff'], speed: 3.6, life: 36, size: 3, kind: 'spark', grav: 0.12 });
+        this.emit(x, y, 10, { colors: ['#3a2b5e', '#6b5a9e'], speed: 2, life: 34, size: 5, kind: 'smoke', up: 1 });
+        break;
+      case 'boss-shards':
+        this.emit(x, y, 8, { colors: ['#4be1ff', '#fff'], speed: 2, life: 18, size: 2, kind: 'spark' });
         break;
       case 'boss-slam':
         this.emit(x - 24, y, 8, { colors: ['#9aa3b2', '#6b7280'], speed: 2, life: 30, size: 5, kind: 'smoke', up: 1.2 });

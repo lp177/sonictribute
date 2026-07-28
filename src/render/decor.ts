@@ -24,7 +24,11 @@ export type DecorKind =
   | 'torch'
   | 'gear'
   | 'steam'
-  | 'lamp';
+  | 'lamp'
+  | 'shardCluster'
+  | 'vein'
+  | 'drip'
+  | 'mote';
 
 export interface DecorItem {
   kind: DecorKind;
@@ -65,10 +69,11 @@ function surfaceAt(map: TileMap, tx: number): number | null {
 
 /**
  * Builds the decor set for a level. `theme` selects the vocabulary: verdant
- * gets plants and fireflies, gear gets torches, vents and turning machinery.
+ * gets plants and fireflies, gear gets torches, vents and turning machinery,
+ * crystal gets glowing clusters, floor veins and cave water.
  */
 export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH = 360): DecorSet {
-  let seed = theme === 'gear' ? 90210 : 1337;
+  let seed = theme === 'gear' ? 90210 : theme === 'crystal' ? 4242 : 1337;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
   const items: DecorItem[] = [];
@@ -84,31 +89,38 @@ export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH =
     if (theme === 'gear') {
       const kind: DecorKind = roll < 0.34 ? 'torch' : roll < 0.62 ? 'steam' : roll < 0.84 ? 'gear' : 'lamp';
       items.push({ kind, x, y, phase, scale });
+    } else if (theme === 'crystal') {
+      const kind: DecorKind = roll < 0.46 ? 'shardCluster' : roll < 0.78 ? 'vein' : 'drip';
+      items.push({ kind, x, y, phase, scale });
     } else {
       const kind: DecorKind = roll < 0.5 ? 'grass' : roll < 0.76 ? 'flower' : 'bush';
       items.push({ kind, x, y, phase, scale });
     }
   }
 
-  // A few fireflies drifting above the verdant ground.
-  if (theme === 'verdant') {
+  // Drifting points of light above the ground: fireflies in the meadow, cold
+  // crystal dust in the vault.
+  if (theme === 'verdant' || theme === 'crystal') {
+    const kind: DecorKind = theme === 'crystal' ? 'mote' : 'firefly';
     for (let i = 0; i < 90; i++) {
       const tx = 2 + Math.floor(rnd() * (map.w - 4));
       const y = surfaceAt(map, tx);
       if (y === null) continue;
-      items.push({ kind: 'firefly', x: tx * T + rnd() * T, y: y - 20 - rnd() * 90, phase: rnd() * 6.283, scale: 0.6 + rnd() * 0.8 });
+      items.push({ kind, x: tx * T + rnd() * T, y: y - 20 - rnd() * 90, phase: rnd() * 6.283, scale: 0.6 + rnd() * 0.8 });
     }
   }
 
-  // Parallax clouds live in the background strip's own coordinate space.
+  // Parallax clouds live in the background strip's own coordinate space. The
+  // cavern has no sky, so its "clouds" are mist banks and lit dust — more of
+  // them, drifting slower, because that layer is the only motion back there.
   const clouds: Cloud[] = [];
-  const cloudCount = theme === 'gear' ? 7 : 9;
+  const cloudCount = theme === 'gear' ? 7 : theme === 'crystal' ? 16 : 9;
   for (let i = 0; i < cloudCount; i++) {
     clouds.push({
       x: rnd() * viewW,
-      y: 24 + rnd() * (viewH * 0.42),
+      y: 24 + rnd() * (viewH * (theme === 'crystal' ? 0.7 : 0.42)),
       scale: 0.6 + rnd() * 1.3,
-      drift: (theme === 'gear' ? 0.10 : 0.16) + rnd() * 0.22,
+      drift: (theme === 'gear' ? 0.10 : theme === 'crystal' ? 0.06 : 0.16) + rnd() * 0.22,
       alpha: (theme === 'gear' ? 0.10 : 0.16) + rnd() * 0.14,
     });
   }
@@ -157,6 +169,18 @@ export function drawDecor(
         break;
       case 'lamp':
         drawLamp(ctx, d, frame, animate);
+        break;
+      case 'shardCluster':
+        drawShardCluster(ctx, d, frame, animate);
+        break;
+      case 'vein':
+        drawFloorVein(ctx, d, frame, animate);
+        break;
+      case 'drip':
+        drawCaveDrip(ctx, d, frame, animate);
+        break;
+      case 'mote':
+        drawMote(ctx, d, frame, animate);
         break;
     }
   }
@@ -332,6 +356,141 @@ function drawLamp(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, an
 }
 
 /**
+ * Crystal outcrop: a few prisms growing out of the rock, breathing light. The
+ * Chrono Vault is lit by its own walls, so these are the zone's lamps as well
+ * as its scenery — the pulse is what stops a dark cavern reading as dead.
+ */
+function drawShardCluster(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  const pulse = animate ? 0.55 + 0.45 * Math.sin(t / 26 + d.phase) : 0.8;
+  // Magenta outcrops are the minority: a rare accent reads richer than an
+  // even split, which just looks like two zones fighting.
+  const hue = d.phase > 4.6 ? '224,90,216' : '75,225,255';
+  const heights = [9, 20, 13];
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  const glow = ctx.createRadialGradient(0, -9 * d.scale, 1, 0, -9 * d.scale, 30 * d.scale);
+  glow.addColorStop(0, `rgba(${hue},${0.32 * pulse})`);
+  glow.addColorStop(1, `rgba(${hue},0)`);
+  ctx.fillStyle = glow;
+  ctx.fillRect(-32 * d.scale, -42 * d.scale, 64 * d.scale, 52 * d.scale);
+  for (let i = 0; i < 3; i++) {
+    const off = (i - 1) * 4.6 * d.scale;
+    const hh = (heights[i] + Math.sin(d.phase + i * 2) * 2.5) * d.scale;
+    const w = 3.1 * d.scale;
+    const lean = Math.sin(d.phase + i) * 1.6 * d.scale;
+    ctx.fillStyle = `rgba(${hue},${0.42 + 0.16 * pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(off - w, 1);
+    ctx.lineTo(off - w * 0.7, -hh * 0.6);
+    ctx.lineTo(off + lean, -hh);
+    ctx.lineTo(off + w * 0.7, -hh * 0.6);
+    ctx.lineTo(off + w, 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${0.28 + 0.42 * pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(off + lean, -hh);
+    ctx.lineTo(off + w * 0.45, -hh * 0.5);
+    ctx.lineTo(off, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** A lit seam running through the cavern floor, breathing along its length. */
+function drawFloorVein(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  const pulse = animate ? 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t / 38 + d.phase)) : 0.75;
+  const len = 17 * d.scale;
+  // Magenta by default: the terrain cap is cyan, and a cyan seam painted on it
+  // simply disappears.
+  const hue = d.phase < 1.6 ? '75,225,255' : '224,90,216';
+  ctx.save();
+  // Seated below the crystal crust, on the rock: painted on the bright cap it
+  // is invisible, and painted above it, it reads as a wire lying on the floor.
+  ctx.translate(d.x, d.y + 8);
+  ctx.lineCap = 'round';
+  const seam = (dir: number, scale: number) => {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(dir * len * 0.4 * scale, 1.4);
+    ctx.lineTo(dir * len * 0.72 * scale, -0.6);
+    ctx.lineTo(dir * len * scale, 1);
+    ctx.stroke();
+  };
+  ctx.strokeStyle = `rgba(${hue},${0.22 * pulse})`;
+  ctx.lineWidth = 5;
+  seam(-1, 1);
+  seam(1, 1);
+  ctx.strokeStyle = `rgba(255,235,255,${0.6 * pulse})`;
+  ctx.lineWidth = 1.3;
+  seam(-1, 1);
+  seam(1, 1);
+  ctx.strokeStyle = `rgba(${hue},${0.55 * pulse})`;
+  seam(d.phase > 3.14 ? 1 : -1, 0.45);
+  ctx.restore();
+}
+
+/** Groundwater finding its way through the rock: drip, land, ripple, repeat. */
+function drawCaveDrip(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const fall = 42 * d.scale;
+  ctx.save();
+  // Below the crust like the veins: a pool drawn on the bright cap vanishes.
+  ctx.translate(d.x, d.y + 7);
+  // The pool it has been carving is always there, even when nothing is falling.
+  ctx.fillStyle = 'rgba(90,205,238,0.30)';
+  ctx.beginPath();
+  ctx.ellipse(0, -1, 7 * d.scale, 2 * d.scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(200,245,255,0.3)';
+  ctx.fillRect(-4 * d.scale, -2, 5 * d.scale, 1);
+
+  const p = animate ? (frame / 96 + d.phase / 6.283) % 1 : 0.05;
+  if (p < 0.72) {
+    // Free fall, so the drop accelerates instead of sliding down at a
+    // constant rate — the one cue that sells it as water and not a spark.
+    const q = p / 0.72;
+    const y = -fall + q * q * fall;
+    ctx.fillStyle = `rgba(185,240,255,${Math.min(1, q * 4) * 0.75})`;
+    ctx.beginPath();
+    ctx.ellipse(0, y, 1.3 * d.scale, (2.2 + q * 1.6) * d.scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const q = (p - 0.72) / 0.28;
+    ctx.strokeStyle = `rgba(170,238,255,${0.5 * (1 - q)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(0, -1, (2 + q * 9) * d.scale, (0.8 + q * 2.6) * d.scale, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Crystal dust hanging in the cavern air — the vault's cold answer to fireflies. */
+function drawMote(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  const x = d.x + Math.sin(t / 96 + d.phase) * 12;
+  // Motes settle downward and are nudged back up, so the air reads as still
+  // and heavy rather than breezy like the meadow.
+  const y = d.y + Math.cos(t / 71 + d.phase * 1.4) * 14;
+  const pulse = animate ? 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(t / 22 + d.phase)) : 0.65;
+  const hue = d.phase > 4.9 ? '224,90,216' : '140,240,255';
+  ctx.save();
+  // A tight halo around a hard core: widen it and the mote stops being dust
+  // and starts looking like a bubble.
+  const g = ctx.createRadialGradient(x, y, 0, x, y, 4.5 * d.scale);
+  g.addColorStop(0, `rgba(${hue},${0.55 * pulse})`);
+  g.addColorStop(1, `rgba(${hue},0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x - 6, y - 6, 12, 12);
+  ctx.fillStyle = `rgba(235,252,255,${0.85 * pulse})`;
+  ctx.fillRect(x - 0.7, y - 0.7, 1.4, 1.4);
+  ctx.restore();
+}
+
+/**
  * Draws drifting clouds into the parallax background, in screen space. They
  * move independently of the camera so the sky is never static.
  */
@@ -351,6 +510,10 @@ export function drawClouds(
     const span = viewW + 260;
     let x = (c.x - camX * 0.08 - t * c.drift) % span;
     if (x < -130) x += span;
+    if (theme === 'crystal') {
+      drawCavernDrift(ctx, c, x, t);
+      continue;
+    }
     const w = 46 * c.scale;
     const h = 11 * c.scale;
     ctx.fillStyle =
@@ -362,4 +525,40 @@ export function drawClouds(
     ctx.fill();
   }
   ctx.restore();
+}
+
+/**
+ * The cavern's parallax layer. Nothing is backlit down here, so a cloud shape
+ * would read as a hole in the rock: the big banks are cold mist catching the
+ * crystal glow, and everything smaller is lit dust sinking through it.
+ */
+function drawCavernDrift(ctx: CanvasRenderingContext2D, c: Cloud, x: number, t: number): void {
+  const y = c.y + Math.sin(t / 130 + c.x) * 7;
+  if (c.scale > 1.15) {
+    const w = 74 * c.scale;
+    const h = 15 * c.scale;
+    ctx.save();
+    // The squash goes on BEFORE the gradient is built: canvas gradients are
+    // evaluated in the transform active when they are painted, so a circle
+    // defined up front would be dragged off the shape it is meant to fill.
+    ctx.translate(x, y);
+    ctx.scale(1, h / w);
+    const mist = ctx.createRadialGradient(0, 0, 1, 0, 0, w);
+    mist.addColorStop(0, `rgba(125,155,235,${c.alpha * 0.5})`);
+    mist.addColorStop(0.55, `rgba(90,80,180,${c.alpha * 0.26})`);
+    mist.addColorStop(1, 'rgba(90,80,180,0)');
+    ctx.fillStyle = mist;
+    ctx.fillRect(-w, -w, w * 2, w * 2);
+    ctx.restore();
+    return;
+  }
+  const r = 5 * c.scale;
+  const hue = c.drift > 0.2 ? '224,90,216' : '140,240,255';
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${hue},${0.35 + c.alpha * 1.6})`);
+  g.addColorStop(1, `rgba(${hue},0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  ctx.fillStyle = `rgba(240,252,255,${0.4 + c.alpha})`;
+  ctx.fillRect(x - 0.6, y - 0.6, 1.2, 1.2);
 }

@@ -3,6 +3,7 @@ import { Level } from '../src/game/Level.ts';
 import { LEVELS } from '../src/levels/index.ts';
 import { zone1 } from '../src/levels/zone1.ts';
 import { zone2 } from '../src/levels/zone2.ts';
+import { zone3 } from '../src/levels/zone3.ts';
 import { PHYS } from '../src/physics/constants.ts';
 import { Player, NO_INPUT } from '../src/game/Player.ts';
 import { castGround } from '../src/physics/sensors.ts';
@@ -136,6 +137,7 @@ describe('Level flow (no momentum-killing terrain)', () => {
   it.each([
     ['VERDANT RUSH', zone1],
     ['COG SKYWAY', zone2],
+    ['THE CHRONO VAULT', zone3],
   ] as const)('%s: a bot holding right keeps moving and reaches the boss', (_name, def) => {
     const r = runBot(def, 9000);
     expect(r.p.dead).toBe(false);

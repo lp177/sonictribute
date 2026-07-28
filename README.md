@@ -16,8 +16,8 @@ ground-speed model, slope factors, rolling, spin dash and 360° loops built
 from dual collision layers.
 
 > Dr. Yolk has stolen the **Chrono Core** and time is stuttering. Chase him
-> through two zones, recover the scattered Chrono Crystals, and take the Core
-> back.
+> through three zones, recover the scattered Chrono Crystals, and take the
+> Core back.
 
 ## Play
 
@@ -38,13 +38,16 @@ loads.
   annulus with dual collision layers. Running into one at any pace grants a
   speed boost and the channel holds you at speed, so you never stall
   upside-down: you commit, you get the whole ride, you come out fast.
-- **Two zones, no loading screens** — story cutscenes double as loading
+- **Three zones, no loading screens** — story cutscenes double as loading
   screens: the next level is built behind the fade while the cinematic plays.
   - *Verdant Rush* — hills, loops, stacked routes, Dr. Yolk's Wrecking Pod.
   - *Cog Skyway* — Yolk's sky-factory: dash pads, Buzz Drones, the
     **Mag-Board** hoverboard (a zone-exclusive vehicle that absorbs one hit),
     and the Piston Crusher boss (armoured except after its slam — jump the
     shockwaves, strike the open window).
+  - *The Chrono Vault* — the crystal cavern the Core was cut from, where
+    **grind rails** turn chasms into high-speed lines, and Yolk's Shard Drill
+    burrows out of sight, erupts, and rains crystal shards.
 - **Exploration rewards** — 5 Chrono Crystals and 3 secret rooms per zone,
   monitors, checkpoints, and a score/time-bonus results screen with
   achievements (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring
@@ -72,7 +75,7 @@ loads.
   states, and `prefers-reduced-motion` support (screen shake and afterimages
   off, fewer particles).
 - **Procedural audio** — a small WebAudio synth, no audio files.
-- **260 unit tests** — physics sensors, player state machine, entities,
+- **326 unit tests** — physics sensors, player state machine, entities,
   hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
   reachability, simulated loop rides, route-continuity contracts, and a flow
   test that fails if a bot holding right ever gets pinned by the terrain.
@@ -170,14 +173,15 @@ src/
               2 collision layers, loop stamper), sensor casts
   game/       Player state machine, Level + LevelBuilder, entities, bosses,
               loop tracker, scoring/achievements, story data
-  levels/     zone1 (Verdant Rush), zone2 (Cog Skyway), campaign roster
+  levels/     zone1 (Verdant Rush), zone2 (Cog Skyway), zone3 (Chrono
+              Vault), campaign roster
   render/     procedural art (themed terrain/backgrounds/sprites) and the
               FX layer (particles, screen shake)
   ui/         canvas menus: settings (key remapping) and pause
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
   core/       game shell (fixed timestep), input, key bindings, camera
   audio/      procedural WebAudio sound effects
-tests/        Vitest suites (260 tests)
+tests/        Vitest suites (326 tests)
 docs/         built site — this is what GitHub Pages serves
 ```
 

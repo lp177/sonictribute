@@ -157,6 +157,15 @@ export class Sfx {
       case 'shield-lost':
         this.blip(660, 0.2, 'sine', -220);
         break;
+      case 'rail-on':
+        // Metal bite, then a sustained grind tone.
+        this.noise(0.14, 0, 0.3);
+        this.blip(520, 0.1, 'sawtooth', 340);
+        this.blip(300, 0.5, 'sawtooth', 90, 0.06, 0.18);
+        break;
+      case 'rail-off':
+        this.blip(700, 0.12, 'sawtooth', -320, 0, 0.22);
+        break;
       case 'board':
         this.blip(330, 0.12, 'triangle', 200);
         this.blip(660, 0.16, 'triangle', 200, 0.1);
@@ -228,6 +237,21 @@ export class Sfx {
       case 'boss-telegraph':
         this.blip(700, 0.08, 'square');
         this.blip(700, 0.08, 'square', 0, 0.12);
+        break;
+      case 'boss-dig':
+        // Rock swallowing the rig: low grinding rumble.
+        this.thud(55, 0.42, 0.9);
+        this.noise(0.34, 0.02, 0.22);
+        break;
+      case 'boss-burst':
+        // The eruption — the heaviest cue in the fight.
+        this.thud(42, 0.6, 1.4);
+        this.noise(0.4, 0, 0.45);
+        this.blip(160, 0.35, 'sawtooth', 260, 0.04, 0.3);
+        break;
+      case 'boss-shards':
+        // Bright glassy volley, no weight: this one you dodge, not feel.
+        [1046, 1318, 1567].forEach((f, i) => this.blip(f, 0.14, 'triangle', 120, i * 0.04, 0.22));
         break;
       case 'boss-defeated':
         this.noise(0.6);
