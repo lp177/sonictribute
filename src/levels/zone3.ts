@@ -37,6 +37,8 @@ import { STORY_ACT3 } from '../game/story.ts';
 export const zone3: LevelDef = {
   name: 'CHRONO VAULT',
   act: 'ACT 3',
+  title: 'The First Vein',
+  biome: 2,
   theme: 'crystal',
   bossKind: 'shard',
   intro: STORY_ACT3,

@@ -24,6 +24,8 @@ import { STORY_INTRO } from '../game/story.ts';
 export const zone1: LevelDef = {
   name: 'VERDANT RUSH',
   act: 'ACT 1',
+  title: 'Tidebreak Run',
+  biome: 0,
   theme: 'verdant',
   bossKind: 'pod',
   intro: STORY_INTRO,

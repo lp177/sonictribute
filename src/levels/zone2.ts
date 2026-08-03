@@ -17,6 +17,8 @@ import { STORY_ACT2 } from '../game/story.ts';
 export const zone2: LevelDef = {
   name: 'COG SKYWAY',
   act: 'ACT 2',
+  title: 'Conveyor Dawn Patrol',
+  biome: 1,
   theme: 'gear',
   bossKind: 'press',
   intro: STORY_ACT2,

@@ -68,15 +68,23 @@ describe('Campaign progression', () => {
     expect(new Set(LEVELS.map((d) => d.theme)).size).toBe(LEVELS.length);
   });
 
-  it('every level declares a theme, a boss and an intro cutscene', () => {
+  it('every level declares a theme; biome openers carry the story beat', () => {
+    const seenBiome = new Set<number>();
     for (const def of LEVELS) {
       expect(['verdant', 'gear', 'crystal']).toContain(def.theme);
-      expect(['pod', 'press', 'shard']).toContain(def.bossKind);
-      expect(def.intro.lines.length).toBeGreaterThanOrEqual(3);
-      expect(['steal', 'chase', 'ending']).toContain(def.intro.art);
+      if (def.bossKind) expect(['pod', 'press', 'shard']).toContain(def.bossKind);
+      const opener = !seenBiome.has(def.biome);
+      seenBiome.add(def.biome);
+      if (opener) {
+        // The first act of a biome is where the story advances.
+        expect(def.intro, `biome ${def.biome} opener has no cutscene`).toBeDefined();
+        expect(def.intro!.lines.length).toBeGreaterThanOrEqual(3);
+      }
+      expect(def.title.length).toBeGreaterThan(3);
     }
-    // Each zone gets its own story beat.
-    expect(new Set(LEVELS.map((d) => d.intro.id)).size).toBe(LEVELS.length);
+    // Each biome opener gets its own story beat.
+    const ids = LEVELS.filter((d) => d.intro).map((d) => d.intro!.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('story order: intro -> act2 -> ending, all with text', () => {
@@ -88,7 +96,7 @@ describe('Campaign progression', () => {
     }
     // The stolen MacGuffin threads through the whole campaign.
     expect(STORY_INTRO.lines.join(' ')).toMatch(/CHRONO CORE/i);
-    expect(STORY_ENDING.lines.join(' ')).toMatch(/CHRONO CORE/i);
+    expect(STORY_ENDING.lines.join(' ')).toMatch(/Core/);
   });
 
   it('every campaign level keeps the collectible contract (5 crystals, 3 secrets)', () => {

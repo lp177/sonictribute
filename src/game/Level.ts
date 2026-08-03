@@ -31,8 +31,8 @@ import { CrystalBoss } from './CrystalBoss.ts';
 import { SCORE, type LevelStats } from './Score.ts';
 import type { Cutscene } from './story.ts';
 
-export type LevelTheme = 'verdant' | 'gear' | 'crystal';
-export type BossKind = 'pod' | 'press' | 'shard';
+export type LevelTheme = 'verdant' | 'gear' | 'crystal' | 'neon';
+export type BossKind = 'pod' | 'press' | 'shard' | 'mirage';
 
 const T = PHYS.tile;
 
@@ -373,22 +373,33 @@ export const WORLD_H = 40;
 export interface LevelDef {
   name: string;
   act: string;
+  /**
+   * Scene-descriptive display name for the level-select list — it should let
+   * a player recognise the stage at a glance ("Tidebreak Run", not "Act 3").
+   */
+  title: string;
+  /** Which biome this act belongs to (index into BIOMES). */
+  biome: number;
   /** World size in tiles; defaults to WORLD_W x WORLD_H. */
   width?: number;
   height?: number;
   /** Visual theme for terrain/background procedural art. */
   theme: LevelTheme;
-  /** Which end-of-zone boss guards the goal. */
-  bossKind: BossKind;
-  /** Story beat played (as a pseudo-loading cinematic) before this level. */
-  intro: Cutscene;
+  /** Boss guarding the goal; omit for acts that end at the signpost. */
+  bossKind?: BossKind;
+  /**
+   * Story beat played (as a pseudo-loading cinematic) before this level.
+   * Only a biome's first act carries one — between ordinary acts the fade
+   * alone keeps the pace up.
+   */
+  intro?: Cutscene;
   build(b: LevelBuilder): void;
 }
 
 export class Level {
   readonly name: string;
   readonly theme: LevelTheme;
-  readonly bossKind: BossKind;
+  readonly bossKind: BossKind | null;
   readonly map: TileMap;
   readonly loops: LoopZone[];
   readonly loopTracker: LoopTracker;
@@ -453,7 +464,7 @@ export class Level {
   constructor(def: LevelDef) {
     this.name = def.name;
     this.theme = def.theme;
-    this.bossKind = def.bossKind;
+    this.bossKind = def.bossKind ?? null;
     const b = new LevelBuilder(def.width ?? WORLD_W, def.height ?? WORLD_H);
     def.build(b);
 
@@ -655,7 +666,7 @@ export class Level {
 
     // Boss: crossing the trigger slams the arena gates shut behind and ahead
     // of the player — the only way out is through the fight.
-    if (!this.boss && !this.bossDefeated && this.bossTriggerX >= 0 && p.x > this.bossTriggerX) {
+    if (this.bossKind && !this.boss && !this.bossDefeated && this.bossTriggerX >= 0 && p.x > this.bossTriggerX) {
       const bx = this.arena.right - 96;
       const gy = this.groundAt(bx);
       this.boss =
@@ -696,7 +707,7 @@ export class Level {
     }
 
     // Goal.
-    if (this.bossDefeated && !this.results && this.goal.tryTrigger(p)) {
+    if ((this.bossKind === null || this.bossDefeated) && !this.results && this.goal.tryTrigger(p)) {
       events.push('goal');
       this.results = this.stats();
     }

@@ -8,6 +8,7 @@ import { Player, NO_INPUT } from '../game/Player.ts';
 import { HUD } from '../game/HUD.ts';
 import { LEVELS } from '../levels/index.ts';
 import { STORY_ENDING } from '../game/story.ts';
+import { Progress } from '../game/progress.ts';
 import {
   PAL,
   renderTerrain,
@@ -67,6 +68,7 @@ export class LevelScene implements Scene {
   private animate: boolean;
   /** Recent hero positions for speed afterimages (newest first). */
   private trail: { x: number; y: number; ball: boolean }[] = [];
+  private clearRecorded = false;
 
   constructor(game: Game, input: Input, sfx: Sfx, levelIndex = 0) {
     this.game = game;
@@ -81,7 +83,8 @@ export class LevelScene implements Scene {
     this.fx = new FxSystem(prefersReducedMotion());
     this.animate = !prefersReducedMotion();
     this.theme = def.theme;
-    this.skyFill = def.theme === 'gear' ? '#0d0d16' : def.theme === 'crystal' ? '#080513' : '#0b1026';
+    this.skyFill =
+      def.theme === 'gear' ? '#0d0d16' : def.theme === 'crystal' ? '#080513' : def.theme === 'neon' ? '#0a0618' : '#0b1026';
     this.decor = buildDecor(this.level.map, def.theme, W, H);
     // Pre-rendered art — built once, behind the scene fade. The background is
     // rendered taller than the view for vertical parallax headroom.
@@ -123,19 +126,36 @@ export class LevelScene implements Scene {
     this.fx.update();
 
     if (level.results) {
+      if (!this.clearRecorded) {
+        // The act is beaten the moment the results exist — record it even if
+        // the player walks away at the results screen.
+        this.clearRecorded = true;
+        const progress = Progress.load();
+        progress.recordClear(this.levelIndex, {
+          score: level.score,
+          timeFrames: level.results.timeFrames,
+          crystals: level.results.crystalsFound,
+          secrets: level.results.secretsFound,
+        });
+        progress.save();
+      }
       if (this.input.confirmPressed()) {
         const next = this.levelIndex + 1;
         if (next < LEVELS.length) {
-          // The next zone's intro cutscene doubles as its loading screen.
+          // A biome's first act opens with its story beat (which doubles as
+          // the loading screen); between ordinary acts the fade is enough.
+          const intro = LEVELS[next].biome !== LEVELS[this.levelIndex].biome ? LEVELS[next].intro : undefined;
           this.game.changeScene(
             () =>
-              new CutsceneScene(
-                this.game,
-                this.input,
-                this.sfx,
-                LEVELS[next].intro,
-                () => new LevelScene(this.game, this.input, this.sfx, next),
-              ),
+              intro
+                ? new CutsceneScene(
+                    this.game,
+                    this.input,
+                    this.sfx,
+                    intro,
+                    () => new LevelScene(this.game, this.input, this.sfx, next),
+                  )
+                : new LevelScene(this.game, this.input, this.sfx, next),
           );
         } else {
           this.game.changeScene(

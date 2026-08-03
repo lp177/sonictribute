@@ -16,11 +16,14 @@ import { keyLabel } from '../core/bindings.ts';
 import { SettingsPanel } from '../ui/SettingsPanel.ts';
 import { UI, keyChip, selectionRow } from '../ui/theme.ts';
 import { LEVELS } from '../levels/index.ts';
+import { Progress } from '../game/progress.ts';
 import { CutsceneScene } from './CutsceneScene.ts';
 import { LevelScene } from './LevelScene.ts';
+import { LevelSelectScene } from './LevelSelectScene.ts';
 
 const MENU = [
-  { id: 'start', label: 'START GAME', hint: `${LEVELS.length} ZONES` },
+  { id: 'start', label: 'START GAME', hint: '' },
+  { id: 'levels', label: 'LEVEL SELECT', hint: '' },
   { id: 'settings', label: 'SETTINGS', hint: 'REBIND CONTROLS' },
 ] as const;
 
@@ -54,6 +57,7 @@ export class TitleScene implements Scene {
   private index = 0;
   private settings: SettingsPanel | null = null;
   private reduced = prefersReducedMotion();
+  private progress = Progress.load();
 
   constructor(game: Game, input: Input, sfx: Sfx) {
     this.game = game;
@@ -83,21 +87,31 @@ export class TitleScene implements Scene {
 
     if (this.input.confirmPressed()) {
       this.sfx.ensure();
-      if (MENU[this.index].id === 'settings') {
+      const id = MENU[this.index].id;
+      if (id === 'settings') {
         this.settings = new SettingsPanel();
         return;
       }
-      // Into the story: the intro cutscene plays while the first level is
-      // built behind the fade — no visible loading pause, ever.
+      if (id === 'levels') {
+        this.game.changeScene(() => new LevelSelectScene(this.game, this.input, this.sfx));
+        return;
+      }
+      // START continues the campaign from the first uncleared act. Its
+      // biome-opening cutscene (when it has one) doubles as the loading
+      // screen — no visible pause, ever.
+      const at = this.progress.continueAt(LEVELS.length);
+      const intro = at === 0 || LEVELS[at].biome !== LEVELS[at - 1].biome ? LEVELS[at].intro : undefined;
       this.game.changeScene(
         () =>
-          new CutsceneScene(
-            this.game,
-            this.input,
-            this.sfx,
-            LEVELS[0].intro,
-            () => new LevelScene(this.game, this.input, this.sfx, 0),
-          ),
+          intro
+            ? new CutsceneScene(
+                this.game,
+                this.input,
+                this.sfx,
+                intro,
+                () => new LevelScene(this.game, this.input, this.sfx, at),
+              )
+            : new LevelScene(this.game, this.input, this.sfx, at),
       );
     }
   }
@@ -185,7 +199,13 @@ export class TitleScene implements Scene {
       ctx.font = '9px monospace';
       ctx.fillStyle = selected ? UI.accent : UI.textFaint;
       ctx.textAlign = 'right';
-      ctx.fillText(item.hint, COL_LEFT + COL_W - 12, y + 17);
+      const hint =
+        item.id === 'start'
+          ? `ACT ${this.progress.continueAt(LEVELS.length) + 1}/${LEVELS.length}`
+          : item.id === 'levels'
+            ? `${this.progress.clearedCount()}/${LEVELS.length} CLEARED`
+            : item.hint;
+      ctx.fillText(hint, COL_LEFT + COL_W - 12, y + 17);
       ctx.textAlign = 'left';
     });
   }

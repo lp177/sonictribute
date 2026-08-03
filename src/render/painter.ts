@@ -55,6 +55,16 @@ interface TerrainTheme {
 }
 
 const TERRAIN_THEMES: Record<LevelTheme, TerrainTheme> = {
+  neon: {
+    // Placeholder until Noon Tomorrow's art lands: dark asphalt + hot magenta.
+    body: '#232030',
+    bodyDark: '#161420',
+    cap: '#ff4fa3',
+    capDark: '#7c2050',
+    platTop: '#41f0ff',
+    platTopDark: '#0d3a40',
+    platBody: '#232030',
+  },
   verdant: {
     body: PAL.dirt,
     bodyDark: PAL.dirtDark,
