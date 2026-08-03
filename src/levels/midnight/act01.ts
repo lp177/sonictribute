@@ -61,7 +61,7 @@ export const midnight01: LevelDef = {
 
     // Sky overlay: the catwalk chain over the whole shop floor, stamped after
     // the ground per the build-order rule.
-    const s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    const s = canopyRun(b, 36, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 104 });
   },
 };

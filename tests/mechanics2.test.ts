@@ -295,14 +295,14 @@ describe('Minecart', () => {
     let crashEvents: string[] = [];
     for (let f = 0; f < 200; f++) {
       const evs = frame(level, p);
-      if (evs.includes('cart-crash')) {
+      if (evs.includes('cart-wreck')) {
         crashEvents = evs;
         break;
       }
     }
-    expect(crashEvents).toContain('cart-crash');
+    expect(crashEvents).toContain('cart-wreck');
     expect(crashEvents).toContain('hurt'); // the level's damage path, same frame
-    expect(level.eventSources.get('cart-crash')!.x).toBe(CART_END_X);
+    expect(level.eventSources.get('cart-wreck')!.x).toBe(CART_END_X);
     expect(p.rings).toBe(0);
     expect(level.tookDamage).toBe(true);
     expect(p.carting).toBe(false);
@@ -314,7 +314,7 @@ describe('Minecart', () => {
     p.rings = 5;
     boardCart(level, p);
     for (let f = 0; f < 200; f++) {
-      if (frame(level, p).includes('cart-crash')) break;
+      if (frame(level, p).includes('cart-wreck')) break;
     }
     // Exactly at the end of the track, feet on the rail line — knockback
     // starts from a known spot, never from inside the buffer.
@@ -329,7 +329,7 @@ describe('Minecart', () => {
     p.shield = true;
     boardCart(level, p);
     const heard: string[] = [];
-    for (let f = 0; f < 200 && !heard.includes('cart-crash'); f++) heard.push(...frame(level, p));
+    for (let f = 0; f < 200 && !heard.includes('cart-wreck'); f++) heard.push(...frame(level, p));
     expect(heard).toContain('shield-lost');
     expect(p.rings).toBe(5); // the shield paid, not the rings
     expect(p.dead).toBe(false);

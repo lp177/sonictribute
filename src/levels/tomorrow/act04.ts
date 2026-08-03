@@ -64,7 +64,7 @@ export const act04: LevelDef = {
     const s2 = canopyRun(b, s.endX, s.endRow, { len: 60 });
     canopyRun(b, s2.endX, s2.endRow, { len: 60 });
     b.phasePlatform(48, 52, 9, 180, 0);
-    b.phasePlatform(158, 162, 9, 180, 90);
+    b.phasePlatform(160, 164, 9, 180, 90); // aligned to the real 160-164 seam
     b.drone(110, 6, 3);
     b.drone(240, 7, 4);
   },

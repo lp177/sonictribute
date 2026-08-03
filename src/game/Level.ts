@@ -96,6 +96,7 @@ export class LevelBuilder {
     convert?: boolean;
   }[] = [];
   railDefs: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  pipeDefs: { x: number; baseY: number; dir: 1 | -1 }[] = [];
   trapDefs: { x: number; y: number; period: number; offset: number }[] = [];
   crumbleDefs: { x: number; y: number; w: number }[] = [];
   swingDefs: { x: number; y: number; len: number; period: number; offset: number }[] = [];
@@ -376,6 +377,9 @@ export class LevelBuilder {
       fill(x + 4, baseRow - 1, ']');
     }
     const lipX = dir === 1 ? x + 4 : x;
+    // Recorded for the renderer: an unmarked converting launcher on ordinary
+    // terrain is an invisible trigger, and invisible triggers are unfair.
+    this.pipeDefs.push({ x: (dir === 1 ? x : x + 5) * T, baseY: baseRow * T, dir });
     this.launcherDefs.push({
       x: tileCentre(lipX),
       y: (baseRow - 4) * T - 8,
@@ -391,6 +395,9 @@ export class LevelBuilder {
 
   /** A minecart track from tile corner (x0,row0) to (x1,row1), cart waiting at the start. */
   cartRide(x0: number, row0: number, x1: number, row1: number): void {
+    // A vertical track would divide by zero in the cart's yAt. Authoring
+    // error, caught at build time rather than as NaN mid-ride.
+    if (x0 === x1) throw new Error('cartRide: vertical tracks are not supported');
     this.cartDefs.push({ x0: x0 * T, y0: row0 * T, x1: x1 * T, y1: row1 * T });
   }
 
@@ -509,6 +516,7 @@ export class Level {
   phasePlats: PhasePlatform[];
   hoppers: Hopper[];
   readonly boardEndX: number;
+  readonly pipes: { x: number; baseY: number; dir: 1 | -1 }[];
   goal: GoalSign;
   boss: BossLike | null = null;
   bossDefeated = false;
@@ -592,6 +600,7 @@ export class Level {
     this.phasePlats = b.phaseDefs.map((d) => new PhasePlatform(d.x, d.y, d.w, d.period, d.offset));
     this.hoppers = b.hopperDefs.map((d) => new Hopper(d.x, d.y));
     this.boardEndX = b.boardEndX;
+    this.pipes = b.pipeDefs;
     this.goal = new GoalSign(b.goalPos.x, b.goalPos.y);
     this.startPos = b.playerStart;
     this.respawnPos = { ...b.playerStart };
@@ -697,9 +706,13 @@ export class Level {
       if (cart.update() === 'crash') {
         // The crash happens wherever the buffer is — which can be far from a
         // player who bailed early, so it is ambient-gated like any hazard.
+        // Two event names because juice policy differs: the unmanned wreck is
+        // spectacle (hit-stop allowed); a ridden crash is damage TAKEN, and
+        // hit-stop never accompanies damage taken (AGENTS.md).
         if (Math.abs(cart.x - p.x) < AMBIENT_RANGE) {
-          events.push('cart-crash');
-          this.eventSources.set('cart-crash', { x: cart.x, y: cart.y });
+          const name = cart.rider ? 'cart-wreck' : 'cart-crash';
+          events.push(name);
+          this.eventSources.set(name, { x: cart.x, y: cart.y });
         }
         if (cart.rider) {
           cart.rider = false;
@@ -861,7 +874,8 @@ export class Level {
         // Victory: the gates grind back up and the goal is reachable again.
         const ev = this.arenaGates?.release();
         if (ev) events.push(ev);
-        events.push('boss-defeated');
+        // interact() already reported the killing hit as 'boss-defeated'.
+        if (!events.includes('boss-defeated')) events.push('boss-defeated');
       }
     }
 

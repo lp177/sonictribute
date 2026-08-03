@@ -20,7 +20,7 @@ import {
  *
  * The cellars where the coolant runs. This act leans downward: a deep triple
  * dip right after the gate, TWO underworld pockets (one secret, one open
- * larder), and the longest stalactite roof so far. The under lane is the
+ * larder), and a stalactite roof to match act 3's. The under lane is the
  * scenic-fast route here — both sneak-under shafts pay out for divers, while
  * the surface pays in traps.
  */
@@ -58,7 +58,7 @@ export const midnight05: LevelDef = {
 
     // Sky overlay at row 11 — the undercroft's service walk, thinner rewards
     // than usual: this act pays underground.
-    let s = canopyRun(b, 48, 11, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 76, 11, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
   },

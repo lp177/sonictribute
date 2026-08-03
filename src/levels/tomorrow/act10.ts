@@ -60,12 +60,13 @@ export const act10: LevelDef = {
     const fin = arenaApproach(b, c.endX, c.endRow, { width: 54 }); // 366–419: the final plaza
     if (fin.endX !== W) throw new Error(`act10 chain ends at ${fin.endX}, not ${W}`);
 
-    // Sky overlay: the last canopy, high and long. Lengths are 13k+8 so the
-    // chained seam stays a standard 5-tile hop.
-    const s = canopyRun(b, 40, 8, { len: 146, crystal: true }); // crystal 5 (sky)
+    // Sky overlay: the last canopy, high and long. Lengths are 13k+8 (138 =
+    // 13*10+8) so the chained seam stays a standard 5-tile hop — 146 left an
+    // unbridged 8-tile sky gap with the phase platform buried in solid deck.
+    const s = canopyRun(b, 40, 8, { len: 138, crystal: true }); // crystal 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 112 });
     b.phasePlatform(48, 52, 8, 150, 0);
-    b.phasePlatform(198, 202, 8, 150, 75);
+    b.phasePlatform(173, 177, 8, 150, 75); // bridges the mid-canopy seam
     b.drone(115, 5, 3);
     b.drone(235, 5, 3);
     b.drone(320, 6, 3);

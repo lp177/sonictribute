@@ -61,7 +61,7 @@ export const midnight10: LevelDef = {
     signpostFinish(b, c.endX, c.endRow, { len: 43 }); // 357–399
 
     // Sky overlay at row 9, running the length of the yard.
-    let s = canopyRun(b, 44, 9, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 72, 9, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104 });
   },

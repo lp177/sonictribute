@@ -68,6 +68,8 @@ export const act08: LevelDef = {
     b.phasePlatform(188, 192, 8, 160, 80);
     b.drone(120, 5, 3);
     b.drone(260, 5, 3);
-    b.drone(340, 10, 3);
+    // Off the leap-of-faith arc: the ring trail through (341,11) must stay a
+    // promise, not an ambush — a launched player cannot attack mid-arc.
+    b.drone(355, 15, 2);
   },
 };

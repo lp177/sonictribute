@@ -1,7 +1,6 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
 import {
   runway,
-  rollersRun,
   corridorLoop,
   stackedChoice,
   boardSprint,
@@ -37,17 +36,21 @@ export const midnight11: LevelDef = {
   width: 420,
   bossKind: 'press',
   build(b: LevelBuilder): void {
+    // The finale opens NOTHING like act 6: no rollers, no early loop — the
+    // shift bell goes straight to machinery. Dip runway, stalactite roof,
+    // cart over the first chasm, THEN the loop, and the board run comes late.
     let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: the final gate
     b.start(4, 24);
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 10–39
-    c = corridorLoop(b, c.endX, c.endRow, { drop: 2, corridor: 24 }); // 40–71
-    c = stackedChoice(b, c.endX, c.endRow, { len: 24, crystal: true }); // 72–95, crystal 1 (sky shelf)
-    b.drone(86, 12, 3); // holds the air between the shelf and the catwalks
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 96–103
-    c = boardSprint(b, c.endX, c.endRow, { sections: 3, board: true }); // 104–151: last board run
-    b.drone(128, 20, 2);
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 152–163, crystal 2 (under), secret 1
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 20, count: 4 }); // 164–183
+    c = stackedChoice(b, c.endX, c.endRow, { len: 26, crystal: true }); // 10–35, crystal 1 (sky shelf)
+    b.drone(24, 12, 3);
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 22, count: 4 }); // 36–57: the roof bites first
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 }); // 58–77: first ride, early
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 78–85
+    c = corridorLoop(b, c.endX, c.endRow, { drop: 2, corridor: 26 }); // 86–119
+    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 120–131, crystal 2 (under), secret 1
+    c = boardSprint(b, c.endX, c.endRow, { sections: 3, board: true }); // 132–179: last board run
+    b.drone(158, 20, 2);
+    c = runway(b, c.endX, c.endRow, { len: 4, rings: false }); // 180–183
     c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 130 }); // 184–202: the fastest bell
     b.swingBall(188, 13, 8, 120, 0); // tackle over the crossing's near lip
     c = secretPocket(b, c.endX, c.endRow); // 203–212, crystal 3 (ground), secret 2

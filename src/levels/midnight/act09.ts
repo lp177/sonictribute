@@ -41,14 +41,14 @@ export const midnight09: LevelDef = {
     c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 150 }); // 90–108: second bell, wider
     b.drone(98, 20, 2);
     c = corridorLoop(b, c.endX, c.endRow, { drop: 2, corridor: 22 }); // 109–138
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 139–150, crystal 2 (under), secret 1
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 139–148, secret 1 (monitor first)
     c = runway(b, c.endX, c.endRow, { rise: 3, len: 5 }); // 151–161, up to row 21
     c = railCascade(b, c.endX, c.endRow); // 162–192, grind down to row 27
     c = runway(b, c.endX, c.endRow, { rise: 3, len: 6 }); // 193–204, back to row 24
     c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 3, period: 120 }); // 205–222
-    c = secretPocket(b, c.endX, c.endRow); // 223–232, crystal 3 (ground), secret 2
+    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // crystal 3 (under), secret 2
     c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 140 }); // 233–251: third bell, fastest
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 252–261, secret 3
+    c = secretPocket(b, c.endX, c.endRow); // crystal (ground), secret 3
     c = leapOfFaith(b, c.endX, c.endRow, { drop: 3, glide: 26 }); // 262–295: glide past the bells
     b.crystal(281, 8); // 4 (sky) — above the catwalk at the top of the arc
     c = runway(b, c.endX, c.endRow, { rise: 3, len: 8, checkpoint: true, enemy: true }); // 296–309
@@ -58,7 +58,7 @@ export const midnight09: LevelDef = {
 
     // Sky overlay at row 10 — always solid, the reward for climbing out of
     // the phase rhythm altogether.
-    let s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 64, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 78 });
   },

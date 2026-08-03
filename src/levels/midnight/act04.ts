@@ -44,19 +44,22 @@ export const midnight04: LevelDef = {
     c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 123–134, crystal 2 (under), secret 1
     c = cartCanyon(b, c.endX, c.endRow, { gap: 7 }); // 135–154: the first ore cart
     b.drone(143, 22, 2); // patrols the canyon airspace the bailers fly through
+    // Tail deliberately runs act 2's beats in a different order and lands
+    // them differently: pressure first, the leap feeds a grind, dips close.
     c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 155–162
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 }); // 163–178
-    c = secretPocket(b, c.endX, c.endRow); // 179–188, crystal 3 (ground), secret 2
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 2, period: 140 }); // 189–206
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shield' }); // 207–216, secret 3
-    c = leapOfFaith(b, c.endX, c.endRow, { drop: 3, glide: 24 }); // 217–248: over the gantry edge
-    b.crystal(238, 9); // 4 (sky) — at the crest of the leap, beside the catwalk
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 8, enemy: true }); // 249–262, back to row 24
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 263–292
-    signpostFinish(b, c.endX, c.endRow, { len: 47 }); // 293–339
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 2, period: 140 }); // 163–180
+    c = secretPocket(b, c.endX, c.endRow); // 181–190, crystal 3 (ground), secret 2
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 }); // 191–206
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 207–216, secret 3
+    c = leapOfFaith(b, c.endX, c.endRow, { drop: 3, glide: 20 }); // 217–244: over the gantry edge
+    b.crystal(234, 10); // 4 (sky) — at the crest of the leap, beside the catwalk
+    c = railCascade(b, c.endX, c.endRow); // the landing feeds straight onto rails
+    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6, enemy: true }); // climb out
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // one last roller
+    signpostFinish(b, c.endX, c.endRow, { len: 339 - c.endX + 1 > 12 ? 339 - c.endX + 1 : 12 }); // to 339
 
     // Sky overlay at row 10 (leap ring trail tops out at row 11 — no clash).
-    let s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 68, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 39 });
   },

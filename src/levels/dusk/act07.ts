@@ -66,7 +66,9 @@ export const act07: LevelDef = {
     signpostFinish(b, c.endX, c.endRow, { len: 32 }); // 348–379
 
     // The lantern walk: two long canopy chains, the act's true main road.
-    const s = canopyRun(b, 94, 8, { len: 130, crystal: true }); // CRYSTAL 5 (sky)
+    // Starts at 76 so the launch ramp's fixed arc (lands ~x74-84) actually
+    // boards it, and rides at row 10 where that arc tops out with margin.
+    const s = canopyRun(b, 76, 10, { len: 143, crystal: true }); // CRYSTAL 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117 });
   },
 };

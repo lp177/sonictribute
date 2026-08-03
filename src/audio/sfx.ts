@@ -216,6 +216,7 @@ export class Sfx {
         this.thud(120, 0.12, 0.5);
         this.blip(240, 0.3, 'sawtooth', 60, 0.04, 0.2);
         break;
+      case 'cart-wreck':
       case 'cart-crash':
         this.thud(52, 0.5, 1.3);
         this.noise(0.35, 0, 0.4);

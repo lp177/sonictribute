@@ -61,7 +61,7 @@ export const midnight07: LevelDef = {
     // The express catwalks sit at row 8 — above the leap arc's ring trail
     // (rows 9+) so no platform tile can bury a leap ring — and carry the
     // monitors that make the sky line worth holding.
-    let s = canopyRun(b, 40, 8, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 84, 8, { len: 104, crystal: true }); // crystal 5 (sky)
     b.monitor(56, 8, 'rings10');
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     b.monitor(160, 8, 'shoes');

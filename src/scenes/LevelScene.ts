@@ -25,6 +25,7 @@ import {
   drawDashPad,
   drawBoardPad,
   drawRail,
+  drawQuarterPipe,
   drawStalactite,
   drawMinecart,
   drawCartBuffer,
@@ -309,6 +310,11 @@ export class LevelScene implements Scene {
         const flipIn = pl.solid ? pl.onFrames - pl.t : pl.period - pl.t;
         drawPhasePlatform(ctx, pl.x, pl.y, pl.w, pl.solid, flipIn, this.frame);
       }
+    }
+    // Quarter-pipe rims: the converting launcher at the lip must be visible,
+    // or the launch reads as an invisible trigger on ordinary terrain.
+    for (const qp of level.pipes) {
+      if (visible(qp.x)) drawQuarterPipe(ctx, qp.x, qp.baseY, qp.dir, this.frame, this.theme);
     }
     for (const st of level.stalactites) {
       if (visible(st.x)) {

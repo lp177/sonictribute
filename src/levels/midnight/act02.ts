@@ -56,7 +56,7 @@ export const midnight02: LevelDef = {
 
     // Sky overlay after the ground chain; row 10 sits clear of the leap arc's
     // ring trail (rows 11+), so no catwalk tile can bury a ring.
-    let s = canopyRun(b, 48, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 52, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 39 });
   },

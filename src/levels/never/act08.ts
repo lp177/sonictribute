@@ -65,6 +65,6 @@ export const act08: LevelDef = {
     // Sky overlay: the calm above the undertow, one crystal.
     const s = canopyRun(b, 30, 10, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117 });
-    b.crystal(288, 8); // crystal 5 — high over the gauntlet, jump from the canopy
+    b.crystal(288, 8); // crystal 5 — high over the gauntlet, ride the leap-of-faith arc
   },
 };

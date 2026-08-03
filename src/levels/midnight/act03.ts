@@ -43,9 +43,9 @@ export const midnight03: LevelDef = {
     c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 118–139, crystal 2 (sky shelf)
     c = railCascade(b, c.endX, c.endRow, { steps: 3, run: 5, span: 7, dropEach: 1 }); // 140–181: shallow glide
     c = runway(b, c.endX, c.endRow, { rise: 3, len: 8, checkpoint: true, enemy: true }); // 182–195
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 196–207, crystal 3 (under), secret 1
+    c = secretPocket(b, c.endX, c.endRow); // 196–205, crystal 3 (ground), secret 1
     c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 140 }); // 208–223
-    c = secretPocket(b, c.endX, c.endRow); // 224–233, crystal 4 (ground), secret 2
+    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // crystal 4 (under), secret 2
     c = boardSprint(b, c.endX, c.endRow, { sections: 3 }); // 234–281: second deck run, on foot
     b.drone(258, 17, 2);
     c = secretPocket(b, c.endX, c.endRow, { reward: 'rings10' }); // 282–291, secret 3
@@ -55,7 +55,7 @@ export const midnight03: LevelDef = {
     signpostFinish(b, c.endX, c.endRow, { len: 44 }); // 356–399
 
     // Sky overlay at row 9 — clear of the stacked shelf's ring line (row 12).
-    let s = canopyRun(b, 48, 9, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 60, 9, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104 });
   },

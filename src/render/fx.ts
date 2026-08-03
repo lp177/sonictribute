@@ -42,6 +42,7 @@ const SHAKES: Record<string, [number, number]> = {
   'stalactite-fall': [1.5, 6],
   'stalactite-shatter': [2.5, 9],
   'cart-crash': [5, 18],
+  'cart-wreck': [4, 14],
   'boss-trace': [2, 10],
   'boss-derez': [3, 12],
 };
@@ -210,6 +211,7 @@ export class FxSystem {
       case 'cart-board':
         this.emit(x, y, 6, { colors: ['#ffd94a', '#cfd6e4'], speed: 1.6, life: 18, size: 2, kind: 'spark' });
         break;
+      case 'cart-wreck':
       case 'cart-crash':
         this.emit(x, y, 14, { colors: ['#8a5a32', '#6e4525', '#cfd6e4', '#ffd94a'], speed: 3, life: 34, size: 3, kind: 'dot', grav: 0.16 });
         this.emit(x, y, 8, { colors: ['#9aa3b2', '#6b7280'], speed: 1.8, life: 30, size: 5, kind: 'smoke', up: 0.9 });

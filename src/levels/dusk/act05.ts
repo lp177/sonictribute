@@ -56,7 +56,9 @@ export const act05: LevelDef = {
     signpostFinish(b, c.endX, c.endRow, { len: 32 }); // 328–359
 
     // Sky overlay — the landing net for both bowls' launches.
-    const s = canopyRun(b, 98, 8, { len: 130, crystal: true }); // CRYSTAL 5 (sky)
+    // Row 10: the bowls' converted launches apex at feet row ~9.0, one row
+    // short of the old row-8 canopy — the promised fling never landed.
+    const s = canopyRun(b, 98, 10, { len: 130, crystal: true }); // CRYSTAL 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 104 });
   },
 };

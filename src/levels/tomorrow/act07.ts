@@ -64,8 +64,9 @@ export const act07: LevelDef = {
     const s1 = canopyRun(b, 36, 10, { len: 103, crystal: true }); // crystal 5 (sky)
     b.rail(135, 10, s1.endX, 12);
     const s2 = canopyRun(b, s1.endX, 12, { len: 100 });
-    b.rail(238, 12, s2.endX, 14);
-    canopyRun(b, s2.endX, 14, { len: 40 });
+    // A real ribbon, not a 1-column stub: the rail spans the whole seam.
+    b.rail(s2.endX - 1, 12, s2.endX + 4, 14);
+    canopyRun(b, s2.endX + 4, 14, { len: 40 });
     b.drone(85, 7, 3);
     b.drone(200, 8, 3);
     b.drone(300, 7, 3);

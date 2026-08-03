@@ -21,7 +21,7 @@ import {
  *
  * The last ordinary act climbs: the running lane rises to row 21 early and
  * stays high, the shelf lane of the opening choice floats a full nine rows
- * up, and the SKY canopy is the fast route the whole way. Everything below
+ * up, and the SKY canopy is the fast route for its first two thirds. Everything below
  * runs on end-of-biome clocks — 150-frame phase lights, a five-spike roof,
  * a density-3 gauntlet — before the leap drops you to the signpost run.
  */

@@ -57,7 +57,7 @@ export const midnight06: LevelDef = {
     arenaApproach(b, c.endX, c.endRow, { width: 54 }); // 306–359: the foreman's floor
 
     // Sky overlay ends before the arena — the fight is fought on the floor.
-    let s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 40, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
   },

@@ -81,7 +81,9 @@ export const act10: LevelDef = {
     b.drone(230, 18, 4); // sweeps the bowl's launch window
 
     // The mercy route: the biome's longest canopy, high above the clocks.
-    const s = canopyRun(b, 50, 7, { len: 143, crystal: true }); // CRYSTAL 5 (sky)
+    // Row 10, not 7: simulated arcs (shelf jump apex ~8.8, bowl apexes 9.0+)
+    // never cleared row 7 — the whole lane and its crystal were decoration.
+    const s = canopyRun(b, 50, 10, { len: 143, crystal: true }); // CRYSTAL 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 130 });
   },
 };

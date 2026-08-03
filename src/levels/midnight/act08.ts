@@ -60,7 +60,7 @@ export const midnight08: LevelDef = {
     signpostFinish(b, c.endX, c.endRow, { len: 41 }); // 319–359
 
     // Sky overlay — the only route with no teeth over it.
-    let s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
+    let s = canopyRun(b, 56, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
   },
