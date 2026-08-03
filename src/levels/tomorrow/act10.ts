@@ -15,6 +15,7 @@ import {
   quarterPipeBowl,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 420;
@@ -34,6 +35,7 @@ export const act10: LevelDef = {
   theme: 'neon',
   width: W,
   bossKind: 'mirage',
+  bossRage: true, // the finale rematch runs the escalated pattern
   build(b: LevelBuilder): void {
     let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: start apron
     b.start(4, 24);
@@ -70,5 +72,32 @@ export const act10: LevelDef = {
     b.drone(115, 5, 3);
     b.drone(235, 5, 3);
     b.drone(320, 6, 3);
+
+    // Undercity metro gallery, in two segments ending well short of the
+    // final plaza — no tunnelling under the boss arena. The cart canyon
+    // (153-161, ledge floor row 30) and the post-leap secret pocket (room
+    // floor row 31 at 342-348) sit in the carve band, so the corridor stops
+    // either side and those floors bridge the under lane (seams of 2-4
+    // tiles). Segment A shafts: 36 (under a stackedChoice shelf, clear of
+    // the crab at 27-33 and the shelf crystal at 35) and 143 (the flat
+    // before the canyon boarding edge), plus a service hatch in the first
+    // phase pit. Segment B shaft: 165 (two tiles past the cart's crash
+    // buffer at 163 — the ride still sets you down on solid floor), plus a
+    // hatch in the late phase pit; the sneakUnder pocket at 190-197 merges
+    // in. All clear of the deep loop at 220-253, both gauntlets, the wide
+    // bowl and the rail cascade. Finale pressure: hazards 2 in both halves.
+    underGallery(b, 12, { len: 139, shafts: [24, 131], hazards: 2, crystal: false });
+    underGallery(b, 164, { len: 174, shafts: [1], hazards: 2, crystal: false });
+    // The hatches: each phase pit's slow lower route continues into the
+    // metro; twin springs directly beneath throw a faller straight back to
+    // the surface, so the hatches are doors, never traps.
+    b.carve(79, 29, 80, 33);
+    b.spring(79, 34, 13);
+    b.spring(80, 34, 13);
+    b.carve(289, 29, 290, 33);
+    b.spring(289, 34, 13);
+    b.spring(290, 34, 13);
+    // Flickering service light over segment B's spike strip.
+    b.phasePlatform(241, 244, 31, 150, 75);
   },
 };

@@ -3,6 +3,7 @@ import { Level, LevelBuilder, WORLD_W, type LevelDef } from '../src/game/Level.t
 import { PHYS } from '../src/physics/constants.ts';
 import { checkAct } from './actContract.ts';
 import {
+  underGallery,
   runway,
   rollersRun,
   corridorLoop,
@@ -216,6 +217,11 @@ const sampler: LevelDef = {
     c = leapOfFaith(b, c.endX, c.endRow, { glide: 17 }); // 259–283, the blind drop to row 27
     const fin = arenaApproach(b, c.endX, c.endRow); // 284–319: boss + goal
     if (fin.endX !== WORLD_W) throw new Error(`sampler chain ends at ${fin.endX}, not ${WORLD_W}`);
+
+    // Under overlay: the bench act obeys the strengthened contract too — a
+    // real travellable gallery, shafts clear of the loop (centre ~76), the
+    // rail cascade, the cart canyon and the leap mesa.
+    underGallery(b, 16, { len: 264, shafts: [4, 82, 128, 216], hazards: 1, rail: true, crystal: false, secret: false });
 
     // Sky overlay, stamped after the ground chain per the build-order rule.
     const s = canopyRun(b, 44, 10, { len: 100, crystal: true }); // crystal 5 (sky)

@@ -601,3 +601,139 @@ export function canopyRun(b: LevelBuilder, x: number, row: number, opts: CanopyR
   if (crystal && len >= 34) b.crystal(x + 17, row - 2);
   return { endX: x + len, endRow: row };
 }
+
+/* --------------------------- Underground overlay ---------------------------- */
+
+export interface UnderGalleryOpts {
+  /** Gallery length in columns. */
+  len?: number;
+  /** Gallery floor row (28-36 band; headroom is carved above it). */
+  row?: number;
+  /** Columns (relative to x) where 3-wide drop shafts punch down from above. */
+  shafts?: number[];
+  /** Hazard pressure inside the gallery: 0 none, 1 spikes, 2 spikes + traps. */
+  hazards?: 0 | 1 | 2;
+  /** Lay a grind rail along a stretch of the gallery. */
+  rail?: boolean;
+  /** Hang the act's under-lane crystal mid-gallery. */
+  crystal?: boolean;
+  /** Carve a secret side-pocket off the far end. */
+  secret?: boolean;
+}
+
+/**
+ * underGallery — THE under route, not a bonus closet: a long carved corridor
+ * with its own floor, entered by falling through visible drop shafts and left
+ * by spring lifts under each shaft. Stamp it AFTER the ground chain (carving
+ * last is what keeps it hollow). Shaft columns are the author's job to keep
+ * clear of loop footprints. FOOTPRINT: columns x .. x+len-1, rows ~(row-4)
+ * .. row; shafts additionally carve rows 18 .. row-4 at their columns.
+ */
+export function underGallery(b: LevelBuilder, x: number, opts: UnderGalleryOpts = {}): MotifEnd {
+  const { len = 120, row = 34, shafts = [8, Math.floor((len - 3) / 2), len - 12], hazards = 1, rail = false, crystal = true, secret = false } = opts;
+  const x1 = x + len - 1;
+  b.carve(x, row - 4, x1, row - 1);
+  b.floor(x, x1, row);
+
+  for (const off of shafts) {
+    const sx = x + off;
+    b.carve(sx, 18, sx + 2, row - 1); // the visible way in (and the light well)
+    b.spring(sx, row, 13); // and the way back out
+    b.spring(sx + 1, row, 13);
+  }
+
+  // The gallery pays its way: ring lines between the shafts.
+  b.ringsH(x + 14, x + 24, row - 2);
+  b.ringsH(x + Math.floor(len * 0.6), x + Math.floor(len * 0.6) + 8, row - 2);
+  b.enemy(x + Math.floor(len * 0.35), row, 4);
+  if (hazards >= 1) b.spikes(x + Math.floor(len * 0.45), x + Math.floor(len * 0.45) + 1, row);
+  if (hazards >= 2) b.spikeTrap(x + Math.floor(len * 0.75), row, 150, 40);
+  if (rail && len >= 60) {
+    // A grind line down the middle of the corridor, clear of the shafts.
+    b.rail(x + Math.floor(len * 0.3), row - 3, x + Math.floor(len * 0.55), row - 2);
+  }
+  if (crystal) b.crystal(x + Math.floor(len * 0.52), row - 2);
+  if (secret) {
+    const px = x1 - 8;
+    b.carve(px, row - 3, px + 6, row - 1);
+    b.secret(px, row - 3, px + 6, row - 1);
+    b.ringBox(px + 2, row - 2, 2, 1);
+  }
+  return { endX: x1 + 1, endRow: row };
+}
+
+/* ------------------------------ Sky set pieces ------------------------------ */
+
+export interface SkyStepsOpts {
+  /** Number of step platforms. */
+  steps?: number;
+  /** Vertical stagger between neighbouring steps (rows). */
+  stagger?: number;
+  /** Guarding drone over the middle step. */
+  drone?: boolean;
+  /** A pop-up trap on one wide step (telegraphed, like all traps). */
+  trap?: boolean;
+}
+
+/**
+ * skySteps — the sky lane earning its keep: short staggered platforms with
+ * 4-5 column gaps, a spring midway to regain height, and optional teeth. The
+ * cure for "flat catwalk with a few jumps": every landing here is aimed.
+ * FOOTPRINT: ~steps*8 columns, rows row-stagger .. row+stagger.
+ */
+export function skySteps(b: LevelBuilder, x: number, row: number, opts: SkyStepsOpts = {}): MotifEnd {
+  const { steps = 5, stagger = 2, drone = true, trap = true } = opts;
+  let cx = x;
+  for (let i = 0; i < steps; i++) {
+    const r = row + (i % 2 === 0 ? 0 : -stagger);
+    const wide = i === Math.floor(steps / 2);
+    const w = wide ? 6 : 3;
+    b.platform(cx, cx + w - 1, r);
+    if (i % 2 === 1) b.ringsH(cx, cx + w - 1, r - 2);
+    if (wide) {
+      b.spring(cx + 1, r, 10); // the height-keeper: miss it and drop a lane
+      if (trap) b.spikeTrap(cx + w - 2, r, 160, 40);
+    }
+    cx += w + 4;
+  }
+  if (drone) b.drone(x + Math.floor((cx - x) / 2), row - 4, 3);
+  return { endX: cx, endRow: row };
+}
+
+export interface GlideRunOpts {
+  /** Total length of the glide corridor. */
+  len?: number;
+  /** Hang the sky crystal mid-glide (the glider is how you reach it). */
+  crystal?: boolean;
+}
+
+/**
+ * glideRun — the deltaplane set piece: a launch perch with the glider pickup,
+ * then a long platform-less stretch crossed on the wing, held up by two
+ * rising-air columns, with ring arcs marking the line. A landing deck closes
+ * it. The ground lane runs underneath as the bail-out.
+ * FOOTPRINT: len columns, rows ~6..16 (plus wind columns reaching down to
+ * the ground band).
+ */
+export function glideRun(b: LevelBuilder, x: number, row: number, opts: GlideRunOpts = {}): MotifEnd {
+  const { len = 64, crystal = false } = opts;
+  // Launch perch with the wing waiting on it.
+  b.platform(x, x + 5, row);
+  b.glider(x + 3, row - 2);
+  b.ringsH(x, x + 5, row - 2);
+  // Two thermals hold the crossing up; the glider rides them, a jumper gets
+  // a nudge. They reach into the ground band so a bailed run can recover.
+  const w1 = x + Math.floor(len * 0.3);
+  const w2 = x + Math.floor(len * 0.62);
+  b.wind(w1, row - 4, w1 + 4, 26, 0.4);
+  b.wind(w2, row - 5, w2 + 4, 26, 0.45);
+  // The line to fly: a shallow descending-then-lifting ring arc.
+  for (let i = 0; i < 8; i++) {
+    b.ringsH(x + 8 + i * Math.floor((len - 20) / 8), x + 8 + i * Math.floor((len - 20) / 8), row + (i < 4 ? i : 8 - i) - 1);
+  }
+  if (crystal) b.crystal(x + Math.floor(len * 0.62) + 2, row - 6);
+  // Landing deck.
+  b.platform(x + len - 8, x + len - 1, row + 1);
+  b.ringsH(x + len - 7, x + len - 2, row - 1);
+  return { endX: x + len, endRow: row + 1 };
+}

@@ -13,6 +13,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 336;
@@ -70,5 +71,16 @@ export const act02: LevelDef = {
     b.phasePlatform(222, 225, 10, 160, 106);
     b.drone(100, 6, 3);
     b.drone(220, 7, 3);
+
+    // Undercity metro gallery — the real under route, carved LAST so it wins
+    // over every ground fill. One corridor spans the act (rows 30-34); the
+    // sneakUnder pocket at 148-155 merges into it as an alcove with its own
+    // 2-wide shaft as a mid-act entrance. Drop shafts sit on plain floor:
+    // 26 (under the stackedChoice upper shelf, clear of the crab at 18-24),
+    // 122 (landing delivers you onto the dash pad at 125) and 290 (fed by
+    // the pad at 287) — clear of the loop at 164-191, the leap zone at
+    // 214-245 and the bowl at 260-273. Both phase pits keep their row-29
+    // floors as a shell over the corridor roof.
+    underGallery(b, 16, { len: 280, shafts: [10, 106, 274], hazards: 1, crystal: false });
   },
 };

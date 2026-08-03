@@ -12,6 +12,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -60,5 +61,18 @@ export const act02: LevelDef = {
     const s = canopyRun(b, 30, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX + 104, s.endRow, { len: 91 });
+
+    /* ================== UNDER — THE CHOIR CRYPT (whole act) ================
+     * One continuous carved route at row 34, stamped last so nothing
+     * back-fills it. No existing floor lives in rows 30-33 in this act, so
+     * the four segments merge into a single biome-length corridor; the
+     * sneak-under pocket (floor 34) opens straight into it. Shafts sit on
+     * flat road, clear of the roof slabs (41-52, 95-110, 221-234), the phase
+     * pits, the bowl and every patrol range.
+     */
+    underGallery(b, 14, { len: 87, row: 34, shafts: [23], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 101, { len: 87, row: 34, shafts: [10, 77], hazards: 0, crystal: false });
+    underGallery(b, 188, { len: 87, row: 34, shafts: [27], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 275, { len: 90, row: 34, shafts: [59, 81], hazards: 1, rail: true, crystal: false });
   },
 };

@@ -13,6 +13,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -63,5 +64,14 @@ export const midnight08: LevelDef = {
     let s = canopyRun(b, 56, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
+
+    // The annex crawlspace: one unbroken bore under the whole act (no canyon
+    // to dodge), sized so its fixed spikes (157–158) sit clear of the
+    // absorbed sneak-under pocket (160–167, floor 34 — the under crystal now
+    // a stop on the bore). Shafts drop between the teeth of the first (15)
+    // and second (142) needle roofs, from the stacked-choice deck (96) and
+    // the long walk-out (314) — clear of the loop corridor (110–137), both
+    // phase pits, the board decks and the bowl.
+    underGallery(b, 4, { len: 340, row: 34, shafts: [11, 92, 138, 310], hazards: 2, crystal: false });
   },
 };

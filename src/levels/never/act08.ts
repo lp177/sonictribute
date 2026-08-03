@@ -13,6 +13,7 @@ import {
   leapOfFaith,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -66,5 +67,23 @@ export const act08: LevelDef = {
     const s = canopyRun(b, 30, 10, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117 });
     b.crystal(288, 8); // crystal 5 — high over the gauntlet, ride the leap-of-faith arc
+
+    /* ================ UNDER — THE UNDERTOW ITSELF (whole act) ==============
+     * The name finally earns its keep: a carved route at row 34 pulled under
+     * every bowl and swell. It breaks only at the cart canyon's deep ledge
+     * (175-183, floor row 30) — standable under-lane floor that bridges the
+     * route — and re-enters past the last bowl's pocket. Shafts punch hill
+     * crowns and flat road, clear of every pipe, dash pad, cart track,
+     * gauntlet clock and patrol range.
+     */
+    // hazards 0: shaft springs at the second swell crown sit where the motif
+    // would put its spikes.
+    underGallery(b, 14, { len: 81, row: 34, shafts: [3, 37], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 95, { len: 80, row: 34, shafts: [0, 43], hazards: 1, rail: true, crystal: false });
+    // hazards 0: the surface gauntlet above this stretch is teeth enough.
+    underGallery(b, 184, { len: 82, row: 34, shafts: [2, 38], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 266, { len: 80, row: 34, shafts: [14, 58], hazards: 1, rail: true, crystal: false });
+    // hazards 0: this stretch owns the finish runway's shaft springs.
+    underGallery(b, 352, { len: 40, row: 34, shafts: [6, 27], hazards: 0, crystal: false });
   },
 };

@@ -13,6 +13,7 @@ import {
   rollersRun,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -62,5 +63,17 @@ export const midnight04: LevelDef = {
     let s = canopyRun(b, 68, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 39 });
+
+    // The gantry yard's service tunnel, in two segments: the cart canyon's
+    // consolation ledge (floor 30, cols 140–146) keeps its own springs, and
+    // the act's tail past col 245 already dives into the under band itself
+    // (rail cascade to row 33, rollers home at row 30), so the east segment
+    // hands over to it at col 244 with a 6-column seam. The sneak-under
+    // pocket (125–132, floor 34) is absorbed whole, under crystal and all.
+    // Shafts: post-cascade runway (96), stacked-choice deck (117), between
+    // the stalactites (196) — clear of the bowl (22–37), both rail cascades
+    // and the leap (217–244).
+    underGallery(b, 4, { len: 136, row: 34, shafts: [92, 113], hazards: 1, crystal: false });
+    underGallery(b, 147, { len: 98, row: 34, shafts: [49], hazards: 1, crystal: false });
   },
 };

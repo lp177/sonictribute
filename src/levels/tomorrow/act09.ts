@@ -15,6 +15,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 400;
@@ -68,5 +69,27 @@ export const act09: LevelDef = {
     b.drone(130, 5, 3);
     b.drone(225, 6, 3);
     b.drone(300, 5, 3);
+
+    // Undercity metro gallery, in two segments. The first cart canyon
+    // (83-91, ledge floor row 30), the post-leap secret pocket (room floor
+    // row 31 at 357-363) and the low-road canyon (370-376, ledge floor row
+    // 33) all live in the gallery's carve band, so the corridor stops short
+    // of each and those floors carry the under lane across (seams of 2-6
+    // tiles, limit 9). Segment A shaft: 17 (fed by the dash pad at 13), plus
+    // a service hatch in the first phase pit's floor. Segment B shafts: 134
+    // (under a stackedChoice shelf, clear of the crab at 125-131 and the
+    // shelf crystal at 133) and 248 (the flat before the second phase gate)
+    // — clear of the loop at 140-167, both gauntlets and the bowl; the
+    // sneakUnder pocket at 188-195 merges in as a mid entrance.
+    underGallery(b, 12, { len: 69, shafts: [5], hazards: 1, crystal: false });
+    underGallery(b, 94, { len: 259, shafts: [40, 154], hazards: 2, crystal: false });
+    // The hatch: the pit's slow lower route continues into the metro; twin
+    // springs directly beneath throw a faller straight back to the surface.
+    b.carve(59, 29, 60, 33);
+    b.spring(59, 34, 13);
+    b.spring(60, 34, 13);
+    // Flickering service light over segment B's spike strip — undercity
+    // dressing and a blink-timed hop line for anyone reading the rhythm.
+    b.phasePlatform(209, 212, 31, 160, 0);
   },
 };

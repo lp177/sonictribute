@@ -15,14 +15,21 @@ const LANES = [
   { name: 'under', from: 28, to: 36 },
 ] as const;
 
-function laneColumns(level: Level, from: number, to: number): number[] {
+function laneColumns(level: Level, from: number, to: number, needHeadroom = false): number[] {
   const cols: number[] = [];
   for (let tx = 0; tx < level.map.w; tx++) {
     for (let ty = from; ty <= to; ty++) {
-      if (level.map.get(tx, ty, 0).heights.some((h) => h > 0)) {
-        cols.push(tx);
-        break;
+      if (!level.map.get(tx, ty, 0).heights.some((h) => h > 0)) continue;
+      if (needHeadroom) {
+        // A REAL route needs somewhere to exist above its floor: two clear
+        // rows of headroom. Without this, solid bedrock "passes" as an
+        // underground path — the exact hole that shipped fake under-routes.
+        const clear = (row: number) =>
+          row >= 0 && !level.map.get(tx, row, 0).heights.some((h) => h > 0);
+        if (!(clear(ty - 1) && clear(ty - 2))) continue;
       }
+      cols.push(tx);
+      break;
     }
   }
   return cols;
@@ -80,7 +87,9 @@ export function checkAct(def: LevelDef): void {
 
   // --- Three routes, continuous and stocked ---
   for (const lane of LANES) {
-    const cols = laneColumns(level, lane.from, lane.to);
+    // The under lane must be a travellable gallery (floor + headroom), not
+    // bedrock; the other bands' surfaces have open air by construction.
+    const cols = laneColumns(level, lane.from, lane.to, lane.name === 'under');
     expect(cols.length, `${name}: ${lane.name} route missing`).toBeGreaterThan(30);
     const span = cols[cols.length - 1] - cols[0];
     expect(span, `${name}: ${lane.name} route too short`).toBeGreaterThan(90);

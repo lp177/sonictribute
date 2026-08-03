@@ -12,6 +12,7 @@ import {
   rollersRun,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -58,5 +59,15 @@ export const midnight03: LevelDef = {
     let s = canopyRun(b, 60, 9, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104 });
+
+    // The mainline's service tunnel, in two segments so the sneak-under
+    // pocket (floor row 32, cols 224–231) survives as a lit side-alcove: the
+    // gallery floor (34) meets it with a two-row hop at its east door, and
+    // the under crystal stays in the alcove. Shafts at the gate apron (8),
+    // the stacked-choice deck (136), between the stalactites (297) and the
+    // run-out (370) — clear of the board decks (20–81, 234–281), the loop
+    // corridor (90–117) and the rail glide (140–181).
+    underGallery(b, 4, { len: 220, row: 34, shafts: [4, 132], hazards: 1, crystal: false });
+    underGallery(b, 232, { len: 164, row: 34, shafts: [65, 138], hazards: 1, crystal: false });
   },
 };

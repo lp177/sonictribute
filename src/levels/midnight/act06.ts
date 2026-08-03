@@ -13,6 +13,7 @@ import {
   quarterPipeBowl,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -60,5 +61,16 @@ export const midnight06: LevelDef = {
     let s = canopyRun(b, 40, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
+
+    // The press hall's under-floor duct, two bores either side of the cart
+    // canyon (ledge at row 30 keeps its springs), ending at col 305 so the
+    // fight is fought on the arena's own solid floor. The sneak-under pocket
+    // (148–155, floor 34) merges in with the under crystal. Mid-shift now:
+    // the duct carries pop-up traps as well as fixed spikes. Shafts: the
+    // stacked-choice deck (84), between stalactites (163), the pre-arena
+    // walk (301) — clear of the loop (40–67), board decks (98–145), the full
+    // gauntlet (174–191) and the bowl (240–255).
+    underGallery(b, 4, { len: 203, row: 34, shafts: [80, 159], hazards: 2, crystal: false });
+    underGallery(b, 215, { len: 91, row: 34, shafts: [86], hazards: 2, crystal: false });
   },
 };

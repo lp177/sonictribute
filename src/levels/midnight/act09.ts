@@ -13,6 +13,7 @@ import {
   cartCanyon,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -61,5 +62,15 @@ export const midnight09: LevelDef = {
     let s = canopyRun(b, 64, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 78 });
+
+    // The bell tower's cable duct, running under all three phase pits (their
+    // shelf floors at row 29 keep their springs; the duct passes beneath) and
+    // broken only by the cart canyon's ledge (floor 30, cols 315–321). The
+    // sneak-under pocket (223–230, floor 34) merges in, under crystal and
+    // all. Shafts: gate apron (8), stacked-choice deck (75), the climb-out
+    // runway (198) and the run-out (348) — clear of the loop corridor
+    // (109–138), the rail cascade, the full gauntlet and the leap.
+    underGallery(b, 4, { len: 311, row: 34, shafts: [4, 71, 194], hazards: 2, crystal: false });
+    underGallery(b, 322, { len: 52, row: 34, shafts: [26], hazards: 2, crystal: false });
   },
 };

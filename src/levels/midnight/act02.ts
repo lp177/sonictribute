@@ -13,6 +13,7 @@ import {
   rollersRun,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -40,7 +41,7 @@ export const midnight02: LevelDef = {
     c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 74–81
     c = railCascade(b, c.endX, c.endRow); // 82–112: grind down to the channel bed (row 27)
     c = runway(b, c.endX, c.endRow, { rise: 3, len: 7, enemy: true }); // 113–125, back to row 24
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 126–137, crystal 2 (under), secret 1
+    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 126–137, secret 1 (pocket joins the gallery below)
     c = boardSprint(b, c.endX, c.endRow, { sections: 2 }); // 138–171: dash decks over slag pits
     b.drone(148, 20, 2); // drones hunt over the pits, like the old skyway
     b.drone(162, 20, 2);
@@ -59,5 +60,13 @@ export const midnight02: LevelDef = {
     let s = canopyRun(b, 52, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 39 });
+
+    // The slag channel's drainage tunnel: the under route proper, carved last.
+    // The sneak-under pocket (128–135, floor 34) becomes an alcove of it and
+    // crystal 2 (under) moves mid-tunnel. Shafts drop from the stacked-choice
+    // deck (68), the post-leap runway (262) and the run-out (308) — clear of
+    // the loop corridor (16–49), the rail cascade, the board decks, the trap
+    // row and the leap's pipe and mesa.
+    underGallery(b, 4, { len: 316, row: 34, shafts: [64, 258, 304], hazards: 1, crystal: true });
   },
 };

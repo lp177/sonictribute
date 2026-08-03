@@ -37,7 +37,11 @@ export class PressBoss implements BossLike {
   readonly maxX: number;
   shockwaves: Shockwave[] = [];
 
-  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number) {
+  /** Finale fury: the rematch doubles the shockwaves and shortens the vent. */
+  readonly rage: boolean;
+
+  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number, rage = false) {
+    this.rage = rage;
     this.x = x;
     this.groundY = groundY;
     this.homeY = groundY - 110;
@@ -69,7 +73,8 @@ export class PressBoss implements BossLike {
     if (this.invuln > 0) this.invuln--;
 
     for (const s of this.shockwaves) {
-      s.x += s.dir * SHOCK_SPEED;
+      // Negative age = queued (the rage trailing pair): inert until born.
+      if (s.age >= 0) s.x += s.dir * SHOCK_SPEED;
       s.age++;
     }
     this.shockwaves = this.shockwaves.filter((s) => s.age < SHOCK_LIFE);
@@ -108,12 +113,16 @@ export class PressBoss implements BossLike {
           this.phase = 'open';
           this.timer = 0;
           this.shockwaves.push({ x: this.x - 24, dir: -1, age: 0 }, { x: this.x + 24, dir: 1, age: 0 });
+          if (this.rage) {
+            // A trailing pair, offset so the jumps must be TIMED, not mashed.
+            this.shockwaves.push({ x: this.x - 24, dir: -1, age: -22 }, { x: this.x + 24, dir: 1, age: -22 });
+          }
           events.push('boss-slam');
         }
         break;
       case 'open':
-        // Vulnerable window: the piston vents on the floor.
-        if (this.timer > 90) {
+        // Vulnerable window: the piston vents on the floor (briefer enraged).
+        if (this.timer > (this.rage ? 64 : 90)) {
           this.phase = 'rise';
           this.timer = 0;
         }
@@ -140,7 +149,7 @@ export class PressBoss implements BossLike {
   interact(p: Player): 'hit' | 'hurt' | null {
     if (this.phase === 'intro' || this.phase === 'defeated') return null;
     for (const s of this.shockwaves) {
-      if (overlaps(playerBox(p), this.shockBox(s))) return 'hurt';
+      if (s.age >= 0 && overlaps(playerBox(p), this.shockBox(s))) return 'hurt';
     }
     if (overlaps(playerBox(p), this.bodyBox)) {
       if (!p.attacking) return 'hurt';

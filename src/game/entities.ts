@@ -291,6 +291,62 @@ export class Rail {
   }
 }
 
+/* ------------------------------ Hang glider -------------------------------- */
+
+/** Sky-lane pickup: grants the hang glider until the player takes a real hit. */
+export class GliderPickup {
+  taken = false;
+  x: number;
+  y: number;
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+  get box(): Rect {
+    return { x: this.x - 10, y: this.y - 12, w: 20, h: 24 };
+  }
+  tryCollect(p: Player): boolean {
+    if (this.taken || p.dead || p.hasGlider || !overlaps(playerBox(p), this.box)) return false;
+    this.taken = true;
+    p.hasGlider = true;
+    return true;
+  }
+}
+
+/* -------------------------------- Wind zone -------------------------------- */
+
+/**
+ * A column of rising air. Airborne players inside it are nudged upward;
+ * a DEPLOYED glider is carried hard — wind is what turns the glider from a
+ * fall-softener into a route. Purely a force field: silent, no contact
+ * damage, drawn as streaming motes by the scene.
+ */
+export class WindZone {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+  readonly lift: number;
+  constructor(x0: number, y0: number, x1: number, y1: number, lift = 0.35) {
+    this.x0 = x0;
+    this.y0 = y0;
+    this.x1 = x1;
+    this.y1 = y1;
+    this.lift = lift;
+  }
+  contains(x: number, y: number): boolean {
+    return x >= this.x0 && x <= this.x1 && y >= this.y0 && y <= this.y1;
+  }
+  apply(p: Player): void {
+    if (p.grounded || p.dead || !this.contains(p.x, p.y)) return;
+    if (p.gliding) {
+      p.ysp = Math.max(p.ysp - this.lift * 2.6, -4.5);
+    } else {
+      p.ysp = Math.max(p.ysp - this.lift, -2.5);
+    }
+  }
+}
+
 /* -------------------------------- Monitors -------------------------------- */
 
 export type MonitorKind = 'rings10' | 'shield' | 'shoes';

@@ -14,6 +14,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 352;
@@ -67,5 +68,18 @@ export const act04: LevelDef = {
     b.phasePlatform(160, 164, 9, 180, 90); // aligned to the real 160-164 seam
     b.drone(110, 6, 3);
     b.drone(240, 7, 4);
+
+    // Undercity metro gallery, split around the cart canyon (99-106, ledge
+    // floor on row 30 — inside the gallery carve band); the ledge itself
+    // carries the under lane across the 2-tile seams. Segment A shafts: 68
+    // (in the second roller dip's basin, springs lift back to the dip floor)
+    // and 91 (plain runway past the checkpoint). Segment B shafts: 280
+    // (under a stackedChoice shelf, clear of the crab at 271-277 and the
+    // shelf crystal at 279) and 313 (clear of the crab patrol at 317-323) —
+    // all clear of the loop at 154-185, the leap zone at 224-251 and the
+    // bowl at 286-301. The sneakUnder pocket at 188-195 merges into segment
+    // B as its mid-act entrance.
+    underGallery(b, 12, { len: 87, shafts: [56, 79], hazards: 1, crystal: false });
+    underGallery(b, 109, { len: 214, shafts: [171, 204], hazards: 1, crystal: false });
   },
 };

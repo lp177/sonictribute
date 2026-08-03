@@ -1,4 +1,5 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { skySteps, canopyRun } from '../motifs.ts';
 import { STORY_HOUR_OF_DUSK } from '../../game/story.ts';
 
 /**
@@ -112,7 +113,7 @@ export const act01: LevelDef = {
     b.checkpoint(243, 24);
     b.monitor(252, 24, 'shoes');
     b.enemy(255, 24, 3);
-    b.swingBall(248, 14, 9, 160, 80);
+    b.swingBall(256, 14, 9, 160, 80); // its arc must never reach into the shaft mouth
     // Mesa over the exit shaft of the underworld gallery.
     b.platform(246, 254, 18);
     b.ringsH(247, 253, 16);
@@ -138,18 +139,13 @@ export const act01: LevelDef = {
     b.crystal(156, 3); // CRYSTAL — sky route
     b.platform(166, 174, 8);
     b.ringsH(167, 173, 6);
-    b.platform(180, 188, 6);
-    b.monitor(184, 6, 'rings10');
-    b.platform(194, 202, 9);
-    b.ringsH(195, 201, 7);
-    b.platform(208, 216, 6);
-    b.ringsH(209, 215, 4);
-    b.platform(222, 230, 9);
-    b.platform(236, 244, 6);
-    b.ringsH(237, 243, 4);
-    b.platform(250, 258, 9);
-    b.ringsH(251, 257, 7);
-    b.platform(264, 272, 12); // last step down to the goal approach
+    // The middle of the lane is now aimed jumps, not a flat catwalk: staggered
+    // steps with the height-keeper spring. Gentle teeth only in act 1 — the
+    // drone patrols but no clocked trap this early in the campaign.
+    const sk = skySteps(b, 180, 9, { steps: 5, stagger: 2, drone: true, trap: false }); // 180–217
+    b.monitor(197, 9, 'rings10'); // on the wide mid step, was the old shelf prize
+    canopyRun(b, sk.endX, 9, { len: 47 }); // 218–264: catwalks to the last hop
+    b.platform(268, 276, 12); // last step down to the goal approach
 
     /* =========================== UNDER ROUTE =============================
      * Carved out of the bedrock AFTER the surface exists, with visible drop
@@ -157,6 +153,20 @@ export const act01: LevelDef = {
      */
     b.carve(150, 28, 262, 33);
     b.floor(150, 262, 34);
+    // The gallery now runs back west under the whole mid-act, so the under
+    // route is a true second road, not a closet: it picks up within 9 columns
+    // of secret room 1 (cols 70-78), keeping the lane continuous per the act
+    // contract, and gets its own light-well shaft on the flat at 135-140.
+    b.carve(84, 28, 149, 33);
+    b.floor(84, 149, 34);
+    b.carve(136, 18, 138, 33); // drop shaft 0, clear of loop 1 (centre 46) and loop 2 (154)
+    b.spring(136, 34, 13);
+    b.spring(137, 34, 13);
+    b.ringsH(100, 110, 31);
+    b.enemy(112, 34, 4);
+    // A sea-cave grind line under the launch-ramp hill — the first taste of
+    // rails in the underworld. It sets the rider down on open floor.
+    b.rail(96, 31, 120, 32);
     // Drop shafts must clear every loop footprint, or they punch a hole in
     // the loop's run-up corridor.
     b.carve(190, 24, 193, 33); // drop shaft 1, through the corridor deck
@@ -168,8 +178,8 @@ export const act01: LevelDef = {
     b.crystal(214, 31); // CRYSTAL — underworld
     b.ringBox(220, 30, 4, 2);
     b.enemy(240, 34, 5);
-    b.spikes(246, 248, 34);
-    b.ringsH(250, 255, 31);
+    b.spikes(250, 252, 34); // clear of shaft 2's landing columns AND its springs
+    b.ringsH(253, 258, 31);
     b.spring(191, 34, 11); // lifts back through drop shaft 1
     b.spring(192, 34, 11);
     b.spring(245, 34, 11);

@@ -11,6 +11,7 @@ import {
   leapOfFaith,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -65,5 +66,20 @@ export const act06: LevelDef = {
     // Sky overlay: two canopy stretches, each carrying a crystal.
     const s = canopyRun(b, 30, 9, { len: 130, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 130, crystal: true }); // crystal 5 (sky)
+
+    /* ================= UNDER — THE GRINDERS' GALLERY (whole act) ===========
+     * The ride act gets a ride-length underworld: a carved route at row 34
+     * running beneath all three cascades, broken only at the cart canyon's
+     * deep ledge (82-89, floor row 30) — itself standable under-lane floor
+     * that bridges the route. Shafts punch through cascade shelves (a missed
+     * catch already costs height here, never a life) and flat runways, clear
+     * of every rail tip, cart buffer, pipe, launcher and patrol.
+     */
+    underGallery(b, 14, { len: 68, row: 34, shafts: [15, 60], hazards: 1, rail: true, crystal: false });
+    // hazards 0: this stretch owns the sneak-under springs — no teeth beside them.
+    underGallery(b, 90, { len: 78, row: 34, shafts: [4, 36], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 168, { len: 75, row: 34, shafts: [7, 28], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 243, { len: 113, row: 34, shafts: [99], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 356, { len: 41, row: 34, shafts: [6, 22], hazards: 1, crystal: false });
   },
 };

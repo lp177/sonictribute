@@ -59,7 +59,12 @@ export class Boss implements BossLike {
   private diveTargetX = 0;
   private swayDir: 1 | -1 = 1;
 
-  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number) {
+  /** Finale fury: second encounters must not replay the first script. */
+  readonly rage: boolean;
+  private divesLeft = 0;
+
+  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number, rage = false) {
+    this.rage = rage;
     this.x = x;
     this.homeY = groundY - 104;
     this.y = this.homeY - 120; // flies in from above
@@ -94,7 +99,8 @@ export class Boss implements BossLike {
     this.timer++;
     this.animT++;
     if (this.invuln > 0) this.invuln--;
-    this.maceAngle = Math.sin(this.animT / 30) * 0.9;
+    // Enraged, the mace swings wider and faster — the safe gaps shrink.
+    this.maceAngle = Math.sin(this.animT / (this.rage ? 22 : 30)) * (this.rage ? 1.25 : 0.9);
 
     switch (this.phase) {
       case 'intro':
@@ -111,9 +117,11 @@ export class Boss implements BossLike {
         this.x += 1.1 * this.swayDir;
         if (this.x > this.maxX) this.swayDir = -1;
         else if (this.x < this.minX) this.swayDir = 1;
-        if (this.timer > 150) {
+        if (this.timer > (this.rage ? 110 : 150)) {
           this.phase = 'telegraph';
           this.timer = 0;
+          // The rematch dives TWICE per telegraph: dodge one, here comes two.
+          this.divesLeft = this.rage ? 2 : 1;
         }
         break;
       case 'telegraph':
@@ -130,8 +138,19 @@ export class Boss implements BossLike {
         this.x = this.diveFromX + (this.diveTargetX - this.diveFromX) * t;
         this.y = this.homeY + t * 56;
         if (t >= 1) {
-          this.phase = 'retreat';
-          this.timer = 0;
+          this.divesLeft--;
+          if (this.divesLeft > 0) {
+            // Straight back up and around for the second pass.
+            this.phase = 'dive';
+            this.timer = 0;
+            this.diveFromX = this.x;
+            this.diveTargetX = Math.max(this.minX, Math.min(this.maxX, player.x));
+            this.y = this.homeY;
+            events.push('boss-telegraph');
+          } else {
+            this.phase = 'retreat';
+            this.timer = 0;
+          }
         }
         break;
       }

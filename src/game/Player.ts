@@ -68,6 +68,21 @@ export const BOARD = {
  *    gated on input: with no input, friction still wins and the ball uncurls,
  *    which is the only way back to standing.
  */
+/**
+ * Hang-glider tuning (game feel, not SPG). The glider is a sky-lane tool:
+ * collected from a pickup, deployed by HOLDING jump while falling, and it
+ * turns descent into travel — slow sink, strong steering, and wind columns
+ * carry it upward. Lost when the player takes a real hit.
+ */
+export const GLIDE = {
+  /** Terminal sink rate while deployed (px/frame). */
+  sink: 1.1,
+  /** Air steering multiplier while deployed. */
+  steer: 2.2,
+  /** Fastest upward speed wind may impart to a deployed glider. */
+  soar: -4.5,
+} as const;
+
 export const ROLL = {
   /** Max lip (px) ridden over instead of stopping dead. */
   stepUp: 8,
@@ -127,6 +142,10 @@ export class Player {
    */
   lookUp = false;
   crouch = false;
+  /** Carrying the hang glider (sky-lane pickup; lost on a real hit). */
+  hasGlider = false;
+  /** Glider currently deployed (held jump while falling). */
+  gliding = false;
   /** Locked onto a grind rail (zone 3's vehicle). */
   railing = false;
   /** Which way along the rail the ride is going. */
@@ -396,15 +415,36 @@ export class Player {
   private updateAir(map: TileMap, input: PlayerInput): void {
     const prevY = this.y;
 
+    // --- Hang glider: HOLD jump while falling to deploy, release to fold ---
+    if (this.hasGlider) {
+      if (!this.gliding && input.jump && !this.jumping && this.ysp > 0) {
+        this.gliding = true;
+        this.rolling = false;
+        this.events.push('glide');
+      } else if (this.gliding && !input.jump) {
+        this.gliding = false;
+      }
+    } else {
+      this.gliding = false;
+    }
+
+    const steer = this.gliding ? PHYS.air * GLIDE.steer : PHYS.air;
     if (input.left) {
-      this.xsp = Math.max(this.xsp - PHYS.air, -PHYS.top);
+      this.xsp = Math.max(this.xsp - steer, -PHYS.top);
       this.facing = -1;
     } else if (input.right) {
-      this.xsp = Math.min(this.xsp + PHYS.air, PHYS.top);
+      this.xsp = Math.min(this.xsp + steer, PHYS.top);
       this.facing = 1;
     }
     if (this.jumping && !input.jump && this.ysp < -PHYS.jrel) this.ysp = -PHYS.jrel;
-    this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
+    if (this.gliding) {
+      // The wing carries the fall: gravity still pulls, but sink is capped
+      // low and wind (applied by the Level) may push the whole thing upward.
+      this.ysp = Math.min(this.ysp + PHYS.grv * 0.3, GLIDE.sink);
+      this.ysp = Math.max(this.ysp, GLIDE.soar);
+    } else {
+      this.ysp = Math.min(this.ysp + PHYS.grv, PHYS.yspMax);
+    }
 
     // Horizontal move + wall clip (only genuinely wall-facing surfaces).
     if (this.xsp !== 0) {
@@ -444,6 +484,7 @@ export class Player {
 
   private land(angle: number, depth: number): void {
     const a = norm360(angle);
+    this.gliding = false; // the wing folds the moment feet touch ground
     this.landImpact = Math.max(0, this.ysp);
     // Hard landings squash the body and are worth extra dust/sound.
     this.squash = Math.min(1, this.landImpact / 10);
@@ -499,6 +540,11 @@ export class Player {
     }
     const lost = this.rings;
     this.rings = 0;
+    if (this.hasGlider) {
+      this.hasGlider = false;
+      this.gliding = false;
+      this.events.push('glider-lost');
+    }
     this.invuln = 120;
     this.adjustHeight(false);
     this.grounded = false;
@@ -618,6 +664,8 @@ export class Player {
     this.board = false;
     this.railing = false;
     this.carting = false;
+    this.hasGlider = false;
+    this.gliding = false;
     this.layer = 0;
     this.dead = false;
     this.invuln = 60;

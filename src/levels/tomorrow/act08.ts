@@ -15,6 +15,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 400;
@@ -71,5 +72,32 @@ export const act08: LevelDef = {
     // Off the leap-of-faith arc: the ring trail through (341,11) must stay a
     // promise, not an ambush — a launched player cannot attack mid-arc.
     b.drone(355, 15, 2);
+
+    // Undercity metro gallery in THREE segments: both cart canyons (45-52
+    // and 283-291, ledge floors on row 30) and the post-leap secret pocket
+    // (room floor on row 31 at 362-368) all live in the carve band, so the
+    // corridor stops either side of each and those floors bridge the under
+    // lane across every seam (max 4 tiles, limit is 9). Segment A (short,
+    // hazardless): shafts 26 (under a stackedChoice shelf) and 37 (pad-fed).
+    // Segment B: shafts 83 (past the checkpoint) and 268 (roller-dip basin);
+    // the sneakUnder pocket at 136-143 merges in. All clear of the loop at
+    // 102-133, the rail cascade, the gauntlet and the wide bowl — and NOT on
+    // the rise-3 ramp flat at 152-157: a runner crests that ramp at walking
+    // speed and needs the dash pad at 155, not a hole.
+    underGallery(b, 12, { len: 31, shafts: [14, 25], hazards: 0, crystal: false });
+    underGallery(b, 54, { len: 227, shafts: [29, 214], hazards: 2, crystal: false });
+    // Segment C runs under the finale stretch and has no room for a surface
+    // shaft (the phase pit, the crowded checkpoint runway and the blind leap
+    // mesa sit above it), so its door is a service hatch in the phase pit's
+    // floor — twin springs directly beneath throw a faller straight back to
+    // the surface, so the hatch is a door, never a trap.
+    underGallery(b, 294, { len: 64, shafts: [], hazards: 1, crystal: false });
+    b.carve(304, 29, 305, 33);
+    b.spring(304, 34, 13);
+    b.spring(305, 34, 13);
+    // A flickering service light over segment B's spike strip: hard-light
+    // infrastructure reused as undercity dressing, and a blink-timed hop
+    // line over the teeth for anyone reading the rhythm.
+    b.phasePlatform(155, 158, 31, 180, 0);
   },
 };

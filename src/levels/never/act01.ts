@@ -7,6 +7,7 @@ import {
   rollersRun,
   runway,
   signpostFinish,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -200,5 +201,24 @@ export const act01: LevelDef = {
     b.secret(269, 31, 276, 33);
     b.crystal(273, 32); // crystal 5 — deep secret
     b.ringBox(271, 32, 2, 1);
+
+    /* ============== UNDER — THE GLIMMERDEEP RUNS (whole act) ===============
+     * The drainage gallery was the only real stretch of underworld; these
+     * segments extend it into a biome-length carved route at row 34. Breaks
+     * only where existing r30 floors must survive: the chasm ledge (61-68)
+     * and the cart canyon ledge (321-326) — both are themselves standable
+     * under-lane floor, so they bridge the route across the skips. Shaft
+     * columns are chosen clear of both loop footprints (cx 45 and 176 ± 6),
+     * the launch ramp (141+), the stalactite roof (285-298) and the bowl.
+     */
+    // Vault mouth run: shaft at 26 threads between the tutorial rail's posts.
+    underGallery(b, 14, { len: 47, row: 34, shafts: [12], hazards: 0, crystal: false });
+    // Cutting-floor run: rail-threaded, entered at 78 (before the spike
+    // clocks) or 130 (off the terrace, past secret room 2's far wall).
+    underGallery(b, 69, { len: 91, row: 34, shafts: [9, 61], hazards: 1, rail: true, crystal: false });
+    // Underwhen-opens run: entered from the last shoulder, before the roof.
+    underGallery(b, 277, { len: 44, row: 34, shafts: [2], hazards: 0, crystal: false });
+    // Signpost run: entered from the finish runway, clear of its patrol.
+    underGallery(b, 327, { len: 52, row: 34, shafts: [35], hazards: 1, crystal: false });
   },
 };

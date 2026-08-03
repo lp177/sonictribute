@@ -13,6 +13,7 @@ import {
   cartCanyon,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -61,5 +62,16 @@ export const midnight05: LevelDef = {
     let s = canopyRun(b, 76, 11, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 52 });
+
+    // The undercroft finally IS an undercroft: the coolant main runs the act
+    // in two bores either side of the cart canyon (its ledge at row 30 keeps
+    // its own springs). Both sneak-under pockets sit at floor 34 and merge
+    // straight into the bore — the under crystal (60) and the shield larder
+    // (254) are now stops along it. The west bore carries a grind rail down
+    // the pipe run. Shafts: between stalactites (69), the stacked-choice deck
+    // (128) and the run-out (312) — clear of the loop corridor (82–109), the
+    // bowl (202–215) and the board-deck pits.
+    underGallery(b, 4, { len: 227, row: 34, shafts: [65, 124], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 239, { len: 106, row: 34, shafts: [73], hazards: 1, crystal: false });
   },
 };

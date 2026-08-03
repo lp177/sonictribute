@@ -19,6 +19,7 @@ const DIG_SPEED = 3.5;
 const RISE_SPEED = 6;
 /** Underground tracking speed. Beatable on foot, so running is a real answer. */
 const BURROW_SPEED = 1.9;
+const BURROW_SPEED_RAGE = 2.5;
 /** Frames spent shadowing the player underground before it commits to a spot. */
 const BURROW_CHASE = 84;
 /** Frames of rubble spray over the chosen spot before it bursts out. */
@@ -95,7 +96,11 @@ export class CrystalBoss implements BossLike {
   readonly arenaRight: number;
   shards: Shard[] = [];
 
-  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number) {
+  /** Finale fury: faster underground chase, a third volley, briefer window. */
+  readonly rage: boolean;
+
+  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number, rage = false) {
+    this.rage = rage;
     this.x = x;
     this.groundY = groundY;
     this.surfaceY = groundY - 22;
@@ -168,7 +173,7 @@ export class CrystalBoss implements BossLike {
         }
         if (this.timer <= BURROW_CHASE) {
           const dx = player.x - this.x;
-          this.x += Math.max(-BURROW_SPEED, Math.min(BURROW_SPEED, dx));
+          this.x += Math.max(-(this.rage ? BURROW_SPEED_RAGE : BURROW_SPEED), Math.min((this.rage ? BURROW_SPEED_RAGE : BURROW_SPEED), dx));
           this.x = Math.max(this.minX, Math.min(this.maxX, this.x));
         } else if (this.timer === BURROW_CHASE + 1) {
           // Commits to a spot and stops moving: the tell is a stationary
@@ -195,6 +200,11 @@ export class CrystalBoss implements BossLike {
         } else if (this.timer === SHARD_VOLLEY) {
           this.fire(FAN_TIGHT, Math.sign(player.x - this.x) * AIM_BIAS);
           events.push('boss-shards');
+        } else if (this.rage && this.timer === SHARD_VOLLEY * 2) {
+          // The rematch adds a third, harder-leaning volley: the safe spot
+          // after volley two is exactly where this one goes.
+          this.fire(FAN_TIGHT, Math.sign(player.x - this.x) * AIM_BIAS * 1.6);
+          events.push('boss-shards');
         }
         if (this.timer > SHARD_PHASE) {
           this.phase = 'vulnerable';
@@ -202,8 +212,9 @@ export class CrystalBoss implements BossLike {
         }
         break;
       case 'vulnerable':
-        // Drill spent and venting: the only window in which it can be hurt.
-        if (this.timer > VULN) {
+        // Drill spent and venting: the only window in which it can be hurt
+        // (briefer in the rematch).
+        if (this.timer > (this.rage ? VULN - 24 : VULN)) {
           this.phase = 'burrow';
           this.timer = 0;
           events.push('boss-dig');

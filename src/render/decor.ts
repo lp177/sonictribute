@@ -30,6 +30,7 @@ export type DecorKind =
   | 'drip'
   | 'mote'
   // Duskmere Coast
+  | 'petal'
   | 'seagrass'
   | 'shell'
   | 'shorebird'
@@ -121,6 +122,15 @@ export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH =
 
   // Drifting points of light above the ground: fireflies in the dusk meadow,
   // cold crystal dust in the vault, hover-lane traffic over the neon city.
+  if (theme === 'verdant') {
+    // Petals shed by a coast stuck at dusk — they drift, but never land.
+    for (let i = 0; i < 55; i++) {
+      const tx = 2 + Math.floor(rnd() * (map.w - 4));
+      const y = surfaceAt(map, tx);
+      if (y === null) continue;
+      items.push({ kind: 'petal', x: tx * T + rnd() * T, y: y - 30 - rnd() * 200, phase: rnd() * 6.283, scale: 0.6 + rnd() * 0.7 });
+    }
+  }
   if (theme === 'verdant' || theme === 'crystal' || theme === 'neon') {
     const kind: DecorKind = theme === 'crystal' ? 'mote' : theme === 'neon' ? 'hoverStreak' : 'firefly';
     const count = theme === 'neon' ? 46 : 90;
@@ -204,6 +214,9 @@ export function drawDecor(
         break;
       case 'mote':
         drawMote(ctx, d, frame, animate);
+        break;
+      case 'petal':
+        drawPetal(ctx, d, frame, animate);
         break;
       case 'seagrass':
         drawSeagrass(ctx, d, sway);
@@ -513,6 +526,22 @@ function drawCaveDrip(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number
 }
 
 /** Tall coastal blades — the meadow grass's leggy shoreline cousin. */
+function drawPetal(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  // A lazy figure-eight drift: time is stuck, so the fall never completes.
+  const x = d.x + Math.sin(t / 60 + d.phase) * 22;
+  const y = d.y + Math.sin(t / 37 + d.phase * 2) * 9;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(t / 45 + d.phase) * 0.8);
+  ctx.fillStyle = ['#ff8fb1', '#ffb03d', '#ffd94a'][Math.floor(d.phase * 2.1) % 3];
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 3.2 * d.scale, 1.8 * d.scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawSeagrass(ctx: CanvasRenderingContext2D, d: DecorItem, sway: number): void {
   ctx.save();
   ctx.translate(d.x, d.y);

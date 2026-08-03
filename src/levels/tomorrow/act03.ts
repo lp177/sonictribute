@@ -13,6 +13,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 352;
@@ -69,5 +70,18 @@ export const act03: LevelDef = {
     b.drone(90, 7, 3);
     b.drone(150, 9, 3);
     b.drone(250, 11, 3);
+
+    // Undercity metro gallery, in two segments: the cart canyon's carved pit
+    // (124-130, consolation ledge on row 30) sits exactly in the gallery's
+    // carve band, so the corridor stops either side of it and the canyon
+    // ledge itself carries the under lane across (gaps of 2 tiles, well
+    // under the 9-tile route-continuity limit). Segment A shafts: 15 (fed by
+    // the dash pad at 13) and 76 (under a stackedChoice shelf, clear of the
+    // crab at 68-74). Segment B shafts: 236 and 278 (both dash-pad fed) and
+    // 321 (the last exit before the finish straight) — all clear of the loop
+    // at 83-110, both rail cascades and the bowl at 282-295. The sneakUnder
+    // pocket at 205-212 merges into segment B as a mid-act entrance.
+    underGallery(b, 12, { len: 110, shafts: [3, 64], hazards: 1, crystal: false });
+    underGallery(b, 133, { len: 191, shafts: [103, 145, 188], hazards: 1, crystal: false });
   },
 };

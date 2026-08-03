@@ -100,7 +100,11 @@ export class MirageBoss implements BossLike {
    */
   private derezLevel = 0;
 
-  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number) {
+  /** Finale fury: hotter trace, denser light-wall, briefer derez. */
+  readonly rage: boolean;
+
+  constructor(x: number, groundY: number, arenaLeft: number, arenaRight: number, rage = false) {
+    this.rage = rage;
     this.x = x;
     this.groundY = groundY;
     this.standY = groundY - 18;
@@ -165,7 +169,7 @@ export class MirageBoss implements BossLike {
         }
         break;
       case 'trace':
-        this.speed = Math.min(TRACE_TOP, this.speed + TRACE_ACCEL);
+        this.speed = Math.min(this.rage ? TRACE_TOP + 1.5 : TRACE_TOP, this.speed + TRACE_ACCEL);
         this.move();
         if (this.timer % AFTER_EVERY === 0 && this.speed >= LAY_MIN_SPEED) {
           this.afterimages.push({ x: this.x, y: this.y, age: 0 });
@@ -179,7 +183,7 @@ export class MirageBoss implements BossLike {
         break;
       case 'derez':
         // Overheated and glitching: stationary, and the only damage window.
-        if (this.timer > DEREZ_LEN) {
+        if (this.timer > (this.rage ? DEREZ_LEN - 30 : DEREZ_LEN)) {
           this.phase = 'pace';
           this.timer = 0;
           events.push('boss-rez');

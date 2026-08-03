@@ -67,6 +67,9 @@ loads.
 - **A world with depth** — run-up ramps that fling you into the sky, holes
   that drop you into the underworks rather than killing you, and a void far
   below that only ever catches a genuinely bottomless fall.
+- **The deltaplane** — a hang-glider pickup on the sky routes: hold jump
+  while falling to deploy, ride rising-air columns to soar, and weave the
+  ring lines. Lost when you take a hit, like everything good.
 - **Game juice** — hit-stop on impact, screen shake, impact flashes, speed
   streaks and a tunnel vignette at pace, squash-and-stretch, run dust,
   spin-dash smoke, board wake, explosion particles and speed afterimages.

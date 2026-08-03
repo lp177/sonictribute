@@ -14,6 +14,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -64,5 +65,17 @@ export const midnight10: LevelDef = {
     let s = canopyRun(b, 72, 9, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104 });
+
+    // The yard's haulage tunnel, threaded between the three canyons — each
+    // canyon ledge (floor 30) keeps its springs and doubles as a raised door
+    // onto the bore (walk off its east lip, drop four rows in). No bore
+    // before canyon 1: the yard throat is solid, the route opens at the
+    // ledge. The sneak-under pocket (146–153, floor 34) merges in with the
+    // under crystal. Shafts: stacked-choice deck (82), between stalactites
+    // (238), the run-out (372) — clear of the loop corridor (116–143), the
+    // gauntlet, the board decks, the phase pit and the bowl.
+    underGallery(b, 28, { len: 73, row: 34, shafts: [54], hazards: 1, crystal: false });
+    underGallery(b, 110, { len: 178, row: 34, shafts: [128], hazards: 2, crystal: false });
+    underGallery(b, 296, { len: 100, row: 34, shafts: [76], hazards: 2, crystal: false });
   },
 };

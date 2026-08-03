@@ -110,7 +110,24 @@ procedurally at boot.
 - Drop shafts must clear every loop footprint, or they punch a hole in the
   loop's run-up corridor.
 - Each zone owes three full-length routes (sky / ground / underground) with
-  crystals spread across them, enforced by `tests/routes.test.ts`.
+  crystals spread across them, enforced by `tests/routes.test.ts`. The under
+  route must be a TRAVELLABLE gallery — floor plus 2 rows of headroom, not
+  bedrock; `tests/actContract.ts` enforces this after the campaign shipped
+  "underground routes" that were solid rock with bonus closets.
+- The camera may overscroll above the map top (`Camera.overscrollTop`).
+  Without it the view pins to y=0 on the sky route and the hero rides the
+  top third of the frame while the lower paths hog the screen.
+- Anything that moves on a track must RENDER its track. Minecarts rode
+  invisible rails — the cart read as flying and its crash as hitting thin
+  air. If the player must predict it, the player must see it.
+- A biome fights its boss twice; the finale rematch must not replay the same
+  script. `LevelDef.bossRage` unlocks each boss's escalated pattern (pod:
+  double dive + wider mace; press: trailing shockwave pair + shorter vent;
+  shard: third leaning volley + faster chase; mirage: hotter trace + briefer
+  derez). Queued rage projectiles are inert until born.
+- The hang glider (`GLIDE`, `b.glider`, `b.wind`) deploys by HOLDING jump
+  while falling, folds on landing or release, and is lost on a real hit.
+  Wind zones are silent force fields, never event sources.
 - A boss's ANIMATION clock must be separate from its phase timer. Phase
   changes reset `timer`, so anything drawn from it (the Wrecking Pod's mace)
   teleports the instant the boss is hit. Same rule for intangibility: gate it

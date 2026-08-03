@@ -26,6 +26,8 @@ import {
   drawBoardPad,
   drawRail,
   drawQuarterPipe,
+  drawGliderPickup,
+  drawWindZone,
   drawStalactite,
   drawMinecart,
   drawCartBuffer,
@@ -311,6 +313,14 @@ export class LevelScene implements Scene {
         drawPhasePlatform(ctx, pl.x, pl.y, pl.w, pl.solid, flipIn, this.frame);
       }
     }
+    for (const wz of level.winds) {
+      if (wz.x1 > camX - 40 && wz.x0 < camX + W + 40) {
+        drawWindZone(ctx, wz.x0, wz.y0, wz.x1, wz.y1, this.frame, this.animate);
+      }
+    }
+    for (const g of level.gliders) {
+      if (!g.taken && visible(g.x)) drawGliderPickup(ctx, g.x, g.y, this.frame);
+    }
     // Quarter-pipe rims: the converting launcher at the lip must be visible,
     // or the launch reads as an invisible trigger on ordinary terrain.
     for (const qp of level.pipes) {
@@ -322,6 +332,11 @@ export class LevelScene implements Scene {
       }
     }
     for (const cart of level.carts) {
+      // The TRACK renders first: a cart with no visible rail reads as flying,
+      // and its crash reads as hitting thin air — unreadable, so unfair.
+      if (cart.endX > camX - 40 && cart.startX < camX + W + 40) {
+        drawRail(ctx, cart.startX, cart.startY, cart.endX, cart.endY, this.frame);
+      }
       if (visible(cart.endX)) drawCartBuffer(ctx, cart.endX, cart.endY, this.frame);
       if (visible(cart.x)) {
         const pitch = Math.atan2(cart.endY - cart.startY, cart.endX - cart.startX);

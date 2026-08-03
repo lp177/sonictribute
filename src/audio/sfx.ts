@@ -166,6 +166,17 @@ export class Sfx {
       case 'rail-off':
         this.blip(700, 0.12, 'sawtooth', -320, 0, 0.22);
         break;
+      case 'glider':
+        this.blip(523, 0.1, 'triangle', 140);
+        this.blip(784, 0.16, 'triangle', 160, 0.09);
+        break;
+      case 'glide':
+        this.noise(0.18, 0, 0.2);
+        this.blip(360, 0.25, 'sine', 120, 0, 0.2);
+        break;
+      case 'glider-lost':
+        this.blip(620, 0.2, 'triangle', -300, 0, 0.24);
+        break;
       case 'board':
         this.blip(330, 0.12, 'triangle', 200);
         this.blip(660, 0.16, 'triangle', 200, 0.1);

@@ -13,6 +13,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 320;
@@ -67,5 +68,17 @@ export const act01: LevelDef = {
     // Security drones patrol the canopy, not the boulevard.
     b.drone(78, 7, 3);
     b.drone(170, 6, 3);
+
+    // Undercity metro gallery — the act's REAL under route (floor + headroom
+    // through rows 30-34 for nearly the whole act), stamped LAST so its carve
+    // wins over every ground fill. It merges with the sneakUnder pocket at
+    // 128-135, turning that closet into an alcove of the corridor. Shaft
+    // columns sit on plain runway floor — 18 (fed by the dash pad at 13),
+    // 145 (fed by the pad at 141, two clear of the hopper at 143) and 200 —
+    // all clear of the loop footprint at 98-125, the bowl at 204-217 and the
+    // secret pockets (whose rooms at rows 25-28 keep a solid shell above the
+    // corridor roof). Nothing in the gallery is clocked, so the idle-silence
+    // rule holds trivially near the start.
+    underGallery(b, 16, { len: 284, shafts: [2, 129, 184], hazards: 1, crystal: false });
   },
 };

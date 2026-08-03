@@ -13,6 +13,7 @@ import {
   boardSprint,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -44,7 +45,7 @@ export const midnight01: LevelDef = {
     c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 40–61, crystal 2 (sky shelf)
     c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 62–69
     c = corridorLoop(b, c.endX, c.endRow); // 70–97: first cog loop
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 98–109, crystal 3 (under), secret 1
+    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 98–109, secret 1 (pocket joins the gallery below)
     c = stalactiteGallery(b, c.endX, c.endRow, { len: 14, count: 2 }); // 110–123: two steel needles
     c = secretPocket(b, c.endX, c.endRow); // 124–133, crystal 4 (ground), secret 2
     c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 134–163
@@ -63,5 +64,14 @@ export const midnight01: LevelDef = {
     // the ground per the build-order rule.
     const s = canopyRun(b, 36, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 104 });
+
+    // The coolant undercroft: a real service tunnel running the length of the
+    // shift, carved LAST so nothing back-fills it. Its floor (row 34) matches
+    // the sneak-under pocket at 100–107, which becomes a lit alcove of the
+    // gallery; crystal 3 (under) now hangs mid-tunnel. Shafts drop from the
+    // stacked-choice deck (56), the trap-row tail (180) and the run-out (296)
+    // — all clear of the loop corridor (70–97), the bowl (196–209) and the
+    // board-deck pits.
+    underGallery(b, 4, { len: 310, row: 34, shafts: [52, 176, 292], hazards: 1, crystal: true });
   },
 };

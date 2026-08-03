@@ -15,6 +15,7 @@ import {
   leapOfFaith,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -35,6 +36,7 @@ export const midnight11: LevelDef = {
   theme: 'gear',
   width: 420,
   bossKind: 'press',
+  bossRage: true, // the finale rematch runs the escalated pattern
   build(b: LevelBuilder): void {
     // The finale opens NOTHING like act 6: no rollers, no early loop — the
     // shift bell goes straight to machinery. Dip runway, stalactite roof,
@@ -74,5 +76,19 @@ export const midnight11: LevelDef = {
     let s = canopyRun(b, 44, 10, { len: 104, crystal: true }); // crystal 5 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104 });
+
+    // The last shift's escape tunnel: three trap-laced bores split by the two
+    // cart canyons, whose ledges (floor 30) keep their springs and act as
+    // drop-in doors onto the bores east of them. The sneak-under pocket
+    // (122–129, floor 34) merges into the middle bore, under crystal and
+    // all; the east bore runs right up to the arena wall (col 369) and no
+    // further — the Piston Press is fought on solid floor. Shafts: the
+    // stacked-choice deck (32), between stalactites (41), mid-gauntlet
+    // (218), the high runway (270) and the pre-arena walk (366) — clear of
+    // the loop corridor (86–119), board decks (132–179), the phase pit, the
+    // rail cascade, the bowl and the leap.
+    underGallery(b, 4, { len: 59, row: 34, shafts: [28, 37], hazards: 2, crystal: false });
+    underGallery(b, 71, { len: 167, row: 34, shafts: [147], hazards: 2, crystal: false });
+    underGallery(b, 247, { len: 123, row: 34, shafts: [23, 119], hazards: 2, crystal: false });
   },
 };

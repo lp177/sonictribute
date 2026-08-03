@@ -14,6 +14,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 384;
@@ -70,5 +71,24 @@ export const act07: LevelDef = {
     b.drone(85, 7, 3);
     b.drone(200, 8, 3);
     b.drone(300, 7, 3);
+
+    // Undercity metro gallery, split around the limit cart canyon (199-207,
+    // ledge floor on row 30 sits in the carve band and bridges the under
+    // lane itself). Late act: hazard pressure 2 (spikes + a clocked trap,
+    // both far beyond idle-silence range of the start). Segment A shafts:
+    // 21 (fed by the opening dash-pad straight, clear of the crab at 14-20),
+    // 52 (landing feeds the pad at 55, three tiles clear of the hopper at
+    // 58) and 121 (plain floor past the checkpoint) — clear of the loop at
+    // 24-51. Segment B shaft: 283 (pad-fed, landing delivers you onto the
+    // leap-of-faith launch pad); the sneakUnder pocket at 184-191 is
+    // segment A's eastern entrance.
+    underGallery(b, 12, { len: 185, shafts: [9, 40, 109], hazards: 2, crystal: false });
+    underGallery(b, 210, { len: 140, shafts: [73], hazards: 2, crystal: false });
+    // Service hatch in the late phase pit's floor (same grammar as act 6):
+    // the slow lower route continues into the metro; twin springs beneath
+    // the slot throw a faller straight back out.
+    b.carve(266, 29, 267, 33);
+    b.spring(266, 34, 13);
+    b.spring(267, 34, 13);
   },
 };

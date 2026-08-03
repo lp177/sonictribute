@@ -20,6 +20,14 @@ export class Camera {
    */
   focus = 0.6;
   /**
+   * How far the view may scroll ABOVE the map top. Without it the camera
+   * pins to y=0 on the sky route and the hero rides the top third of the
+   * frame while the lower paths hog the screen — the view must stay anchored
+   * on the hero, not on whatever happens to fill the clamped frame. The
+   * overscrolled strip renders as sky, which is exactly what is up there.
+   */
+  overscrollTop = 48;
+  /**
    * Look up / look down (classic "hold up or down while standing still").
    * `lookOff` eases toward `lookDist * dir` so the pan reads as a deliberate
    * glance rather than a snap, and `viewY` is what the renderer must use — it
@@ -79,6 +87,6 @@ export class Camera {
   }
 
   private clampY(y: number, levelH: number): number {
-    return Math.max(0, Math.min(Math.max(0, levelH - this.h), y));
+    return Math.max(-this.overscrollTop, Math.min(Math.max(0, levelH - this.h), y));
   }
 }

@@ -14,6 +14,7 @@ import {
   leapOfFaith,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -61,5 +62,21 @@ export const act09: LevelDef = {
     const s = canopyRun(b, 34, 9, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117 });
     b.crystal(280, 7); // crystal 5 — the gleam above the bowl (sky)
+
+    /* ============= UNDER — THE ROOTS OF THE ASCENT (whole act) =============
+     * The climb act keeps a counterweight below: a carved route at row 34
+     * under the whole ascent. It breaks only at the sneak-under pocket
+     * (94-101, floor row 31 — standable under-lane floor that bridges the
+     * route) and never cuts the loop's run-up corridor (64-85). Shafts punch
+     * cascade shelves, swell crowns and flat road, clear of the gauntlet
+     * clocks, the pipes, the launchers and every patrol range. Several
+     * stretches run hazard-free where the motif's teeth would collide with
+     * their own shaft springs.
+     */
+    underGallery(b, 14, { len: 80, row: 34, shafts: [11], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 102, { len: 80, row: 34, shafts: [36, 76], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 182, { len: 80, row: 34, shafts: [4, 36], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 262, { len: 80, row: 34, shafts: [56], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 342, { len: 40, row: 34, shafts: [1, 31], hazards: 0, crystal: false });
   },
 };

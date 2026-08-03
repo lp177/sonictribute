@@ -14,6 +14,7 @@ import {
   quarterPipeBowl,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 352;
@@ -61,5 +62,17 @@ export const act05: LevelDef = {
     b.phasePlatform(44, 48, 9, 170, 0);
     b.drone(75, 6, 3);
     b.drone(180, 6, 3);
+
+    // Undercity metro gallery, split around the cart canyon (109-116, ledge
+    // floor on row 30 sits in the carve band; the ledge itself bridges the
+    // under lane over the 2-tile seams) and ending flush with the toll
+    // plaza — no tunnelling under the boss arena. Segment A shafts: 26
+    // (under a stackedChoice shelf, clear of the crab at 17-23) and 100 (the
+    // flat before the canyon boarding edge). Segment B shaft: 266 (plain
+    // floor past the checkpoint) — clear of the loop at 162-189, the leap
+    // zone at 222-255 and the bowl at 270-283; the sneakUnder pocket at
+    // 126-133 merges in as segment B's western entrance.
+    underGallery(b, 12, { len: 97, shafts: [14, 88], hazards: 1, crystal: false });
+    underGallery(b, 119, { len: 165, shafts: [147], hazards: 1, crystal: false });
   },
 };

@@ -1831,6 +1831,107 @@ export function drawBossGate(
   ctx.restore();
 }
 
+export function drawGliderPickup(ctx: CanvasRenderingContext2D, x: number, y: number, frame: number): void {
+  const bob = Math.sin(frame / 22) * 2.5;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 18);
+  glow.addColorStop(0, 'rgba(255,214,120,0.5)');
+  glow.addColorStop(1, 'rgba(255,214,120,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(-18, -18, 36, 36);
+  // Folded wing: a bright chevron sail on a tiny frame.
+  ctx.strokeStyle = '#8a5a32';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, 8);
+  ctx.lineTo(0, -4);
+  ctx.stroke();
+  ctx.fillStyle = '#ffb03d';
+  ctx.beginPath();
+  ctx.moveTo(-12, -2);
+  ctx.quadraticCurveTo(0, -12, 12, -2);
+  ctx.lineTo(0, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#fff3b0';
+  ctx.beginPath();
+  ctx.moveTo(-12, -2);
+  ctx.quadraticCurveTo(0, -12, 12, -2);
+  ctx.lineTo(9, -3.4);
+  ctx.quadraticCurveTo(0, -10, -9, -3.4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The deployed wing, drawn over the hero (call inside the hero transform). */
+export function drawGliderWing(ctx: CanvasRenderingContext2D, frame: number): void {
+  const flex = Math.sin(frame / 7) * 1.5;
+  ctx.save();
+  ctx.strokeStyle = '#8a5a32';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-2, -14);
+  ctx.lineTo(0, -24);
+  ctx.moveTo(6, -14);
+  ctx.lineTo(0, -24);
+  ctx.stroke();
+  ctx.fillStyle = '#ffb03d';
+  ctx.beginPath();
+  ctx.moveTo(-22, -22 + flex);
+  ctx.quadraticCurveTo(0, -34 - flex, 24, -22 + flex);
+  ctx.lineTo(0, -25);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#fff3b0';
+  ctx.beginPath();
+  ctx.moveTo(-22, -22 + flex);
+  ctx.quadraticCurveTo(0, -34 - flex, 24, -22 + flex);
+  ctx.lineTo(18, -23);
+  ctx.quadraticCurveTo(0, -31, -17, -23);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Rising-air column: streaming motes, drawn in world space. */
+export function drawWindZone(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  frame: number,
+  animate: boolean,
+): void {
+  const w = x1 - x0;
+  const h = y1 - y0;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, y0, w, h);
+  ctx.clip();
+  const t = animate ? frame : 0;
+  // Deterministic streak lattice, phase-shifted per column.
+  const cols = Math.max(2, Math.floor(w / 22));
+  for (let i = 0; i < cols; i++) {
+    const cx = x0 + ((i + 0.5) / cols) * w + Math.sin(i * 2.7) * 5;
+    const speed = 2.2 + (i % 3) * 0.8;
+    for (let k = 0; k < 3; k++) {
+      const phase = ((i * 977 + k * 331) % 1000) / 1000;
+      const yy = y1 - (((t * speed) / (h + 40) + phase) % 1) * (h + 40);
+      const fade = Math.min(1, (y1 - yy) / 60, (yy - y0 + 40) / 60);
+      ctx.strokeStyle = `rgba(220,240,255,${0.28 * Math.max(0, fade)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, yy + 12);
+      ctx.lineTo(cx + Math.sin(yy / 30) * 2, yy);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 export function drawGoal(ctx: CanvasRenderingContext2D, x: number, y: number, spinning: number, frame: number): void {
   ctx.save();
   ctx.translate(x, y);
@@ -1941,6 +2042,7 @@ function drawPressBoss(ctx: CanvasRenderingContext2D, boss: PressBoss, frame: nu
 
   // Ground shockwaves: rippling energy arcs.
   for (const s of boss.shockwaves) {
+    if (s.age < 0) continue; // queued rage wave: not in the world yet
     const a = 1 - s.age / 80;
     ctx.strokeStyle = `rgba(255,170,60,${0.9 * a})`;
     ctx.lineWidth = 2;
@@ -2572,6 +2674,8 @@ export function drawHero(ctx: CanvasRenderingContext2D, p: Player, frame: number
     ctx.scale(1.08, 0.78);
   }
   ctx.scale(p.facing, 1);
+
+  if (p.gliding) drawGliderWing(ctx, frame);
 
   // Mag-Board deck under the rider (vehicle, zone-specific).
   if (p.board) {

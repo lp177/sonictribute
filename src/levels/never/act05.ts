@@ -15,6 +15,7 @@ import {
   leapOfFaith,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -65,5 +66,20 @@ export const act05: LevelDef = {
     // Sky overlay: two canopy stretches, each carrying a crystal.
     const s = canopyRun(b, 40, 10, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117, crystal: true }); // crystal 5 (sky)
+
+    /* ================ UNDER — THE LOCK'S UNDERCROFT (whole act) ============
+     * A biome-length carved route at row 34 running beneath the exam. It
+     * breaks only at the cart canyon's deep ledge (98-104, floor row 30),
+     * which is itself standable under-lane floor and bridges the route, and
+     * it stops short of the arena — the boss floor stays whole. Shafts avoid
+     * the loop's run-up corridor (10-37), the cart track and buffer, the
+     * bowl's pipes, the leap launcher and every patrol range. The sneak-under
+     * pocket (floor 34) opens straight into the corridor.
+     */
+    underGallery(b, 14, { len: 84, row: 34, shafts: [32, 49], hazards: 1, rail: true, crystal: false });
+    // hazards 0: this stretch owns the sneak-under springs — no teeth beside them.
+    underGallery(b, 105, { len: 68, row: 34, shafts: [4, 53], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 173, { len: 90, row: 34, shafts: [1, 48], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 263, { len: 93, row: 34, shafts: [25, 67, 85], hazards: 1, rail: true, crystal: false });
   },
 };

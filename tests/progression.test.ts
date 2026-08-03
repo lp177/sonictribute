@@ -120,3 +120,14 @@ describe('Campaign progression', () => {
     }
   });
 });
+
+describe('Boss rematches are not reruns', () => {
+  it('every biome finale enrages its boss; the mid-biome fight does not', () => {
+    BIOMES.forEach((_, bi) => {
+      const acts = biomeActs(bi);
+      const bosses = acts.filter((a) => a.def.bossKind);
+      expect(bosses[bosses.length - 1].def.bossRage, `biome ${bi} finale must rage`).toBe(true);
+      expect(bosses[0].def.bossRage ?? false, `biome ${bi} first fight must not`).toBe(false);
+    });
+  });
+});

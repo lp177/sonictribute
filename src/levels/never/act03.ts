@@ -14,6 +14,7 @@ import {
   leapOfFaith,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -63,5 +64,22 @@ export const act03: LevelDef = {
     // Sky overlay: two canopy stretches, each carrying a crystal.
     const s = canopyRun(b, 40, 10, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117, crystal: true }); // crystal 5 (sky)
+
+    /* ================ UNDER — THE CARTFALL UNDERCUT (whole act) ============
+     * A biome-length carved route at row 34 beneath the canyons. It breaks
+     * only at the two deep canyon ledges (126-133 and 198-206, floor row 30)
+     * — those ledges are themselves standable under-lane floor, so they
+     * bridge the route across the skips. Shafts avoid the cart tracks and
+     * buffers, the loop's run-up corridor (81-108) and every patrol.
+     */
+    // The long western run: entered under the rail cascade's safety floors.
+    underGallery(b, 14, { len: 112, row: 34, shafts: [28], hazards: 1, rail: true, crystal: false });
+    // And, on theme, a cart crossing the undercut below the loop corridor.
+    b.cartRide(80, 34, 100, 34);
+    // Between the two deep canyons.
+    underGallery(b, 134, { len: 64, row: 34, shafts: [3, 55], hazards: 1, rail: true, crystal: false });
+    // The eastern runs, split so each stays stocked and entered.
+    underGallery(b, 207, { len: 84, row: 34, shafts: [2, 60], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 291, { len: 86, row: 34, shafts: [24, 64, 78], hazards: 1, rail: true, crystal: false });
   },
 };

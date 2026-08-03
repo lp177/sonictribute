@@ -12,6 +12,7 @@ import {
   hazardGauntlet,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -60,5 +61,18 @@ export const act04: LevelDef = {
     let s = canopyRun(b, 28, 10, { len: 104, crystal: true }); // crystal 4 (sky)
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     canopyRun(b, s.endX, s.endRow, { len: 104, crystal: true }); // crystal 5 (sky)
+
+    /* =============== UNDER — THE DARKLIGHT GALLERY (whole act) =============
+     * The counterweight to the act's blinking surface: one continuous carved
+     * corridor at row 34, stamped last so nothing back-fills it. Nothing in
+     * this act keeps floor in rows 30-33, so all four segments merge; the
+     * phase-pit floors (row 29) and secret pockets (row 28) keep a thin roof
+     * over it. Shafts sit on flat road clear of the pits, the bowl's pipes,
+     * the leap launcher and every patrol range.
+     */
+    underGallery(b, 14, { len: 94, row: 34, shafts: [29], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 108, { len: 94, row: 34, shafts: [56], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 202, { len: 94, row: 34, shafts: [14, 38], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 296, { len: 75, row: 34, shafts: [37, 60], hazards: 1, rail: true, crystal: false });
   },
 };

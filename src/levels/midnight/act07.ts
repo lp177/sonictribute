@@ -14,6 +14,7 @@ import {
   rollersRun,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -66,5 +67,17 @@ export const midnight07: LevelDef = {
     s = canopyRun(b, s.endX, s.endRow, { len: 104 });
     b.monitor(160, 8, 'shoes');
     canopyRun(b, s.endX, s.endRow, { len: 104 });
+
+    // Under the expressway: the utility bore, three segments. The sneak-under
+    // pocket (floor 32, cols 178–185) and the cart canyon ledge (floor 30,
+    // cols 266–272) stay as raised side-chambers — each opens onto the bore
+    // with a two-to-four-row hop, so they are doors, not breaks. Shafts: the
+    // gate runway (8), under the stacked-choice west platform (155), the
+    // climb-out runway (229), between stalactites (296) and the run-out
+    // (358) — clear of the board decks (16–63), the leap (72–101), the loop
+    // corridor (114–149), the rail steps and the full-density gauntlet.
+    underGallery(b, 4, { len: 174, row: 34, shafts: [4, 151], hazards: 2, crystal: false });
+    underGallery(b, 186, { len: 80, row: 34, shafts: [43], hazards: 2, crystal: false });
+    underGallery(b, 273, { len: 100, row: 34, shafts: [23, 85], hazards: 2, crystal: false });
   },
 };

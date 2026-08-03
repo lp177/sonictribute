@@ -248,6 +248,9 @@ export class FxSystem {
       case 'checkpoint':
         this.emit(x, y - 24, 8, { colors: ['#4be1ff', '#fff'], speed: 1.5, life: 30, size: 2, kind: 'glow' });
         break;
+      case 'glider':
+        this.emit(x, y, 8, { colors: ['#ffb03d', '#fff3b0'], speed: 1.8, life: 24, size: 2, kind: 'spark' });
+        break;
       case 'board':
         this.emit(x, y, 10, { colors: ['#38e0c8', '#b7fff4'], speed: 2, life: 26, size: 3, kind: 'glow' });
         break;

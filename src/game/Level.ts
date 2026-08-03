@@ -15,6 +15,8 @@ import {
   DashPad,
   BoardPad,
   Launcher,
+  GliderPickup,
+  WindZone,
   Rail,
   SpikeTrap,
   CrumblePlatform,
@@ -97,6 +99,8 @@ export class LevelBuilder {
   }[] = [];
   railDefs: { x0: number; y0: number; x1: number; y1: number }[] = [];
   pipeDefs: { x: number; baseY: number; dir: 1 | -1 }[] = [];
+  gliderDefs: { x: number; y: number }[] = [];
+  windDefs: { x0: number; y0: number; x1: number; y1: number; lift: number }[] = [];
   trapDefs: { x: number; y: number; period: number; offset: number }[] = [];
   crumbleDefs: { x: number; y: number; w: number }[] = [];
   swingDefs: { x: number; y: number; len: number; period: number; offset: number }[] = [];
@@ -319,6 +323,16 @@ export class LevelBuilder {
     this.railDefs.push({ x0: x0 * T, y0: row0 * T, x1: x1 * T, y1: row1 * T });
   }
 
+  /** Hang-glider pickup hovering at tile (x, row). */
+  glider(x: number, row: number): void {
+    this.gliderDefs.push({ x: tileCentre(x), y: tileCentre(row) });
+  }
+
+  /** Rising-air column over tiles [x0,x1] x [rowTop,rowBottom]. */
+  wind(x0: number, rowTop: number, x1: number, rowBottom: number, lift = 0.35): void {
+    this.windDefs.push({ x0: x0 * T, y0: rowTop * T, x1: (x1 + 1) * T, y1: (rowBottom + 1) * T, lift });
+  }
+
   /** Telegraphed pop-up spikes flush with the surface at `surfaceRow`. */
   spikeTrap(x: number, surfaceRow: number, period = 150, offset = 0): void {
     this.trapDefs.push({ x: tileCentre(x), y: surfaceRow * T, period, offset });
@@ -477,6 +491,12 @@ export interface LevelDef {
   /** Boss guarding the goal; omit for acts that end at the signpost. */
   bossKind?: BossKind;
   /**
+   * Second-encounter fury. A biome fights its boss twice; the finale rematch
+   * must NOT replay the same script, so `bossRage: true` unlocks each boss's
+   * escalated pattern (new moves, tighter timings — see each class).
+   */
+  bossRage?: boolean;
+  /**
    * Story beat played (as a pseudo-loading cinematic) before this level.
    * Only a biome's first act carries one — between ordinary acts the fade
    * alone keeps the pace up.
@@ -489,6 +509,7 @@ export class Level {
   readonly name: string;
   readonly theme: LevelTheme;
   readonly bossKind: BossKind | null;
+  readonly bossRage: boolean;
   readonly map: TileMap;
   readonly loops: LoopZone[];
   readonly loopTracker: LoopTracker;
@@ -517,6 +538,8 @@ export class Level {
   hoppers: Hopper[];
   readonly boardEndX: number;
   readonly pipes: { x: number; baseY: number; dir: 1 | -1 }[];
+  gliders: GliderPickup[];
+  winds: WindZone[];
   goal: GoalSign;
   boss: BossLike | null = null;
   bossDefeated = false;
@@ -559,6 +582,7 @@ export class Level {
     this.name = def.name;
     this.theme = def.theme;
     this.bossKind = def.bossKind ?? null;
+    this.bossRage = def.bossRage ?? false;
     const b = new LevelBuilder(def.width ?? WORLD_W, def.height ?? WORLD_H);
     def.build(b);
 
@@ -601,6 +625,8 @@ export class Level {
     this.hoppers = b.hopperDefs.map((d) => new Hopper(d.x, d.y));
     this.boardEndX = b.boardEndX;
     this.pipes = b.pipeDefs;
+    this.gliders = b.gliderDefs.map((d) => new GliderPickup(d.x, d.y));
+    this.winds = b.windDefs.map((d) => new WindZone(d.x0, d.y0, d.x1, d.y1, d.lift));
     this.goal = new GoalSign(b.goalPos.x, b.goalPos.y);
     this.startPos = b.playerStart;
     this.respawnPos = { ...b.playerStart };
@@ -688,6 +714,14 @@ export class Level {
     for (const bp of this.boardPads) {
       if (bp.tryMount(p)) events.push('board');
     }
+    for (const g of this.gliders) {
+      if (g.tryCollect(p)) {
+        events.push('glider');
+        this.eventSources.set('glider', { x: g.x, y: g.y });
+      }
+    }
+    // Wind is a silent force field, not an event source.
+    for (const w of this.winds) w.apply(p);
     if (p.board && this.boardEndX >= 0 && p.x >= this.boardEndX) {
       p.dismountBoard();
       events.push('board-end');
@@ -841,12 +875,12 @@ export class Level {
       const gy = this.groundAt(bx);
       this.boss =
         this.bossKind === 'press'
-          ? new PressBoss(bx, gy, this.arena.left, this.arena.right)
+          ? new PressBoss(bx, gy, this.arena.left, this.arena.right, this.bossRage)
           : this.bossKind === 'shard'
-            ? new CrystalBoss(bx, gy, this.arena.left, this.arena.right)
+            ? new CrystalBoss(bx, gy, this.arena.left, this.arena.right, this.bossRage)
             : this.bossKind === 'mirage'
-              ? new MirageBoss(bx, gy, this.arena.left, this.arena.right)
-              : new Boss(bx, gy, this.arena.left, this.arena.right);
+              ? new MirageBoss(bx, gy, this.arena.left, this.arena.right, this.bossRage)
+              : new Boss(bx, gy, this.arena.left, this.arena.right, this.bossRage);
       this.arenaGates = new BossArena(this.arena.left, this.arena.right, this.groundAt(this.arena.left + 40));
       const ev = this.arenaGates.lock();
       if (ev) events.push(ev);

@@ -14,6 +14,7 @@ import {
   leapOfFaith,
   arenaApproach,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -35,6 +36,7 @@ export const act10: LevelDef = {
   theme: 'crystal',
   width: W,
   bossKind: 'shard',
+  bossRage: true, // the finale rematch runs the escalated pattern
   build(b: LevelBuilder): void {
     let c = runway(b, 0, 24, { len: 10, rings: false });
     b.start(4, 24);
@@ -67,5 +69,24 @@ export const act10: LevelDef = {
     // Sky overlay: two canopy stretches, each carrying a crystal.
     const s = canopyRun(b, 30, 10, { len: 130, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 130, crystal: true }); // crystal 5 (sky)
+
+    /* ================ UNDER — THE VAULT BENEATH THE VAULT ==================
+     * The finale's carved route at row 34 runs from the swells to the arena
+     * door and stops there — the boss floor stays whole. It breaks only at
+     * the cart canyon's deep ledge (63-71, floor row 30), standable
+     * under-lane floor that bridges the route. Shafts punch a swell crown,
+     * cascade shelves, the stacked road and the last phase pit's floor,
+     * clear of every gauntlet clock, pipe, cart buffer and patrol range;
+     * the sneak-under pocket (floor 34) opens straight into the corridor.
+     */
+    // One shaft, placed after the dip: a runner reaches it carrying full
+    // rolling speed and sails over. A hole at the slow uphill crown proved a
+    // trap — the flow bot fell in and dead-ended against the segment wall.
+    underGallery(b, 14, { len: 44, row: 34, shafts: [24], hazards: 1, crystal: false });
+    // hazards spared where the motif's teeth would land beside shaft springs.
+    underGallery(b, 76, { len: 80, row: 34, shafts: [0], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 156, { len: 80, row: 34, shafts: [14, 58], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 236, { len: 80, row: 34, shafts: [34, 52], hazards: 0, rail: true, crystal: false });
+    underGallery(b, 316, { len: 56, row: 34, shafts: [26, 39], hazards: 0, crystal: false });
   },
 };

@@ -15,6 +15,7 @@ import {
   quarterPipeBowl,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 const W = 384;
@@ -66,5 +67,23 @@ export const act06: LevelDef = {
     b.phasePlatform(168, 172, 9, 170, 85);
     b.drone(95, 6, 3);
     b.drone(215, 6, 3);
+
+    // Undercity metro gallery, split around the cart canyon (133-140, ledge
+    // floor on row 30 lives in the carve band; the ledge bridges the under
+    // lane across the seams). Segment A shafts: 15 (fed by the dash pad at
+    // 13) and 124 (the flat before the canyon boarding edge). Segment B
+    // shaft: 269 (in the deep roller dip's basin) — clear of the deep loop
+    // at 202-235, the bowl at 18-31 and the closing leap zone; the
+    // sneakUnder pocket at 168-175 merges in as segment B's western
+    // entrance. The under fast lane earns act 6's "UNDER-slung" billing.
+    underGallery(b, 12, { len: 119, shafts: [3, 112], hazards: 1, crystal: false });
+    underGallery(b, 143, { len: 213, shafts: [126], hazards: 2, crystal: false });
+    // Service hatch: the late phase pit's slow lower route continues down
+    // into the gallery through a 2-wide slot in the pit floor; twin springs
+    // directly beneath throw a faller straight back to the surface, so the
+    // hatch is a door, never a trap.
+    b.carve(288, 29, 289, 33);
+    b.spring(288, 34, 13);
+    b.spring(289, 34, 13);
   },
 };

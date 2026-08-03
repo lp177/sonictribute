@@ -12,6 +12,7 @@ import {
   secretPocket,
   signpostFinish,
   canopyRun,
+  underGallery,
 } from '../motifs.ts';
 
 /**
@@ -100,5 +101,17 @@ export const act07: LevelDef = {
     // Sky overlay: two canopy stretches, each carrying a crystal.
     const s = canopyRun(b, 28, 10, { len: 117, crystal: true }); // crystal 4 (sky)
     canopyRun(b, s.endX, s.endRow, { len: 117, crystal: true }); // crystal 5 (sky)
+
+    /* ============== UNDER — THE HALLS RUN THE WHOLE ACT ====================
+     * The Halls were only ever a hundred columns; the underworld act deserves
+     * an underworld the length of the act. Three more carved runs at row 34
+     * join the existing gallery seamlessly on both sides (its exit shaft at
+     * 193-196 opens straight into the eastern run), and the sneak-under
+     * pocket's floor merges with the western one. Shafts avoid the gauntlet
+     * clocks, the bowl's pipes, the leap launcher and every patrol range.
+     */
+    underGallery(b, 14, { len: 74, row: 34, shafts: [11, 37], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 197, { len: 84, row: 34, shafts: [17, 59], hazards: 1, rail: true, crystal: false });
+    underGallery(b, 281, { len: 80, row: 34, shafts: [3, 17], hazards: 1, rail: true, crystal: false });
   },
 };
