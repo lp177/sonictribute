@@ -28,7 +28,16 @@ export type DecorKind =
   | 'shardCluster'
   | 'vein'
   | 'drip'
-  | 'mote';
+  | 'mote'
+  // Duskmere Coast
+  | 'seagrass'
+  | 'shell'
+  | 'shorebird'
+  // Noon Tomorrow
+  | 'holoSign'
+  | 'grate'
+  | 'antenna'
+  | 'hoverStreak';
 
 export interface DecorItem {
   kind: DecorKind;
@@ -73,15 +82,18 @@ function surfaceAt(map: TileMap, tx: number): number | null {
  * crystal gets glowing clusters, floor veins and cave water.
  */
 export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH = 360): DecorSet {
-  let seed = theme === 'gear' ? 90210 : theme === 'crystal' ? 4242 : 1337;
+  let seed = theme === 'gear' ? 90210 : theme === 'crystal' ? 4242 : theme === 'neon' ? 777001 : 1337;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
   const items: DecorItem[] = [];
+  // The coast is the campaign's first impression, so it is planted denser
+  // than the industrial zones; the density gap itself reads as biome flavour.
+  const density = theme === 'verdant' ? 0.52 : 0.34;
   for (let tx = 1; tx < map.w - 1; tx++) {
     const y = surfaceAt(map, tx);
     if (y === null) continue;
     // Keep the running lane clear: only decorate some columns.
-    if (rnd() > 0.34) continue;
+    if (rnd() > density) continue;
     const x = tx * T + rnd() * T;
     const phase = rnd() * Math.PI * 2;
     const scale = 0.75 + rnd() * 0.55;
@@ -92,17 +104,27 @@ export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH =
     } else if (theme === 'crystal') {
       const kind: DecorKind = roll < 0.46 ? 'shardCluster' : roll < 0.78 ? 'vein' : 'drip';
       items.push({ kind, x, y, phase, scale });
+    } else if (theme === 'neon') {
+      const kind: DecorKind = roll < 0.3 ? 'holoSign' : roll < 0.58 ? 'grate' : roll < 0.82 ? 'antenna' : 'lamp';
+      items.push({ kind, x, y, phase, scale });
     } else {
-      const kind: DecorKind = roll < 0.5 ? 'grass' : roll < 0.76 ? 'flower' : 'bush';
+      const kind: DecorKind =
+        roll < 0.26 ? 'grass'
+        : roll < 0.46 ? 'seagrass'
+        : roll < 0.62 ? 'flower'
+        : roll < 0.78 ? 'shell'
+        : roll < 0.96 ? 'bush'
+        : 'shorebird'; // rare on purpose: one frozen bird is a story, five are wallpaper
       items.push({ kind, x, y, phase, scale });
     }
   }
 
-  // Drifting points of light above the ground: fireflies in the meadow, cold
-  // crystal dust in the vault.
-  if (theme === 'verdant' || theme === 'crystal') {
-    const kind: DecorKind = theme === 'crystal' ? 'mote' : 'firefly';
-    for (let i = 0; i < 90; i++) {
+  // Drifting points of light above the ground: fireflies in the dusk meadow,
+  // cold crystal dust in the vault, hover-lane traffic over the neon city.
+  if (theme === 'verdant' || theme === 'crystal' || theme === 'neon') {
+    const kind: DecorKind = theme === 'crystal' ? 'mote' : theme === 'neon' ? 'hoverStreak' : 'firefly';
+    const count = theme === 'neon' ? 46 : 90;
+    for (let i = 0; i < count; i++) {
       const tx = 2 + Math.floor(rnd() * (map.w - 4));
       const y = surfaceAt(map, tx);
       if (y === null) continue;
@@ -113,15 +135,16 @@ export function buildDecor(map: TileMap, theme: LevelTheme, viewW = 640, viewH =
   // Parallax clouds live in the background strip's own coordinate space. The
   // cavern has no sky, so its "clouds" are mist banks and lit dust — more of
   // them, drifting slower, because that layer is the only motion back there.
+  // Noon Tomorrow gets a thin, slow smog: its sky is mostly light and haze.
   const clouds: Cloud[] = [];
-  const cloudCount = theme === 'gear' ? 7 : theme === 'crystal' ? 16 : 9;
+  const cloudCount = theme === 'gear' ? 7 : theme === 'crystal' ? 16 : theme === 'neon' ? 6 : 9;
   for (let i = 0; i < cloudCount; i++) {
     clouds.push({
       x: rnd() * viewW,
       y: 24 + rnd() * (viewH * (theme === 'crystal' ? 0.7 : 0.42)),
       scale: 0.6 + rnd() * 1.3,
-      drift: (theme === 'gear' ? 0.10 : theme === 'crystal' ? 0.06 : 0.16) + rnd() * 0.22,
-      alpha: (theme === 'gear' ? 0.10 : 0.16) + rnd() * 0.14,
+      drift: (theme === 'gear' ? 0.10 : theme === 'crystal' ? 0.06 : theme === 'neon' ? 0.05 : 0.16) + rnd() * 0.22,
+      alpha: (theme === 'gear' || theme === 'neon' ? 0.10 : 0.16) + rnd() * 0.14,
     });
   }
   return { items, clouds };
@@ -181,6 +204,27 @@ export function drawDecor(
         break;
       case 'mote':
         drawMote(ctx, d, frame, animate);
+        break;
+      case 'seagrass':
+        drawSeagrass(ctx, d, sway);
+        break;
+      case 'shell':
+        drawShell(ctx, d);
+        break;
+      case 'shorebird':
+        drawShorebird(ctx, d);
+        break;
+      case 'holoSign':
+        drawHoloSign(ctx, d, frame, animate);
+        break;
+      case 'grate':
+        drawGrate(ctx, d, frame, animate);
+        break;
+      case 'antenna':
+        drawAntenna(ctx, d, frame, animate);
+        break;
+      case 'hoverStreak':
+        drawHoverStreak(ctx, d, frame, animate);
         break;
     }
   }
@@ -468,6 +512,214 @@ function drawCaveDrip(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number
   ctx.restore();
 }
 
+/** Tall coastal blades — the meadow grass's leggy shoreline cousin. */
+function drawSeagrass(ctx: CanvasRenderingContext2D, d: DecorItem, sway: number): void {
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  for (let i = -2; i <= 2; i++) {
+    const h = (13 + (i % 2) * 4 + Math.abs(i)) * d.scale;
+    // Sea-green blades with the odd sun-dried one, so the tuft reads coastal.
+    ctx.strokeStyle = i === 0 ? '#7c9b4a' : '#3f8e6e';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(i * 1.8, 0);
+    // The stalk stays rooted and upright; only the top third leans with the
+    // wind. Throwing the whole blade sideways made the tuft read as debris.
+    ctx.quadraticCurveTo(i * 1.8 + sway * 2, -h * 0.62, i * 1.8 + sway * 6.5, -h);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A washed-up scallop, catching the last of the stuck sun. Static. */
+function drawShell(ctx: CanvasRenderingContext2D, d: DecorItem): void {
+  ctx.save();
+  ctx.translate(d.x, d.y - 1.5 * d.scale);
+  ctx.rotate((d.phase - 3.14) * 0.12);
+  const r = 3.6 * d.scale;
+  ctx.fillStyle = d.phase > 3.6 ? '#f0d6c2' : '#f2c8c8';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150,95,80,0.55)';
+  ctx.lineWidth = 0.8;
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(i * r * 0.6, -r * 0.78);
+    ctx.stroke();
+  }
+  // Dusk glint along the rim.
+  ctx.strokeStyle = 'rgba(255,214,120,0.5)';
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.92, Math.PI * 1.15, Math.PI * 1.6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A shore bird caught mid-hop by the time freeze. Deliberately ignores the
+ * animate flag and the wind: everything else on the coast still moves, and
+ * one thing that should move but never does is what sells the stolen hour.
+ */
+function drawShorebird(ctx: CanvasRenderingContext2D, d: DecorItem): void {
+  ctx.save();
+  ctx.translate(d.x, d.y - 7 * d.scale);
+  ctx.scale(d.phase > 3.14 ? d.scale : -d.scale, d.scale);
+  // The stopped ripple of its take-off, ruled and still like the sea glints.
+  ctx.strokeStyle = 'rgba(255,206,120,0.35)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(0, 7, 5, 1.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Body, wing thrown up, never coming down.
+  ctx.fillStyle = '#2e3348';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 4.4, 2.8, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath(); // wing
+  ctx.moveTo(-0.5, -1);
+  ctx.quadraticCurveTo(-4.5, -7, -8, -7.5);
+  ctx.quadraticCurveTo(-4, -4.5, -1.5, -2.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#e8ddc8'; // breast
+  ctx.beginPath();
+  ctx.ellipse(1, 1, 2.6, 1.6, -0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2e3348'; // head + beak
+  ctx.beginPath();
+  ctx.arc(3.6, -2.2, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(5, -2.6);
+  ctx.lineTo(8, -1.9);
+  ctx.lineTo(5, -1.4);
+  ctx.closePath();
+  ctx.fill();
+  // Legs trailing the hop.
+  ctx.strokeStyle = '#c98a3f';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-1, 2.4);
+  ctx.lineTo(-3, 5.4);
+  ctx.moveTo(0.6, 2.6);
+  ctx.lineTo(-0.8, 5.8);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A kerbside holo-sign, flickering the way cheap hard-light does. */
+function drawHoloSign(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  // Stuttering duty cycle: mostly on, occasionally dipping — but steady under
+  // reduced motion, where flicker is exactly the wrong kind of life.
+  const s = Math.sin(t / 7 + d.phase * 3) + Math.sin(t / 2.3 + d.phase);
+  const on = !animate ? 0.85 : s > -1.1 ? 1 : 0.3;
+  const hue = d.phase > 3.14 ? '255,79,168' : '65,240,255';
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.fillStyle = '#2a2438';
+  ctx.fillRect(-1.5, -14 * d.scale, 3, 14 * d.scale);
+  const py = -14 * d.scale - 7 * d.scale;
+  const g = ctx.createRadialGradient(0, py, 1, 0, py, 16 * d.scale);
+  g.addColorStop(0, `rgba(${hue},${0.4 * on})`);
+  g.addColorStop(1, `rgba(${hue},0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(-18, py - 18, 36, 36);
+  ctx.fillStyle = `rgba(${hue},${0.28 * on})`;
+  ctx.fillRect(-7 * d.scale, py - 5 * d.scale, 14 * d.scale, 10 * d.scale);
+  ctx.strokeStyle = `rgba(${hue},${0.9 * on})`;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-7 * d.scale, py - 5 * d.scale, 14 * d.scale, 10 * d.scale);
+  // Unreadable glyphs — signage, not a message for the player.
+  ctx.fillStyle = `rgba(255,255,255,${0.75 * on})`;
+  ctx.fillRect(-5 * d.scale, py - 2.4 * d.scale, 7 * d.scale, 1.2);
+  ctx.fillRect(-5 * d.scale, py + 0.6 * d.scale, 9 * d.scale, 1.2);
+  ctx.restore();
+}
+
+/** A street steam grate, breathing the city's heat out through the deck. */
+function drawGrate(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.fillStyle = '#0d0c14';
+  ctx.fillRect(-8, -2.5, 16, 3);
+  ctx.fillStyle = '#3a3450';
+  for (let i = -3; i <= 3; i++) ctx.fillRect(i * 2.4 - 0.6, -2.5, 1.2, 3);
+  if (animate) {
+    for (let i = 0; i < 3; i++) {
+      const p = (t / 60 + i / 3 + d.phase / 6.283) % 1;
+      const yy = -4 - p * 26 * d.scale;
+      ctx.fillStyle = `rgba(180,168,205,${0.22 * (1 - p)})`;
+      ctx.beginPath();
+      ctx.arc(Math.sin(p * 4 + d.phase) * 5, yy, (2 + p * 6) * d.scale, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** A comms mast with a slow aircraft-warning blink. */
+function drawAntenna(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const t = animate ? frame : 0;
+  const hh = (20 + d.phase * 2) * d.scale;
+  const on = animate ? Math.sin(t / 26 + d.phase) > 0.1 : true;
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.strokeStyle = '#3a3450';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, -hh);
+  ctx.moveTo(-3.5, -hh * 0.55);
+  ctx.lineTo(3.5, -hh * 0.55);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(58,52,80,0.6)'; // guy wires
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(0, -hh * 0.8);
+  ctx.lineTo(-6, 0);
+  ctx.moveTo(0, -hh * 0.8);
+  ctx.lineTo(6, 0);
+  ctx.stroke();
+  if (on) {
+    const g = ctx.createRadialGradient(0, -hh - 2, 0.5, 0, -hh - 2, 7);
+    g.addColorStop(0, 'rgba(255,80,110,0.65)');
+    g.addColorStop(1, 'rgba(255,80,110,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-8, -hh - 10, 16, 16);
+  }
+  ctx.fillStyle = on ? '#ff506e' : '#5c2a38';
+  ctx.fillRect(-1.2, -hh - 3.2, 2.4, 2.4);
+  ctx.restore();
+}
+
+/**
+ * Hover traffic cutting across the mid-air lanes — the neon zone's firefly.
+ * The streak IS the vehicle: at lane speed all you ever see is the light.
+ */
+function drawHoverStreak(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
+  const span = 300;
+  const dir = d.phase > 3.14 ? 1 : -1;
+  const p = animate ? ((frame * (0.9 + d.scale) * 1.6) / span + d.phase / 6.283) % 1 : d.phase / 6.283;
+  const x = d.x - (span / 2) * dir + p * span * dir;
+  const y = d.y + Math.sin(d.phase * 3) * 4;
+  const len = 20 * d.scale;
+  const hue = d.phase % 1.5 > 0.75 ? '255,79,168' : '65,240,255';
+  ctx.save();
+  const g = ctx.createLinearGradient(x - dir * len, y, x, y);
+  g.addColorStop(0, `rgba(${hue},0)`);
+  g.addColorStop(1, `rgba(${hue},0.6)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(Math.min(x, x - dir * len), y - 1, len, 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillRect(x - 1, y - 1, 2, 2);
+  ctx.restore();
+}
+
 /** Crystal dust hanging in the cavern air — the vault's cold answer to fireflies. */
 function drawMote(ctx: CanvasRenderingContext2D, d: DecorItem, frame: number, animate: boolean): void {
   const t = animate ? frame : 0;
@@ -516,8 +768,13 @@ export function drawClouds(
     }
     const w = 46 * c.scale;
     const h = 11 * c.scale;
+    // Clouds wear the biome's light: smog in the foundry, warm underlit dusk
+    // banks on the coast, pale exhaust haze over the neon city.
     ctx.fillStyle =
-      theme === 'gear' ? `rgba(150,150,170,${c.alpha})` : `rgba(210,224,245,${c.alpha})`;
+      theme === 'gear' ? `rgba(150,150,170,${c.alpha})`
+      : theme === 'neon' ? `rgba(240,222,205,${c.alpha})`
+      : theme === 'verdant' ? `rgba(255,178,130,${c.alpha})`
+      : `rgba(210,224,245,${c.alpha})`;
     ctx.beginPath();
     ctx.ellipse(x, c.y, w, h, 0, 0, Math.PI * 2);
     ctx.ellipse(x - w * 0.55, c.y + h * 0.3, w * 0.55, h * 0.72, 0, 0, Math.PI * 2);

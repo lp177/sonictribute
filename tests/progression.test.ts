@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { LEVELS } from '../src/levels/index.ts';
-import { zone1 } from '../src/levels/zone1.ts';
-import { zone2 } from '../src/levels/zone2.ts';
-import { zone3 } from '../src/levels/zone3.ts';
-import { STORY_INTRO, STORY_ACT2, STORY_ENDING } from '../src/game/story.ts';
+import { LEVELS, BIOMES, biomeActs } from '../src/levels/index.ts';
+import {
+  STORY_HOUR_OF_DUSK,
+  STORY_HOUR_OF_MIDNIGHT,
+  STORY_HOUR_OF_NEVER,
+  STORY_HOUR_OF_TOMORROW,
+  STORY_ENDING,
+} from '../src/game/story.ts';
 import { Level } from '../src/game/Level.ts';
 import { Game, type Scene } from '../src/core/Game.ts';
 import { Input } from '../src/core/Input.ts';
@@ -49,30 +52,32 @@ describe('Scene transitions', () => {
 });
 
 describe('Campaign progression', () => {
-  it('runs Verdant Rush, then Cog Skyway, then the Chrono Vault', () => {
-    expect(LEVELS).toHaveLength(3);
-    expect(LEVELS[0]).toBe(zone1);
-    expect(LEVELS[1]).toBe(zone2);
-    expect(LEVELS[2]).toBe(zone3);
+  it('runs the four stolen hours: 11 + 11 + 10 + 10 = 42 acts', () => {
+    expect(LEVELS).toHaveLength(42);
+    expect(biomeActs(0)).toHaveLength(11);
+    expect(biomeActs(1)).toHaveLength(11);
+    expect(biomeActs(2)).toHaveLength(10);
+    expect(biomeActs(3)).toHaveLength(10);
   });
 
-  it('gives each zone its own look and its own boss', () => {
-    // Pinned per zone: an enum-membership check would pass if both zones
-    // declared the same theme, or if the two were swapped.
-    expect(zone1.theme).toBe('verdant');
-    expect(zone1.bossKind).toBe('pod');
-    expect(zone2.theme).toBe('gear');
-    expect(zone2.bossKind).toBe('press');
-    expect(zone3.theme).toBe('crystal');
-    expect(zone3.bossKind).toBe('shard');
-    expect(new Set(LEVELS.map((d) => d.theme)).size).toBe(LEVELS.length);
+  it('each biome keeps its own theme and its own boss, mid + finale', () => {
+    const bossKinds = ['pod', 'press', 'shard', 'mirage'] as const;
+    BIOMES.forEach((biome, bi) => {
+      const acts = biomeActs(bi);
+      for (const { def } of acts) expect(def.theme, `${def.title} theme`).toBe(biome.theme);
+      const bosses = acts.filter((a) => a.def.bossKind);
+      expect(bosses, `${biome.name} boss cadence`).toHaveLength(2);
+      for (const b of bosses) expect(b.def.bossKind).toBe(bossKinds[bi]);
+      // The finale carries a boss; the other one sits mid-biome.
+      expect(acts[acts.length - 1].def.bossKind).toBe(bossKinds[bi]);
+    });
   });
 
   it('every level declares a theme; biome openers carry the story beat', () => {
     const seenBiome = new Set<number>();
     for (const def of LEVELS) {
-      expect(['verdant', 'gear', 'crystal']).toContain(def.theme);
-      if (def.bossKind) expect(['pod', 'press', 'shard']).toContain(def.bossKind);
+      expect(['verdant', 'gear', 'crystal', 'neon']).toContain(def.theme);
+      if (def.bossKind) expect(['pod', 'press', 'shard', 'mirage']).toContain(def.bossKind);
       const opener = !seenBiome.has(def.biome);
       seenBiome.add(def.biome);
       if (opener) {
@@ -87,25 +92,31 @@ describe('Campaign progression', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('story order: intro -> act2 -> ending, all with text', () => {
-    expect(zone1.intro).toBe(STORY_INTRO);
-    expect(zone2.intro).toBe(STORY_ACT2);
-    for (const c of [STORY_INTRO, STORY_ACT2, STORY_ENDING]) {
+  it('the four hour beats open their biomes, and the ending exists', () => {
+    const beats = [STORY_HOUR_OF_DUSK, STORY_HOUR_OF_MIDNIGHT, STORY_HOUR_OF_NEVER, STORY_HOUR_OF_TOMORROW];
+    BIOMES.forEach((_, bi) => {
+      const acts = biomeActs(bi);
+      expect(acts[0].def.intro, `biome ${bi} opener`).toBe(beats[bi]);
+      for (const { def } of acts.slice(1)) expect(def.intro, `${def.title} must not re-run the cutscene`).toBeUndefined();
+    });
+    for (const c of [...beats, STORY_ENDING]) {
       expect(c.lines.length).toBeGreaterThanOrEqual(3);
       for (const line of c.lines) expect(line.length).toBeGreaterThan(0);
     }
-    // The stolen MacGuffin threads through the whole campaign.
-    expect(STORY_INTRO.lines.join(' ')).toMatch(/CHRONO CORE/i);
+    expect(STORY_HOUR_OF_DUSK.lines.join(' ')).toMatch(/CHRONO CORE/i);
     expect(STORY_ENDING.lines.join(' ')).toMatch(/Core/);
   });
 
-  it('every campaign level keeps the collectible contract (5 crystals, 3 secrets)', () => {
-    for (const def of LEVELS) {
-      const level = new Level(def);
-      expect(level.crystals).toHaveLength(5);
-      expect(level.secrets).toHaveLength(3);
-      expect(level.goal.x).toBeGreaterThan(level.bossTriggerX);
-      expect(level.checkpoints.length).toBeGreaterThanOrEqual(2);
+  it('spot-checks the collectible contract on each biome opener and finale', () => {
+    // The full 42-act sweep lives in tests/acts.test.ts; this is the fast pin.
+    for (const bi of [0, 1, 2, 3]) {
+      const acts = biomeActs(bi);
+      for (const { def } of [acts[0], acts[acts.length - 1]]) {
+        const level = new Level(def);
+        expect(level.crystals).toHaveLength(5);
+        expect(level.secrets).toHaveLength(3);
+        expect(level.checkpoints.length).toBeGreaterThanOrEqual(2);
+      }
     }
   });
 });

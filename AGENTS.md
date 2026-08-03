@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (326 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (695 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -28,9 +28,12 @@ procedurally at boot.
   a boost and the channel enforces a floor speed, so any loop entered at a
   running pace is always completed (a deliberate departure from raw SPG).
 - `src/game/Level.ts` + `src/levels/` — LevelBuilder API (floor/slope/carve/
-  spring/secret/loop/boss/dashPad/boardPad/boardEnd/drone…) and level data
-  (`zone1` Verdant Rush, `zone2` Cog Skyway, `zone3` The Chrono Vault; roster
-  in `levels/index.ts`).
+  spring/secret/loop/boss/dashPad/boardPad/drone/rail/cartRide/quarterPipe/
+  stalactite/phasePlatform/hopper…). The campaign is 42 acts in four biome
+  dirs (dusk/midnight/never/tomorrow), composed from `levels/motifs.ts` and
+  gated per-act by `tests/actContract.ts` (structure minimums, 3 continuous
+  routes, reachability, no-stall flow bot, idle silence). zone1/2/3.ts are
+  retired from the roster but kept as engine-test fixtures.
   LevelDef carries `theme` ('verdant' | 'gear'), `bossKind` ('pod' | 'press')
   and its `intro` cutscene. Level owns entities, score, secrets, checkpoints,
   boss, respawn, board mount/dismount.

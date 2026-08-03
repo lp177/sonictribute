@@ -39,6 +39,11 @@ const SHAKES: Record<string, [number, number]> = {
   'gate-slam': [5, 18],
   crumble: [2, 8],
   'spike-trap': [2, 8],
+  'stalactite-fall': [1.5, 6],
+  'stalactite-shatter': [2.5, 9],
+  'cart-crash': [5, 18],
+  'boss-trace': [2, 10],
+  'boss-derez': [3, 12],
 };
 
 /**
@@ -59,8 +64,10 @@ const HIT_STOP: Record<string, number> = {
   'boss-slam': 5,
   'boss-burst': 6,
   enemy: 4,
+  'hopper-stomp': 4,
   monitor: 3,
   crumble: 2,
+  'cart-crash': 7,
 };
 
 /** Absolute ceiling, so no event or bug can ever hold the world still. */
@@ -193,8 +200,28 @@ export class FxSystem {
         this.emit(x, y, 10, { colors: ['#4be1ff', '#ffd94a'], speed: 1.6, life: 40, size: 2, kind: 'glow' });
         break;
       case 'enemy':
+      case 'hopper-stomp':
         this.emit(x, y, 10, { colors: ['#ff9d40', '#ffd94a', '#fff'], speed: 2.6, life: 24, size: 3, kind: 'spark', grav: 0.08 });
         this.emit(x, y, 5, { colors: ['#8f96a3', '#565d6e'], speed: 1.2, life: 30, size: 4, kind: 'smoke', up: 0.6 });
+        break;
+      case 'stalactite-shatter':
+        this.emit(x, y, 9, { colors: ['#b7f3ff', '#45c3e2', '#fff'], speed: 2.2, life: 24, size: 2, kind: 'spark', grav: 0.14 });
+        break;
+      case 'cart-board':
+        this.emit(x, y, 6, { colors: ['#ffd94a', '#cfd6e4'], speed: 1.6, life: 18, size: 2, kind: 'spark' });
+        break;
+      case 'cart-crash':
+        this.emit(x, y, 14, { colors: ['#8a5a32', '#6e4525', '#cfd6e4', '#ffd94a'], speed: 3, life: 34, size: 3, kind: 'dot', grav: 0.16 });
+        this.emit(x, y, 8, { colors: ['#9aa3b2', '#6b7280'], speed: 1.8, life: 30, size: 5, kind: 'smoke', up: 0.9 });
+        break;
+      case 'phase-blink':
+        this.emit(x, y, 3, { colors: ['#41f0ff'], speed: 0.8, life: 14, size: 2, kind: 'glow' });
+        break;
+      case 'boss-trace':
+        this.emit(x, y, 8, { colors: ['#ff4fa8', '#41f0ff'], speed: 2, life: 22, size: 2, kind: 'spark' });
+        break;
+      case 'boss-derez':
+        this.emit(x, y, 14, { colors: ['#ff4fa8', '#41f0ff', '#fff'], speed: 2.6, life: 28, size: 2, kind: 'spark' });
         break;
       case 'monitor':
         this.emit(x, y, 8, { colors: ['#b6c2d9', '#e8f0ff'], speed: 2.2, life: 22, size: 2, kind: 'spark', grav: 0.12 });

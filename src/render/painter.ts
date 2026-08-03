@@ -7,6 +7,7 @@ import type { PressBoss } from '../game/PressBoss.ts';
 import type { CrystalBoss } from '../game/CrystalBoss.ts';
 import type { LoopZone } from '../game/loops.ts';
 import type { LevelTheme } from '../game/Level.ts';
+import { AFTERIMAGE_LIFE, AFTERIMAGE_ARM } from '../game/MirageBoss.ts';
 
 const T = PHYS.tile;
 
@@ -52,27 +53,59 @@ interface TerrainTheme {
   platTop: string;
   platTopDark: string;
   platBody: string;
+  /** Cap thickness in px (default 6). A deeper cap reads as turf, not paint. */
+  capDepth?: number;
+  /** Thin lit line along the very surface (low sun / light strip). */
+  capHighlight?: string;
+  /** Highlight thickness in px (default 1.6 — a glint, not a stripe). */
+  capHighlightDepth?: number;
+  /** Soft translucent glow painted just above the surface line. */
+  capGlow?: string;
+  /** Horizontal sediment bands inside the body, spaced this many px apart. */
+  strataSpacing?: number;
+  strataDark?: string;
+  strataLight?: string;
+  /** Glow above one-way platforms (hard-light decks want to bleed light). */
+  platGlow?: string;
 }
 
 const TERRAIN_THEMES: Record<LevelTheme, TerrainTheme> = {
+  // Noon Tomorrow: asphalt/composite decks with a hot light-strip running
+  // along every walkable edge. The strip carries the readability: the body is
+  // nearly black on purpose so the magenta line is the ground.
   neon: {
-    // Placeholder until Noon Tomorrow's art lands: dark asphalt + hot magenta.
-    body: '#232030',
-    bodyDark: '#161420',
-    cap: '#ff4fa3',
-    capDark: '#7c2050',
+    body: '#1a1824',
+    bodyDark: '#100e18',
+    cap: '#332e44',
+    capDark: '#1c1928',
     platTop: '#41f0ff',
-    platTopDark: '#0d3a40',
-    platBody: '#232030',
+    platTopDark: '#12414a',
+    platBody: '#1a1824',
+    capDepth: 7,
+    capHighlight: '#ff4fa8',
+    capHighlightDepth: 2.4,
+    capGlow: 'rgba(255,79,168,0.35)',
+    strataSpacing: 16,
+    strataDark: 'rgba(0,0,0,0.30)',
+    platGlow: 'rgba(65,240,255,0.28)',
   },
+  // Duskmere Coast: warm shore earth under a deep turf cap, its tips lit by
+  // the jammed sun. Strata in the body keep tall cliffs from reading as one
+  // brown slab.
   verdant: {
-    body: PAL.dirt,
-    bodyDark: PAL.dirtDark,
-    cap: PAL.grass,
-    capDark: PAL.grassDark,
-    platTop: PAL.grass,
-    platTopDark: PAL.grassDark,
-    platBody: PAL.dirt,
+    body: '#7c4a29',
+    bodyDark: '#5e381f',
+    cap: '#379a52',
+    capDark: '#256e3a',
+    platTop: '#379a52',
+    platTopDark: '#256e3a',
+    platBody: '#7c4a29',
+    capDepth: 9,
+    capHighlight: '#c9e070',
+    capGlow: 'rgba(255,196,90,0.22)',
+    strataSpacing: 22,
+    strataDark: 'rgba(46,24,10,0.42)',
+    strataLight: 'rgba(255,190,120,0.10)',
   },
   gear: {
     body: '#4a4f5c',
@@ -158,10 +191,31 @@ function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: n
       if (h > 6) ctx.fillRect(c + 1, T - h + 6, 2, 2);
       if (h > 11) ctx.fillRect(c + 2, T - h + 11, 2, 2);
     }
+    // Sediment strata keyed to WORLD y, so bands run level across tile seams
+    // and a tall cliff face reads as layered earth instead of one flat fill.
+    const spacing = pal.strataSpacing ?? 0;
+    if (spacing > 0) {
+      for (let sy = 0; sy < T; sy++) {
+        const band = (ty * T + sy) % spacing;
+        const dark = band === 0;
+        const light = band === Math.floor(spacing / 2) && pal.strataLight;
+        if (!dark && !light) continue;
+        ctx.fillStyle = dark ? (pal.strataDark ?? pal.bodyDark) : pal.strataLight!;
+        for (let c = 0; c < T; c++) {
+          const top = T - heights[c];
+          // Stay clear of the cap so strata never cut through the turf.
+          if (sy > top + (pal.capDepth ?? 6) + 2) ctx.fillRect(c, sy, 1, dark ? 2 : 1);
+        }
+      }
+    }
   }
 
   if (id === 8) {
     // One-way platform: capped slab (grass ledge / hazard-striped girder).
+    if (pal.platGlow) {
+      ctx.fillStyle = pal.platGlow;
+      ctx.fillRect(0, -2, T, 2);
+    }
     ctx.fillStyle = pal.platBody;
     ctx.fillRect(0, 8, T, 8);
     ctx.fillStyle = pal.platTop;
@@ -170,15 +224,26 @@ function drawTile(ctx: CanvasRenderingContext2D, map: TileMap, id: number, px: n
     ctx.fillRect(0, 6, T, 2);
   } else if (exposed) {
     // Surface cap following the terrain profile.
+    const depth = pal.capDepth ?? 6;
     ctx.fillStyle = pal.cap;
     for (let c = 0; c < T; c++) {
       const top = T - heights[c];
-      ctx.fillRect(c, top, 1, Math.min(6, heights[c]));
+      ctx.fillRect(c, top, 1, Math.min(depth, heights[c]));
     }
     ctx.fillStyle = pal.capDark;
     for (let c = 0; c < T; c += 3) {
       const top = T - heights[c];
-      ctx.fillRect(c, top + 4, 1, 2);
+      ctx.fillRect(c, top + depth - 2, 1, 2);
+    }
+    // Lit edge: the one line of the terrain the light actually catches.
+    if (pal.capGlow) {
+      ctx.fillStyle = pal.capGlow;
+      for (let c = 0; c < T; c++) ctx.fillRect(c, T - heights[c] - 2, 1, 2);
+    }
+    if (pal.capHighlight) {
+      ctx.fillStyle = pal.capHighlight;
+      const hd = pal.capHighlightDepth ?? 1.6;
+      for (let c = 0; c < T; c++) ctx.fillRect(c, T - heights[c], 1, hd);
     }
   }
   ctx.restore();
@@ -216,6 +281,22 @@ export function renderLoopArt(loop: LoopZone, theme: LevelTheme = 'verdant'): HT
   ctx.closePath();
   ctx.fillStyle = pal.cap;
   ctx.fill();
+  // Themes with a lit running edge carry it around the loop too, so the ring
+  // reads as part of the same track and not a hole punched in the level.
+  if (pal.capHighlight) {
+    if (pal.capGlow) {
+      ctx.strokeStyle = pal.capGlow;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, loop.outerR + 1, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = pal.capHighlight;
+    ctx.lineWidth = pal.capHighlightDepth ?? 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, loop.outerR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   return cv;
 }
 
@@ -234,37 +315,383 @@ export function renderBackground(w: number, h: number, theme: LevelTheme = 'verd
     renderCrystalBackground(ctx, w, h);
     return cv;
   }
+  if (theme === 'neon') {
+    renderNeonBackground(ctx, w, h);
+    return cv;
+  }
+  renderDuskBackground(ctx, w, h);
+  return cv;
+}
 
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, PAL.skyTop);
-  sky.addColorStop(1, PAL.skyBottom);
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, w, h);
-
-  // Stars.
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+/**
+ * Duskmere Coast: the hour is jammed at golden dusk. A low sun sits ON the
+ * horizon over a sea that is stopped mid-shimmer — the glitter path is baked
+ * static, in unnaturally neat rows, because water that never moves is the
+ * whole story beat. Everything else is layered silhouettes: headlands on the
+ * horizon, then dunes, then a dark near bank for the terrain to sit against.
+ */
+function renderDuskBackground(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const horizon = h * 0.52;
+  const sunX = w * 0.5;
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 90; i++) {
+
+  // Sky: violet dusk overhead falling to hot amber where the sun is stuck.
+  const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+  sky.addColorStop(0, '#241a44');
+  sky.addColorStop(0.42, '#5c2e58');
+  sky.addColorStop(0.78, '#b3503f');
+  sky.addColorStop(1, '#f0913f');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, horizon);
+
+  // The first stars are out in the top of the sky — dusk, not day.
+  for (let i = 0; i < 40; i++) {
     const s = rnd();
-    ctx.globalAlpha = 0.2 + rnd() * 0.5;
-    ctx.fillRect(rnd() * w, rnd() * h * 0.55, s > 0.9 ? 2 : 1, s > 0.9 ? 2 : 1);
+    ctx.globalAlpha = 0.12 + rnd() * 0.35;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(rnd() * w, rnd() * h * 0.24, s > 0.92 ? 2 : 1, s > 0.92 ? 2 : 1);
   }
   ctx.globalAlpha = 1;
 
-  // Moon glow.
-  const moon = ctx.createRadialGradient(w * 0.78, h * 0.2, 4, w * 0.78, h * 0.2, 60);
-  moon.addColorStop(0, 'rgba(240,244,255,0.9)');
-  moon.addColorStop(0.25, 'rgba(200,214,255,0.25)');
-  moon.addColorStop(1, 'rgba(200,214,255,0)');
-  ctx.fillStyle = moon;
+  // Flat underlit cloud bars — dusk cirrus catching the sun from below.
+  for (let i = 0; i < 7; i++) {
+    const cy = horizon * (0.32 + rnd() * 0.55);
+    const cw = 50 + rnd() * 130;
+    const cx = rnd() * w;
+    const warm = cy / horizon; // lower bars sit closer to the sun's light
+    ctx.fillStyle = `rgba(255,${150 + Math.round(60 * warm)},${90 + Math.round(40 * warm)},${0.10 + warm * 0.16})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cw, 3 + warm * 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Molten light along the WHOLE horizon. This band is translation-invariant,
+  // so the scene's double parallax pass can overlay it at any offset without
+  // manufacturing a second sunset — only the modest disc below is localised.
+  const molten = ctx.createLinearGradient(0, horizon - 26, 0, horizon);
+  molten.addColorStop(0, 'rgba(255,170,80,0)');
+  molten.addColorStop(1, 'rgba(255,190,95,0.38)');
+  ctx.fillStyle = molten;
+  ctx.fillRect(0, horizon - 26, w, 26);
+
+  // Sun pillar: the vertical shaft of light a low sun throws in cold air.
+  const pillar = ctx.createLinearGradient(sunX - 26, 0, sunX + 26, 0);
+  pillar.addColorStop(0, 'rgba(255,180,90,0)');
+  pillar.addColorStop(0.5, 'rgba(255,190,100,0.14)');
+  pillar.addColorStop(1, 'rgba(255,180,90,0)');
+  ctx.fillStyle = pillar;
+  ctx.fillRect(sunX - 26, h * 0.1, 52, horizon - h * 0.1);
+
+  // The sun itself, half-swallowed by the horizon line. Kept soft: the second
+  // parallax pass duplicates it faintly, and a soft disc's ghost reads as a
+  // lit cloud instead of a spare sun.
+  const glow = ctx.createRadialGradient(sunX, horizon - 4, 4, sunX, horizon - 4, 78);
+  glow.addColorStop(0, 'rgba(255,214,130,0.6)');
+  glow.addColorStop(0.35, 'rgba(255,170,80,0.24)');
+  glow.addColorStop(1, 'rgba(255,150,70,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sunX - 84, horizon - 84, 168, 88);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, w, horizon);
+  ctx.clip(); // the disc ends AT the waterline — the sea owns its reflection
+  ctx.fillStyle = '#ffe9b0';
+  ctx.beginPath();
+  ctx.arc(sunX, horizon + 4, 26, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,240,0.85)';
+  ctx.beginPath();
+  ctx.arc(sunX, horizon + 2, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Headlands resting on the horizon at the frame edges.
+  ctx.fillStyle = '#2c1a3e';
+  ctx.beginPath();
+  ctx.moveTo(-4, horizon);
+  ctx.lineTo(w * 0.1, horizon - 14);
+  ctx.lineTo(w * 0.2, horizon - 4);
+  ctx.lineTo(w * 0.26, horizon);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w * 0.72, horizon);
+  ctx.lineTo(w * 0.8, horizon - 9);
+  ctx.lineTo(w * 0.9, horizon - 18);
+  ctx.lineTo(w + 4, horizon - 6);
+  ctx.lineTo(w + 4, horizon);
+  ctx.closePath();
+  ctx.fill();
+  // A lighthouse on the far right headland, its lamp lit for the stuck dusk.
+  ctx.fillStyle = '#1d1230';
+  ctx.fillRect(w * 0.9 - 3, horizon - 34, 6, 17);
+  ctx.fillStyle = '#ffd94a';
+  ctx.fillRect(w * 0.9 - 2, horizon - 37, 4, 3);
+  const beam = ctx.createRadialGradient(w * 0.9, horizon - 36, 1, w * 0.9, horizon - 36, 16);
+  beam.addColorStop(0, 'rgba(255,217,74,0.5)');
+  beam.addColorStop(1, 'rgba(255,217,74,0)');
+  ctx.fillStyle = beam;
+  ctx.fillRect(w * 0.9 - 16, horizon - 52, 32, 32);
+
+  // The frozen sea: warm reflection fading into deep water.
+  const seaBottom = h * 0.86;
+  const sea = ctx.createLinearGradient(0, horizon, 0, seaBottom);
+  sea.addColorStop(0, '#8a4046');
+  sea.addColorStop(0.3, '#5c2c4e');
+  sea.addColorStop(1, '#1e1638');
+  ctx.fillStyle = sea;
+  ctx.fillRect(0, horizon, w, seaBottom - horizon);
+
+  // Static glitter. Real water scatters its sparkle; this sea's is ruled into
+  // even rows — light stopped mid-dance. Density falls off away from the sun
+  // path so it still reads as a reflection, not a texture.
+  for (let row = 0; row < 22; row++) {
+    const gy = horizon + 3 + row * ((seaBottom - horizon - 6) / 22);
+    const depth = row / 22;
+    const pathHalf = 26 + depth * 90; // glitter path widens toward the viewer
+    const n = 3 + Math.floor(rnd() * 4);
+    for (let i = 0; i < n; i++) {
+      const gx = sunX + (rnd() * 2 - 1) * pathHalf;
+      const len = 3 + rnd() * (6 + depth * 10);
+      ctx.fillStyle = `rgba(255,${205 - depth * 60},${120 - depth * 40},${0.55 - depth * 0.3})`;
+      ctx.fillRect(gx - len / 2, gy, len, 1.4);
+    }
+    // Sparse cold glints out on the open water.
+    if (row % 2 === 0) {
+      const gx = rnd() * w;
+      ctx.fillStyle = `rgba(200,170,220,${0.18 - depth * 0.1})`;
+      ctx.fillRect(gx, gy, 2 + rnd() * 5, 1);
+    }
+  }
+
+  // Coast silhouettes: dune ridges walking toward the viewer, then a near
+  // bank that grounds the playfield. Frequencies are whole cycles per tile
+  // width so the background loops without a seam.
+  duneRidge(ctx, w, h, h * 0.80, 16, '#3a2244', 2, 5, 1.3);
+  duneRidge(ctx, w, h, h * 0.88, 20, '#251534', 3, 7, 4.1);
+  duneRidge(ctx, w, h, h * 0.97, 14, '#140c22', 2, 9, 2.2);
+  // Seagrass ticks along the middle dune crest.
+  ctx.strokeStyle = 'rgba(80,50,90,0.9)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    const gx = rnd() * w;
+    const gy = duneY(gx, w, h * 0.88, 20, 3, 7, 4.1);
+    const gh = 3 + rnd() * 5;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.lineTo(gx + (rnd() * 2 - 1) * 2, gy - gh);
+    ctx.stroke();
+  }
+}
+
+/** y of a dune crest at x — sin harmonics with whole cycles per width. */
+function duneY(x: number, w: number, base: number, amp: number, k1: number, k2: number, phase: number): number {
+  const t = (x / w) * Math.PI * 2;
+  return base - (Math.sin(t * k1 + phase) * 0.65 + Math.sin(t * k2 + phase * 2.7) * 0.35 + 1) * 0.5 * amp;
+}
+
+/** A dune silhouette filled to the bottom of the frame. Tiles seamlessly. */
+function duneRidge(ctx: CanvasRenderingContext2D, w: number, h: number, base: number, amp: number, color: string, k1: number, k2: number, phase: number): void {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  for (let x = 0; x <= w; x += 6) ctx.lineTo(x, duneY(x, w, base, amp, k1, k2, phase));
+  ctx.lineTo(w, h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * Noon Tomorrow: a neon metropolis one second before a noon that never comes.
+ * The sky is bleached and hazy with a hard little zenith sun; under it the
+ * city is all silhouette — window grids, sky-rail ribbons carrying frozen
+ * light-streak traffic, and a giant countdown billboard stopped at 00:00:01.
+ */
+function renderNeonBackground(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  let seed = 20260803;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // Bleached zenith pressed down into dusty rose, then city smog. The bright
+  // band is kept thin: the picture belongs to the silhouettes under it.
+  const sky = ctx.createLinearGradient(0, 0, 0, h * 0.82);
+  sky.addColorStop(0, '#ead9b4');
+  sky.addColorStop(0.2, '#d9a290');
+  sky.addColorStop(0.5, '#8f5a88');
+  sky.addColorStop(0.78, '#45305f');
+  sky.addColorStop(1, '#241636');
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, w, h);
 
-  // Far hills.
-  ridge(ctx, w, h, h * 0.62, 34, PAL.hillFar, 3);
-  // Near hills.
-  ridge(ctx, w, h, h * 0.78, 46, PAL.hillNear, 7);
-  return cv;
+  // A small, harsh sun almost at zenith — one second from the top of the sky.
+  const sunX = w * 0.52;
+  const sunY = h * 0.08;
+  const glow = ctx.createRadialGradient(sunX, sunY, 2, sunX, sunY, 44);
+  glow.addColorStop(0, 'rgba(255,252,235,0.9)');
+  glow.addColorStop(0.3, 'rgba(255,240,200,0.28)');
+  glow.addColorStop(1, 'rgba(255,240,200,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sunX - 46, sunY - 46, 92, 92);
+  ctx.fillStyle = '#fffdf2';
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // Heat haze bands pressing down on the city.
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = `rgba(255,245,225,${0.04 + rnd() * 0.04})`;
+    ctx.fillRect(0, h * (0.14 + i * 0.06) + rnd() * 8, w, 2 + rnd() * 3);
+  }
+
+  // Far skyline: haze towers rising well into the sky band.
+  ctx.fillStyle = '#7a5588';
+  for (let x = -10; x < w; ) {
+    const bw = 24 + rnd() * 42;
+    const bh = 70 + rnd() * 110;
+    ctx.fillRect(x, h * 0.66 - bh, bw, bh + h * 0.36);
+    x += bw + 3;
+  }
+
+  // Sky-rail ribbons threading BETWEEN the tower depths, carrying baked
+  // traffic streaks stopped dead on the line. Whole sine cycles per width so
+  // the tile edge never shows a kink.
+  const rail = (base: number, amp: number, k: number, phase: number, tint: string) => {
+    ctx.strokeStyle = 'rgba(225,215,240,0.4)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let x = 0; x <= w; x += 8) {
+      const y = base + Math.sin(((x / w) * Math.PI * 2) * k + phase) * amp;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const tx = rnd() * w;
+      const ty = base + Math.sin(((tx / w) * Math.PI * 2) * k + phase) * amp;
+      const dir = rnd() > 0.5 ? 1 : -1;
+      const len = 10 + rnd() * 18;
+      const g = ctx.createLinearGradient(tx - dir * len, ty, tx, ty);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(1, tint);
+      ctx.fillStyle = g;
+      ctx.fillRect(Math.min(tx, tx - dir * len), ty - 1.4, len, 2.2);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(tx - 1, ty - 1.4, 2, 2.2);
+    }
+  };
+  rail(h * 0.5, 10, 1, 0.8, 'rgba(65,240,255,0.85)');
+
+  // Mid skyline: darker towers with sparse lit windows.
+  ctx.fillStyle = '#3c2a54';
+  const midTops: { x: number; bw: number; top: number }[] = [];
+  for (let x = -8; x < w; ) {
+    const bw = 30 + rnd() * 50;
+    const top = h * (0.42 + rnd() * 0.2);
+    ctx.fillRect(x, top, bw, h - top);
+    midTops.push({ x, bw, top });
+    x += bw + 5;
+  }
+  for (const b of midTops) {
+    for (let i = 0; i < 8; i++) {
+      if (rnd() > 0.55) continue;
+      ctx.fillStyle = rnd() > 0.5 ? 'rgba(65,240,255,0.7)' : 'rgba(255,220,150,0.7)';
+      ctx.fillRect(b.x + 3 + rnd() * (b.bw - 7), b.top + 4 + rnd() * (h - b.top - 30), 2, 2);
+    }
+  }
+  // The second ribbon runs in front of the mid skyline, behind the near one.
+  rail(h * 0.62, 12, 2, 3.6, 'rgba(255,79,168,0.85)');
+
+  // Near skyline: black towers wearing the neon — edge strips, window grids,
+  // antennae. This is the band the countdown billboard lives in.
+  interface Tower { x: number; bw: number; top: number }
+  const towers: Tower[] = [];
+  for (let x = -6; x < w; ) {
+    const bw = 42 + rnd() * 58;
+    const top = h * (0.5 + rnd() * 0.26);
+    towers.push({ x, bw, top });
+    x += bw + 8 + rnd() * 20;
+  }
+  for (const t of towers) {
+    ctx.fillStyle = '#170f28';
+    ctx.fillRect(t.x, t.top, t.bw, h - t.top);
+    // Neon edge strip down one side.
+    const edge = rnd() > 0.5 ? t.x + 1 : t.x + t.bw - 2.4;
+    ctx.fillStyle = rnd() > 0.5 ? 'rgba(255,79,168,0.8)' : 'rgba(65,240,255,0.8)';
+    ctx.fillRect(edge, t.top + 2, 1.6, (h - t.top) * (0.4 + rnd() * 0.4));
+    // Window grid, mostly dark — offices at (almost) noon.
+    for (let wy = t.top + 6; wy < h - 8; wy += 9) {
+      for (let wx = t.x + 5; wx < t.x + t.bw - 5; wx += 8) {
+        const lit = rnd();
+        ctx.fillStyle = lit > 0.86 ? 'rgba(255,235,170,0.8)' : lit > 0.78 ? 'rgba(120,230,255,0.5)' : 'rgba(255,255,255,0.06)';
+        ctx.fillRect(wx, wy, 3, 4);
+      }
+    }
+    // Rooftop antenna with a beacon.
+    if (rnd() > 0.45) {
+      const ax = t.x + 6 + rnd() * (t.bw - 12);
+      ctx.fillStyle = '#0d0818';
+      ctx.fillRect(ax - 1, t.top - 14, 2, 14);
+      ctx.fillStyle = 'rgba(255,80,110,0.9)';
+      ctx.fillRect(ax - 1.5, t.top - 17, 3, 3);
+    }
+  }
+
+  // The countdown billboard: mounted high on the tallest near tower, frozen
+  // one second before tomorrow starts. It is the biome's thesis statement, so
+  // it gets a glow no other sign has.
+  const host = towers.reduce((a, b) => (b.top < a.top ? b : a), towers[0]);
+  const bx = Math.min(Math.max(host.x + host.bw / 2, 90), w - 90);
+  // High in the frame no matter which tower won: the countdown must clear the
+  // playfield's terrain, which owns the bottom half of the screen.
+  const by = Math.min(host.top + 26, h * 0.34);
+  const bw2 = 108;
+  const bh2 = 40;
+  const bloom = ctx.createRadialGradient(bx, by, 4, bx, by, 90);
+  bloom.addColorStop(0, 'rgba(255,79,168,0.28)');
+  bloom.addColorStop(1, 'rgba(255,79,168,0)');
+  ctx.fillStyle = bloom;
+  ctx.fillRect(bx - 90, by - 70, 180, 140);
+  ctx.fillStyle = '#0b0716';
+  ctx.beginPath();
+  ctx.roundRect(bx - bw2 / 2, by - bh2 / 2, bw2, bh2, 4);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,79,168,0.9)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#8a8098';
+  ctx.fillRect(bx - 8, by + bh2 / 2, 4, 10); // mounting struts
+  ctx.fillRect(bx + 4, by + bh2 / 2, 4, 10);
+  ctx.font = 'bold 8px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(160,235,255,0.85)';
+  ctx.fillText('TOMORROW IN', bx, by - 8);
+  ctx.font = 'bold 19px monospace';
+  ctx.fillStyle = '#41f0ff';
+  ctx.fillText('00:00:01', bx, by + 11);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('00:00:01', bx, by + 11); // hot double-strike core
+  ctx.textAlign = 'left';
+  // Scanlines over the panel.
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  for (let sy = by - bh2 / 2 + 2; sy < by + bh2 / 2; sy += 4) ctx.fillRect(bx - bw2 / 2 + 2, sy, bw2 - 4, 1);
+
+  // Street-level light haze pooling at the bottom of the frame.
+  const street = ctx.createLinearGradient(0, h - 46, 0, h);
+  street.addColorStop(0, 'rgba(10,6,24,0)');
+  street.addColorStop(1, 'rgba(10,6,24,0.9)');
+  ctx.fillStyle = street;
+  ctx.fillRect(0, h - 46, w, 46);
+  for (let i = 0; i < 12; i++) {
+    const lx = rnd() * w;
+    const ly = h - 6 - rnd() * 30;
+    const len = 16 + rnd() * 40;
+    const dir = rnd() > 0.5 ? 1 : -1;
+    const tint = rnd() > 0.5 ? '65,240,255' : '255,79,168';
+    const g = ctx.createLinearGradient(lx - dir * len, ly, lx, ly);
+    g.addColorStop(0, `rgba(${tint},0)`);
+    g.addColorStop(1, `rgba(${tint},0.5)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.min(lx, lx - dir * len), ly, len, 1.6);
+  }
 }
 
 /** Cog Skyway: smog-lit sky, factory skyline, giant gear silhouettes. */
@@ -888,6 +1315,477 @@ export function drawSwingBall(
   ctx.restore();
 }
 
+/* --------------------------- New mechanic art ------------------------------ */
+
+export type StalactiteState = 'hanging' | 'trembling' | 'falling' | 'shattered';
+
+/**
+ * A hanging spike under a ceiling tile: crystal in the Underwhen, steel
+ * elsewhere. (x, y) is the ANCHOR — the ceiling point for hanging/trembling,
+ * the moving top of the spike while falling, and the floor impact point once
+ * shattered. `stateTime` is frames in the current state; it drives the
+ * one-shot tells (regrow after respawn, debris fade) while `frame` drives the
+ * looping shimmer, so phase changes never teleport the art.
+ */
+export function drawStalactite(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  state: StalactiteState,
+  frame: number,
+  stateTime = 0,
+  theme: LevelTheme = 'crystal',
+): void {
+  const crystal = theme === 'crystal';
+  const body = crystal ? '#8b7ab8' : '#7b8496';
+  const dark = crystal ? '#5b4e90' : '#4a4f5c';
+  const glint = crystal ? 'rgba(140,245,255,' : 'rgba(220,230,245,';
+  const len = 26;
+  const halfW = 6;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (state === 'shattered') {
+    // Debris on the floor. Harmless, and drawn like it: flat, settling dust,
+    // fading as the respawn approaches.
+    const a = Math.max(0, 1 - stateTime / 60) * 0.9 + 0.1;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = dark;
+    for (let i = 0; i < 5; i++) {
+      const sx = (i - 2) * 6 + ((i * 7) % 3) - 1;
+      const sw = 3 + ((i * 5) % 4);
+      ctx.beginPath();
+      ctx.moveTo(sx - sw / 2, 0);
+      ctx.lineTo(sx + sw / 2, 0);
+      ctx.lineTo(sx + ((i % 2) * 2 - 1), -3 - ((i * 3) % 4));
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (stateTime < 22) {
+      // Impact dust for the first beat only.
+      const p = stateTime / 22;
+      ctx.fillStyle = `${glint}${0.3 * (1 - p)})`;
+      for (const dir of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(dir * (6 + p * 14), -3 - p * 6, 2 + p * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Regrow after respawn: scale in about the anchor so it descends from the
+  // ceiling rather than popping into place.
+  const grow = state === 'hanging' ? Math.min(1, 0.4 + (stateTime / 40) * 0.6) : 1;
+  const jx = state === 'trembling' ? Math.sin(frame * 2.6) * 1.6 : 0;
+  ctx.translate(jx, 0);
+  ctx.scale(1, grow);
+
+  if (state === 'falling') {
+    // Vertical motion smear above the spike: the read is DOWN, fast.
+    const smear = ctx.createLinearGradient(0, -26, 0, 2);
+    smear.addColorStop(0, `${glint}0)`);
+    smear.addColorStop(1, `${glint}0.4)`);
+    ctx.fillStyle = smear;
+    ctx.fillRect(-halfW * 0.5, -26, halfW, 28);
+  } else {
+    // Ceiling mount rubble.
+    ctx.fillStyle = dark;
+    ctx.fillRect(-halfW - 2, -1, halfW * 2 + 4, 3);
+  }
+
+  // The spike itself.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-halfW, 0);
+  ctx.lineTo(halfW, 0);
+  ctx.lineTo(1, len);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.moveTo(1, 2);
+  ctx.lineTo(halfW, 0);
+  ctx.lineTo(1, len);
+  ctx.closePath();
+  ctx.fill();
+  // Lit facet, breathing on the loop clock.
+  ctx.fillStyle = `${glint}${0.35 + 0.2 * Math.sin(frame / 16)})`;
+  ctx.fillRect(-2.4, 3, 1.6, len * 0.55);
+
+  if (state === 'trembling') {
+    // The warning is amber — the game's established "about to hurt you" hue —
+    // plus dust shaken off the mount.
+    ctx.fillStyle = `rgba(255,190,60,${0.4 + 0.4 * Math.sin(frame / 2.2)})`;
+    ctx.fillRect(-halfW - 2, -1, halfW * 2 + 4, 1.6);
+    ctx.fillStyle = 'rgba(200,195,220,0.6)';
+    for (let i = 0; i < 2; i++) {
+      const p = (frame / 22 + i / 2) % 1;
+      ctx.fillRect(-3 + i * 6, len * 0.3 + p * 20, 1.4, 1.4);
+    }
+  } else if (state === 'falling') {
+    ctx.fillStyle = `${glint}${0.5 + 0.3 * Math.sin(frame / 2)})`;
+    ctx.beginPath();
+    ctx.arc(1, len, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * The rail minecart. (x, y) is the rail contact point under the axles;
+ * `angle` is the rail's pitch in radians. Waiting carts advertise themselves
+ * with a boarding glow (same invitation language as the board pad); riding
+ * carts spark and rattle; crashed carts sit tipped against the buffer with
+ * `stateTime` timing the impact burst.
+ */
+export function drawMinecart(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  state: 'waiting' | 'riding' | 'crashed',
+  frame: number,
+  angle = 0,
+  stateTime = 0,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  if (state === 'crashed') ctx.rotate(-0.38); // pitched up onto the buffer
+
+  if (state === 'waiting') {
+    const pulse = 0.35 + 0.2 * Math.sin(frame / 18);
+    const glow = ctx.createRadialGradient(0, -10, 3, 0, -10, 24);
+    glow.addColorStop(0, `rgba(56,224,200,${pulse})`);
+    glow.addColorStop(1, 'rgba(56,224,200,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(-26, -34, 52, 48);
+  }
+
+  // Wheels behind the tub, spinning only when the cart moves.
+  for (const side of [-9, 9]) {
+    ctx.save();
+    ctx.translate(side, -4);
+    ctx.fillStyle = '#2c2838';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#6b7280';
+    ctx.lineWidth = 1.2;
+    const spin = state === 'riding' ? frame / 2 : 0;
+    for (let i = 0; i < 2; i++) {
+      const a = spin + (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 3.4, Math.sin(a) * 3.4);
+      ctx.lineTo(-Math.cos(a) * 3.4, -Math.sin(a) * 3.4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // The tub: riveted steel with rust streaks and a worn top rail.
+  ctx.fillStyle = '#5c5468';
+  ctx.beginPath();
+  ctx.moveTo(-14, -20);
+  ctx.lineTo(14, -20);
+  ctx.lineTo(11, -6);
+  ctx.lineTo(-11, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#3f3a4c';
+  ctx.beginPath();
+  ctx.moveTo(-14, -20);
+  ctx.lineTo(-10, -20);
+  ctx.lineTo(-8, -6);
+  ctx.lineTo(-11, -6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#8a5a32'; // rust
+  ctx.fillRect(4, -16, 3, 7);
+  ctx.fillRect(-6, -12, 2, 5);
+  ctx.fillStyle = '#8a93a5';
+  ctx.fillRect(-15, -22, 30, 3);
+  ctx.fillStyle = '#2c2838';
+  ctx.fillRect(-11, -7, 22, 2.4);
+
+  if (state === 'riding') {
+    // Rail sparks off the leading wheel.
+    ctx.fillStyle = `rgba(255,190,80,${0.5 + 0.4 * Math.sin(frame * 1.7)})`;
+    ctx.fillRect(11, -2, 3, 1.6);
+    ctx.fillRect(14, -3.4, 2, 1.4);
+  } else if (state === 'crashed') {
+    // Impact burst for the first beat, then a wreck that keeps smoking until
+    // the respawn sweeps it away.
+    if (stateTime < 26) {
+      const p = stateTime / 26;
+      ctx.strokeStyle = `rgba(255,190,80,${0.8 * (1 - p)})`;
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const a = -0.5 + i * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(12 + Math.cos(a) * 6 * p * 3, -12 + Math.sin(a) * 6 * p * 3);
+        ctx.lineTo(12 + Math.cos(a) * (10 + 8 * p), -12 + Math.sin(a) * (10 + 8 * p));
+        ctx.stroke();
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      const p = (frame / 48 + i / 3) % 1;
+      ctx.fillStyle = `rgba(160,150,175,${0.3 * (1 - p)})`;
+      ctx.beginPath();
+      ctx.arc(-2 + Math.sin(p * 5 + i) * 4, -24 - p * 22, 2.5 + p * 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // A thrown plank beside the wreck.
+    ctx.fillStyle = '#3f3a4c';
+    ctx.save();
+    ctx.rotate(0.9);
+    ctx.fillRect(6, 8, 12, 3);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/** The end-of-line buffer a cart wrecks against. (x, y) is ground level. */
+export function drawCartBuffer(ctx: CanvasRenderingContext2D, x: number, y: number, frame: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#3f3a4c';
+  ctx.fillRect(-3, -18, 6, 18);
+  ctx.fillStyle = '#2c2838';
+  ctx.fillRect(-8, -2, 16, 2);
+  // Hazard-striped beam at cart height: the language of "this ends here".
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-9, -16, 18, 7);
+  ctx.clip();
+  for (let i = -2; i < 4; i++) {
+    ctx.fillStyle = i % 2 ? '#e8c832' : '#23262e';
+    ctx.beginPath();
+    ctx.moveTo(i * 6, -16);
+    ctx.lineTo(i * 6 + 6, -16);
+    ctx.lineTo(i * 6 + 2, -9);
+    ctx.lineTo(i * 6 - 4, -9);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = `rgba(232,56,79,${0.45 + 0.45 * Math.sin(frame / 8)})`;
+  ctx.beginPath();
+  ctx.arc(0, -21, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Quarter-pipe lip dressing over the terrain tiles. (x, baseY) is where the
+ * curve leaves flat ground and `dir` the direction it launches; the chevrons
+ * climb the curve so the invitation reads like a dash pad bent skyward.
+ */
+export function drawQuarterPipe(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  baseY: number,
+  dir: 1 | -1,
+  frame: number,
+  theme: LevelTheme = 'verdant',
+  radius = 76,
+): void {
+  const rim =
+    theme === 'neon' ? '#ff4fa8' : theme === 'crystal' ? '#45c3e2' : theme === 'gear' ? '#e8c832' : '#c9e070';
+  const pt = (a: number) => ({
+    x: x + dir * radius * Math.sin(a),
+    y: baseY - radius + radius * Math.cos(a),
+  });
+  ctx.save();
+  // Rim: a soft wide band with a hot line on top, hugging the curve.
+  for (const [width, alpha] of [
+    [5, 0.22],
+    [1.8, 0.85],
+  ] as const) {
+    ctx.strokeStyle = rim;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const p = pt((i / 16) * (Math.PI / 2));
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // Chevrons climbing toward the lip.
+  for (let i = 0; i < 3; i++) {
+    const t = (frame / 46 + i / 3) % 1;
+    const a = t * (Math.PI / 2);
+    const p = pt(a);
+    const fade = Math.sin(t * Math.PI); // ease in and out at the ends
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    // Tangent of the curve at a, pointing up-slope.
+    ctx.rotate(Math.atan2(-Math.sin(a), dir * Math.cos(a)) + (dir === 1 ? 0 : Math.PI));
+    ctx.scale(dir, 1);
+    ctx.fillStyle = rim;
+    ctx.globalAlpha = 0.5 * fade;
+    ctx.beginPath();
+    ctx.moveTo(-4, -4);
+    ctx.lineTo(1, 0);
+    ctx.lineTo(-4, 4);
+    ctx.lineTo(-2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  // Lip marker: the take-off point, flagged like a summit.
+  const lip = pt(Math.PI / 2);
+  ctx.fillStyle = rim;
+  ctx.fillRect(lip.x - 1, lip.y - 8, 2, 8);
+  const g = ctx.createRadialGradient(lip.x, lip.y - 8, 1, lip.x, lip.y - 8, 8);
+  g.addColorStop(0, 'rgba(255,255,255,0.5)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(lip.x - 8, lip.y - 16, 16, 16);
+  ctx.restore();
+}
+
+/**
+ * Hard-light one-way platform. (x, y) is the top-left of the deck, `w` its
+ * width. `flipIn` is frames until the next solid<->ghost flip: a solid deck
+ * blinks its last 40 frames (the mechanics side guarantees at least 20 under
+ * a standing player), and a ghost brightens as its return approaches.
+ */
+export function drawPhasePlatform(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  solid: boolean,
+  flipIn: number,
+  frame: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  if (solid) {
+    // Warning blink is keyed to flipIn, not the frame clock, so the LAST
+    // blink always lands exactly at the flip.
+    const warning = flipIn < 40;
+    const dim = warning && Math.floor(flipIn / 5) % 2 === 0;
+    ctx.globalAlpha = dim ? 0.42 : 1;
+    ctx.fillStyle = 'rgba(65,240,255,0.25)';
+    ctx.fillRect(-2, -3, w + 4, 12);
+    ctx.fillStyle = '#1a7a8c';
+    ctx.fillRect(0, 4, w, 3);
+    ctx.fillStyle = '#41d4ec';
+    ctx.fillRect(0, 1.6, w, 3);
+    ctx.fillStyle = '#c9f6ff';
+    ctx.fillRect(0, 0, w, 2);
+    // Scan shimmer sliding along the deck.
+    const sx = ((frame * 1.4) % (w + 30)) - 15;
+    const g = ctx.createLinearGradient(sx - 12, 0, sx + 12, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.55)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(Math.max(0, sx - 12), 0, Math.min(24, w), 2.4);
+    // End caps.
+    ctx.fillStyle = '#ff4fa8';
+    ctx.fillRect(-2, -1, 3, 8.5);
+    ctx.fillRect(w - 1, -1, 3, 8.5);
+    if (warning && !dim) {
+      ctx.fillStyle = 'rgba(255,190,60,0.8)';
+      ctx.fillRect(0, -2.4, w, 1.6);
+    }
+  } else {
+    // Ghost: the telegraph that the floor comes back. Brightens on approach,
+    // sparkles just before re-materialising.
+    const near = Math.max(0, 1 - flipIn / 50);
+    const a = 0.1 + near * 0.3;
+    ctx.strokeStyle = `rgba(65,240,255,${a})`;
+    ctx.lineWidth = 1.2;
+    for (let sx = 0; sx < w; sx += 10) {
+      ctx.beginPath();
+      ctx.moveTo(sx, 0);
+      ctx.lineTo(Math.min(sx + 6, w), 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx + 2, 7);
+      ctx.lineTo(Math.min(sx + 8, w), 7);
+      ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(255,79,168,${a + 0.1})`;
+    ctx.fillRect(-2, -1, 3, 8.5);
+    ctx.fillRect(w - 1, -1, 3, 8.5);
+    if (flipIn < 16) {
+      // Rising assembly ticks.
+      for (let i = 0; i < 3; i++) {
+        const p = ((16 - flipIn) / 16 + i / 3) % 1;
+        ctx.fillStyle = `rgba(200,250,255,${0.7 * (1 - p)})`;
+        ctx.fillRect(w * (0.2 + i * 0.3), 6 - p * 10, 1.6, 3);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * The hopper: a coiled spring-legged jumper, stompable like a crab. (x, y) is
+ * its ground contact point. `charge01` squashes the coil through the wind-up
+ * (its jump tell); airborne it rides fully extended.
+ */
+export function drawHopper(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  dir: 1 | -1,
+  grounded: boolean,
+  charge01: number,
+  frame: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(dir >= 0 ? 1 : -1, 1);
+  const coilH = grounded ? 10 - 4.5 * charge01 : 14;
+  const rattle = grounded && charge01 > 0.75 ? Math.sin(frame * 2.4) : 0;
+  ctx.translate(rattle, 0);
+
+  // Foot plate + coil.
+  ctx.fillStyle = '#2c2838';
+  ctx.fillRect(-5, -2, 10, 2);
+  ctx.strokeStyle = '#8b93a5';
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 3; i++) {
+    const cy = -2 - (coilH / 3) * (i + 0.5);
+    ctx.beginPath();
+    ctx.ellipse(0, cy, 5.5 - i * 0.7, coilH / 7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Body: same hostile red family as the crab, so "stomp me" carries over.
+  const squash = grounded ? 1 - charge01 * 0.22 : 1.12;
+  ctx.translate(0, -2 - coilH);
+  ctx.scale(1 / Math.sqrt(squash), squash);
+  ctx.fillStyle = PAL.enemy;
+  ctx.beginPath();
+  ctx.roundRect(-7.5, -11, 15, 11, 5);
+  ctx.fill();
+  ctx.fillStyle = PAL.podDark;
+  ctx.fillRect(-7.5, -3.5, 15, 2);
+  // Eyes forward.
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(1, -9.5, 4, 4.5);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(3, -8.2, 2, 2);
+  if (!grounded) {
+    // Airborne: motion ticks under the coil.
+    ctx.fillStyle = 'rgba(200,210,225,0.5)';
+    ctx.fillRect(-4, 13, 1.6, 4);
+    ctx.fillRect(2.5, 14, 1.6, 3);
+  }
+  ctx.restore();
+}
+
 /** The arena gates that seal the boss fight in. */
 export function drawBossGate(
   ctx: CanvasRenderingContext2D,
@@ -951,9 +1849,35 @@ export function drawGoal(ctx: CanvasRenderingContext2D, x: number, y: number, sp
 }
 
 export function drawBoss(ctx: CanvasRenderingContext2D, boss: BossLike, frame: number): void {
-  if (boss.kind === 'press') drawPressBoss(ctx, boss as PressBoss, frame);
-  else if (boss.kind === 'shard') drawShardBoss(ctx, boss as CrystalBoss, frame);
+  // Compared through `string` so this file stays green while the mirage boss
+  // itself is still landing in its own lane.
+  const kind = boss.kind as string;
+  if (kind === 'press') drawPressBoss(ctx, boss as PressBoss, frame);
+  else if (kind === 'shard') drawShardBoss(ctx, boss as CrystalBoss, frame);
+  else if (kind === 'mirage') drawMirageBoss(ctx, boss as unknown as MirageBossView, frame);
   else drawPodBoss(ctx, boss as Boss, frame);
+}
+
+/**
+ * The shape of the mirage boss this painter draws from — kept structural so
+ * the art and the boss logic can land independently. The boss lane's class
+ * satisfies this by construction.
+ */
+export interface MirageBossView {
+  x: number;
+  y: number;
+  groundY: number;
+  phase: 'intro' | 'pace' | 'trace' | 'derez' | 'defeated';
+  afterimages: { x: number; y: number; age: number }[];
+  /** 0 = fully rendered, 1 = fully de-rezzed (core exposed). */
+  derez01: number;
+  facing: 1 | -1;
+  timer: number;
+  hp: number;
+  maxHp: number;
+  invuln: number;
+  /** Ground speed, px/frame (>= 0). Drives the legs — a planted pacer stands. */
+  speed?: number;
 }
 
 function drawPodBoss(ctx: CanvasRenderingContext2D, boss: Boss, frame: number): void {
@@ -1359,6 +2283,259 @@ function drawBurrowMound(ctx: CanvasRenderingContext2D, boss: CrystalBoss, frame
     ctx.beginPath();
     ctx.arc(Math.sin(p * 5 + i * 2) * 7, -mh - 2 - p * 20, 3 + p * 7, 0, Math.PI * 2);
     ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * The Mirage: a hard-light pace-runner. Its fight is told in light levels —
+ * sprinting it is a saturated neon streak trailing afterimages; de-rezzed it
+ * collapses into glitched slices around a bare core, and THAT is the thing to
+ * hit. The silhouette is deliberately taller and leaner than the hero: a
+ * rival runner, not another machine.
+ */
+function drawMirageBoss(ctx: CanvasRenderingContext2D, boss: MirageBossView, frame: number): void {
+  const flash = boss.invuln > 0 && frame % 4 < 2;
+  // Legs follow actual speed when the boss exposes it: the pre-trace tell is
+  // the pacer PLANTING mid-lap, which only reads if a stationary boss stands.
+  const running = boss.speed !== undefined ? boss.speed > 0.5 : boss.phase === 'pace' || boss.phase === 'trace';
+  const derez = boss.derez01;
+
+  ctx.save();
+
+  // Afterimages first. These are not exhaust — each one is a hard-light copy
+  // frozen in the lane that stays LETHAL until it ages out (whatever phase
+  // the boss itself is in), so each is drawn from its own age alone: a brief
+  // materialise, a long solid hold, and a clearly-dying flicker at the end.
+  for (const ai of boss.afterimages) {
+    if (ai.age >= AFTERIMAGE_LIFE) continue;
+    const life = 1 - ai.age / AFTERIMAGE_LIFE;
+    const arming = ai.age < AFTERIMAGE_ARM;
+    // The last quarter of life burns down visibly; before that, hold solid.
+    let alpha = arming ? 0.2 + (ai.age / AFTERIMAGE_ARM) * 0.35 : life < 0.25 ? 0.55 * (life / 0.25) : 0.55;
+    if (!arming && life < 0.25 && frame % 6 < 2) alpha *= 0.45; // dying flicker
+    // A vertical hard-light seam through the copy sells "fence post", which
+    // is what the hazard box actually is.
+    ctx.fillStyle = `rgba(255,79,168,${alpha * 0.55})`;
+    ctx.fillRect(ai.x - 1, ai.y - 17, 2, 34);
+    mirageFigure(ctx, ai.x, ai.y, boss.facing, frame, {
+      running: false,
+      alpha,
+      color: '255,79,168',
+      ghost: true,
+    });
+  }
+
+  // Ground light: a runner made of light throws glow, not shadow.
+  const pool = ctx.createRadialGradient(boss.x, boss.groundY, 2, boss.x, boss.groundY, 34);
+  pool.addColorStop(0, `rgba(255,79,168,${0.22 * (1 - derez * 0.6)})`);
+  pool.addColorStop(1, 'rgba(255,79,168,0)');
+  ctx.fillStyle = pool;
+  ctx.fillRect(boss.x - 36, boss.groundY - 12, 72, 18);
+
+  // Intro: assembling out of scanlines. `timer` is safe here — it is the
+  // intro's own one-shot ramp, not a looping animation clock.
+  const assemble = boss.phase === 'intro' ? Math.min(1, boss.timer / 55) : 1;
+
+  if (boss.phase === 'defeated') {
+    // Kneeling and coming apart: pixels stream upward off the body.
+    mirageFigure(ctx, boss.x, boss.y + 8, boss.facing, frame, {
+      running: false,
+      alpha: 0.5 + 0.2 * Math.sin(frame / 5),
+      color: '120,110,160',
+      ghost: false,
+      kneel: true,
+    });
+    for (let i = 0; i < 8; i++) {
+      const p = (frame / 60 + i / 8) % 1;
+      const px = boss.x + Math.sin(i * 2.6) * 14;
+      ctx.fillStyle = `rgba(${i % 2 ? '255,79,168' : '65,240,255'},${0.7 * (1 - p)})`;
+      ctx.fillRect(px, boss.y + 4 - p * 46, 2, 2);
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (derez > 0.05) {
+    // De-rezzed: the figure shears into horizontal slices, each thrown a
+    // deterministic distance sideways. More derez, more throw.
+    const sliceH = 12;
+    for (let s = 0; s < 5; s++) {
+      const off = Math.sin(s * 37.7 + Math.floor(frame / 3) * 1.31) * 7 * derez;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(boss.x - 40, boss.y - 34 + s * sliceH, 80, sliceH);
+      ctx.clip();
+      mirageFigure(ctx, boss.x + off, boss.y, boss.facing, frame, {
+        running: false,
+        alpha: (0.5 + 0.3 * Math.sin(frame / 2 + s)) * assemble,
+        color: flash ? '255,255,255' : '255,79,168',
+        ghost: false,
+      });
+      ctx.restore();
+    }
+    // The exposed core: brightest thing on screen while the window is open,
+    // exactly like the shard rig's hatch. Hit this.
+    const pulse = 0.55 + 0.45 * Math.sin(frame / 5);
+    const bloom = ctx.createRadialGradient(boss.x, boss.y - 12, 2, boss.x, boss.y - 12, 26 * derez + 6);
+    bloom.addColorStop(0, `rgba(200,250,255,${0.7 * pulse * derez})`);
+    bloom.addColorStop(0.55, `rgba(255,79,168,${0.3 * pulse * derez})`);
+    bloom.addColorStop(1, 'rgba(255,79,168,0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(boss.x - 34, boss.y - 46, 68, 68);
+    ctx.fillStyle = `rgba(235,252,255,${0.6 + 0.4 * pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(boss.x, boss.y - 12 - 6 - 3 * derez);
+    ctx.lineTo(boss.x + 5 + 2 * derez, boss.y - 12);
+    ctx.lineTo(boss.x, boss.y - 12 + 6 + 3 * derez);
+    ctx.lineTo(boss.x - 5 - 2 * derez, boss.y - 12);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    // Fully rendered. Speed streaks trail the sprint.
+    if (running) {
+      for (let i = 0; i < 3; i++) {
+        const g = ctx.createLinearGradient(boss.x - boss.facing * 46, 0, boss.x - boss.facing * 8, 0);
+        g.addColorStop(0, 'rgba(65,240,255,0)');
+        g.addColorStop(1, `rgba(65,240,255,${0.3 - i * 0.08})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(Math.min(boss.x - boss.facing * 46, boss.x - boss.facing * 8), boss.y - 26 + i * 14, 38, 2);
+      }
+    }
+    ctx.save();
+    if (assemble < 1) {
+      // Materialise bottom-up behind a scanline curtain.
+      ctx.beginPath();
+      ctx.rect(boss.x - 40, boss.y + 24 - 60 * assemble, 80, 60 * assemble);
+      ctx.clip();
+    }
+    mirageFigure(ctx, boss.x, boss.y, boss.facing, frame, {
+      running,
+      alpha: flash ? 1 : 0.92,
+      color: flash ? '255,255,255' : '255,79,168',
+      ghost: false,
+    });
+    if (assemble < 1) {
+      ctx.fillStyle = 'rgba(160,240,255,0.5)';
+      ctx.fillRect(boss.x - 26, boss.y + 24 - 60 * assemble, 52, 1.6);
+    }
+    ctx.restore();
+    // Core seam glinting through the chest plate — the tell of where to aim,
+    // taught before the first derez window ever opens.
+    ctx.fillStyle = `rgba(200,250,255,${0.25 + 0.15 * Math.sin(frame / 9)})`;
+    ctx.fillRect(boss.x - 1, boss.y - 17, 2, 10);
+    // The pre-trace tell: the pacer has PLANTED mid-lap and is charging up.
+    // (Early pace also starts at standstill, but it is up to cruise within
+    // ~30 frames, so a stationary pacer past that is always the wind-up.)
+    if (boss.phase === 'pace' && (boss.speed ?? 1) < 0.3 && boss.timer > 30) {
+      const surge = 0.35 + 0.45 * Math.sin(frame / 2.6);
+      ctx.fillStyle = `rgba(65,240,255,${surge})`;
+      for (let i = 0; i < 3; i++) {
+        const gy = boss.y - 24 + ((frame * 2 + i * 18) % 48);
+        ctx.fillRect(boss.x - 12, gy, 24, 1.4);
+      }
+      ctx.fillStyle = `rgba(255,255,255,${surge * 0.8})`;
+      ctx.fillRect(boss.x - 14, boss.y + 22, 28, 1.6);
+    }
+  }
+  ctx.restore();
+}
+
+/** One hard-light runner figure. `color` is an "r,g,b" string. */
+function mirageFigure(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  facing: 1 | -1,
+  frame: number,
+  opt: { running: boolean; alpha: number; color: string; ghost: boolean; kneel?: boolean },
+): void {
+  const { running, alpha, color, ghost, kneel } = opt;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(facing, 1);
+  ctx.globalAlpha = alpha;
+  if (kneel) {
+    ctx.translate(0, 6);
+    ctx.rotate(-0.18);
+  }
+
+  const body = `rgba(${color},${ghost ? 0.55 : 0.85})`;
+  const edge = ghost ? `rgba(${color},0.9)` : 'rgba(65,240,255,0.9)';
+
+  // Legs: light-blades scissoring on the frame clock in a sprint, or a
+  // braced stance when planted.
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 3;
+  if (running) {
+    for (let i = 0; i < 2; i++) {
+      const a = frame / 1.8 + i * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(0, 8);
+      ctx.quadraticCurveTo(Math.cos(a) * 6, 15, Math.cos(a) * 11, 8 + Math.abs(Math.sin(a)) * 14);
+      ctx.stroke();
+    }
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(-1, 8);
+    ctx.lineTo(-5, 22);
+    ctx.moveTo(1, 8);
+    ctx.lineTo(6, 22);
+    ctx.stroke();
+  }
+
+  // Torso: a swept wedge leaning into the run.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-5, 10);
+  ctx.lineTo(-8, -14);
+  ctx.lineTo(4, -18);
+  ctx.lineTo(8, -6);
+  ctx.lineTo(4, 10);
+  ctx.closePath();
+  ctx.fill();
+  // Leading-edge light.
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(4, -18);
+  ctx.lineTo(8, -6);
+  ctx.stroke();
+
+  // Head: angular visor helm with a swept crest.
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.moveTo(-3, -18);
+  ctx.lineTo(6, -22);
+  ctx.lineTo(9, -27);
+  ctx.lineTo(-2, -30);
+  ctx.lineTo(-9, -24);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath(); // crest streaming behind
+  ctx.moveTo(-7, -28);
+  ctx.lineTo(-18, -24);
+  ctx.lineTo(-8, -22);
+  ctx.closePath();
+  ctx.fill();
+  // Visor slit.
+  ctx.fillStyle = ghost ? `rgba(${color},1)` : 'rgba(235,252,255,0.95)';
+  ctx.fillRect(1, -26.5, 7, 2);
+
+  // Arms pumping (simple counter-swing light blades).
+  ctx.strokeStyle = body;
+  ctx.lineWidth = 2.4;
+  if (running) {
+    const a = frame / 1.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(Math.cos(a + Math.PI) * 9, -6 + Math.sin(a + Math.PI) * 5);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(0, -12);
+    ctx.lineTo(7, -2);
+    ctx.stroke();
   }
   ctx.restore();
 }

@@ -19,6 +19,10 @@ import {
   SpikeTrap,
   CrumblePlatform,
   SwingBall,
+  Stalactite,
+  Minecart,
+  PhasePlatform,
+  Hopper,
   GoalSign,
   tileCentre,
   type Rect,
@@ -28,6 +32,7 @@ import { BossArena } from './BossArena.ts';
 import { Boss, type BossLike } from './Boss.ts';
 import { PressBoss } from './PressBoss.ts';
 import { CrystalBoss } from './CrystalBoss.ts';
+import { MirageBoss } from './MirageBoss.ts';
 import { SCORE, type LevelStats } from './Score.ts';
 import type { Cutscene } from './story.ts';
 
@@ -81,11 +86,23 @@ export class LevelBuilder {
   droneDefs: { x: number; y: number; range: number }[] = [];
   dashPadDefs: { x: number; y: number; dir: 1 | -1; power: number }[] = [];
   boardPadDefs: { x: number; y: number }[] = [];
-  launcherDefs: { x: number; y: number; dir: 1 | -1; power: number; angle: number }[] = [];
+  launcherDefs: {
+    x: number;
+    y: number;
+    dir: 1 | -1;
+    power: number;
+    angle: number;
+    minSpeed?: number;
+    convert?: boolean;
+  }[] = [];
   railDefs: { x0: number; y0: number; x1: number; y1: number }[] = [];
   trapDefs: { x: number; y: number; period: number; offset: number }[] = [];
   crumbleDefs: { x: number; y: number; w: number }[] = [];
   swingDefs: { x: number; y: number; len: number; period: number; offset: number }[] = [];
+  stalactiteDefs: { x: number; y: number }[] = [];
+  cartDefs: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  phaseDefs: { x: number; y: number; w: number; period: number; offset: number }[] = [];
+  hopperDefs: { x: number; y: number }[] = [];
   boardEndX = -1;
   loops: LoopZone[] = [];
   secretRects: Rect[] = [];
@@ -322,6 +339,71 @@ export class LevelBuilder {
     });
   }
 
+  /**
+   * Hanging spike under the ceiling tile at (x, ceilingRow). Armed by the
+   * player passing beneath: trembles, drops, shatters, regrows.
+   */
+  stalactite(x: number, ceilingRow: number): void {
+    this.stalactiteDefs.push({ x: tileCentre(x), y: (ceilingRow + 1) * T });
+  }
+
+  /**
+   * A ~5-tile quarter-pipe lip: rounded foot, gentle middle, 45° upper curve,
+   * with a speed-gated converting launcher at the lip. Entered fast in `dir`
+   * it turns ground speed into a steep diagonal launch; entered slow it is
+   * just a climbable curve the player slides back down — every tile in it is
+   * ordinary ground, so it can never read as a wall.
+   *
+   * `x` is the LEFTMOST column of the footprint either way; `dir` picks which
+   * end is the lip (dir=1 launches rightward off the right end).
+   */
+  quarterPipe(x: number, baseRow: number, dir: 1 | -1): void {
+    const fill = (col: number, row: number, ch: string) => {
+      this.set(col, row, ch);
+      for (let y = row + 1; y < this.h; y++) this.set(col, y, '#');
+    };
+    if (dir === 1) {
+      fill(x, baseRow - 1, '{');
+      fill(x + 1, baseRow - 1, ')');
+      fill(x + 2, baseRow - 2, '/');
+      fill(x + 3, baseRow - 3, '/');
+      fill(x + 4, baseRow - 4, '/');
+    } else {
+      fill(x, baseRow - 4, '\\');
+      fill(x + 1, baseRow - 3, '\\');
+      fill(x + 2, baseRow - 2, '\\');
+      fill(x + 3, baseRow - 1, '>');
+      fill(x + 4, baseRow - 1, ']');
+    }
+    const lipX = dir === 1 ? x + 4 : x;
+    this.launcherDefs.push({
+      x: tileCentre(lipX),
+      y: (baseRow - 4) * T - 8,
+      dir,
+      power: 12,
+      angle: 62,
+      // Well above walking-up-the-curve pace, comfortably below a real run:
+      // the gate that separates "launch" from "climbable curve".
+      minSpeed: 4.5,
+      convert: true,
+    });
+  }
+
+  /** A minecart track from tile corner (x0,row0) to (x1,row1), cart waiting at the start. */
+  cartRide(x0: number, row0: number, x1: number, row1: number): void {
+    this.cartDefs.push({ x0: x0 * T, y0: row0 * T, x1: x1 * T, y1: row1 * T });
+  }
+
+  /** Hard-light one-way platform spanning tiles [x0,x1], top surface on `row`. */
+  phasePlatform(x0: number, x1: number, row: number, period = 180, offset = 0): void {
+    this.phaseDefs.push({ x: x0 * T, y: row * T, w: (x1 - x0 + 1) * T, period, offset });
+  }
+
+  /** Coiled jumper enemy sitting on the surface at `surfaceRow`. */
+  hopper(x: number, surfaceRow: number): void {
+    this.hopperDefs.push({ x: tileCentre(x), y: surfaceRow * T });
+  }
+
   start(x: number, surfaceRow: number): void {
     this.playerStart = { x: tileCentre(x), y: surfaceRow * T - PHYS.heightRadius - 2 };
   }
@@ -422,6 +504,10 @@ export class Level {
   traps: SpikeTrap[];
   crumbles: CrumblePlatform[];
   swings: SwingBall[];
+  stalactites: Stalactite[];
+  carts: Minecart[];
+  phasePlats: PhasePlatform[];
+  hoppers: Hopper[];
   readonly boardEndX: number;
   goal: GoalSign;
   boss: BossLike | null = null;
@@ -494,11 +580,17 @@ export class Level {
     this.drones = b.droneDefs.map((d) => new BuzzDrone(d.x, d.y, d.range));
     this.dashPads = b.dashPadDefs.map((d) => new DashPad(d.x, d.y, d.dir, d.power));
     this.boardPads = b.boardPadDefs.map((d) => new BoardPad(d.x, d.y));
-    this.launchers = b.launcherDefs.map((d) => new Launcher(d.x, d.y, d.dir, d.power, d.angle));
+    this.launchers = b.launcherDefs.map(
+      (d) => new Launcher(d.x, d.y, d.dir, d.power, d.angle, d.minSpeed ?? 3.5, d.convert ?? false),
+    );
     this.rails = b.railDefs.map((d) => new Rail(d.x0, d.y0, d.x1, d.y1));
     this.traps = b.trapDefs.map((d) => new SpikeTrap(d.x, d.y, d.period, d.offset));
     this.crumbles = b.crumbleDefs.map((d) => new CrumblePlatform(d.x, d.y, d.w));
     this.swings = b.swingDefs.map((d) => new SwingBall(d.x, d.y, d.len, d.period, d.offset));
+    this.stalactites = b.stalactiteDefs.map((d) => new Stalactite(d.x, d.y));
+    this.carts = b.cartDefs.map((d) => new Minecart(d.x0, d.y0, d.x1, d.y1));
+    this.phasePlats = b.phaseDefs.map((d) => new PhasePlatform(d.x, d.y, d.w, d.period, d.offset));
+    this.hoppers = b.hopperDefs.map((d) => new Hopper(d.x, d.y));
     this.boardEndX = b.boardEndX;
     this.goal = new GoalSign(b.goalPos.x, b.goalPos.y);
     this.startPos = b.playerStart;
@@ -592,6 +684,38 @@ export class Level {
       events.push('board-end');
     }
 
+    // Minecarts: touching a waiting cart commits the player to the ride; the
+    // cart runs its track and crashes into the buffer at the far end.
+    for (const cart of this.carts) {
+      if (cart.tryBoard(p)) {
+        events.push('cart-board');
+        this.eventSources.set('cart-board', { x: cart.x, y: cart.y });
+      }
+      // A rider who jumped out (or died) is no longer aboard, but a launched
+      // cart is committed: it runs on riderless and still crashes.
+      if (cart.rider && (!p.carting || p.dead)) cart.rider = false;
+      if (cart.update() === 'crash') {
+        // The crash happens wherever the buffer is — which can be far from a
+        // player who bailed early, so it is ambient-gated like any hazard.
+        if (Math.abs(cart.x - p.x) < AMBIENT_RANGE) {
+          events.push('cart-crash');
+          this.eventSources.set('cart-crash', { x: cart.x, y: cart.y });
+        }
+        if (cart.rider) {
+          cart.rider = false;
+          // Set the rider down at a DEFINED position (feet on the buffer end
+          // of the track) BEFORE the hit — the knockback must start from a
+          // known spot, never from inside whatever the cart finished against.
+          p.dismountCart();
+          p.x = cart.endX;
+          p.y = cart.endY - p.h;
+          this.damagePlayer(p, cart.x + cart.dirX * 8, events);
+        }
+      } else if (cart.rider && p.carting && !p.dead) {
+        cart.carry(p);
+      }
+    }
+
     // Hazards.
     if (!p.dead) {
       for (const s of this.spikes) {
@@ -611,6 +735,28 @@ export class Level {
       for (const s of this.swings) {
         s.update();
         if (s.touches(p)) this.damagePlayer(p, s.x, events);
+      }
+      for (const st of this.stalactites) {
+        const ev = st.update(this.map, p.layer, p);
+        // Armed by the player, but they may already have dashed out of
+        // earshot by the time it lands — gate like every scenery hazard.
+        if (ev && Math.abs(st.x - p.x) < AMBIENT_RANGE) {
+          const name = ev === 'warn' ? 'stalactite-warn' : ev === 'fall' ? 'stalactite-fall' : 'stalactite-shatter';
+          events.push(name);
+          this.eventSources.set(name, { x: st.x, y: st.y });
+        }
+        if (st.touches(p)) this.damagePlayer(p, st.x, events);
+      }
+      for (const hp of this.hoppers) {
+        hp.update();
+        const r = hp.interact(p);
+        if (r === 'kill') {
+          this.score += SCORE.enemy;
+          events.push('hopper-stomp');
+          this.eventSources.set('hopper-stomp', { x: hp.x, y: hp.y });
+        } else if (r === 'hurt') {
+          this.damagePlayer(p, hp.x, events);
+        }
       }
       for (const e of this.enemies) {
         e.update();
@@ -641,6 +787,17 @@ export class Level {
         this.eventSources.set('crumble', { x: c.x + c.w / 2, y: c.y });
       }
       if (c.solid && !p.dead) this.standOn(p, c.x, c.y, c.w);
+    }
+
+    // Phase platforms: hard light, solid half the time. Like the crumble
+    // ledge they are NOT tilemap tiles — standOn carries the player. Their
+    // clocks tick level-wide, so the blink is ambient-gated.
+    for (const ph of this.phasePlats) {
+      if (ph.update() === 'blink' && Math.abs(ph.x + ph.w / 2 - p.x) < AMBIENT_RANGE) {
+        events.push('phase-blink');
+        this.eventSources.set('phase-blink', { x: ph.x + ph.w / 2, y: ph.y });
+      }
+      if (ph.solid && !p.dead) this.standOn(p, ph.x, ph.y, ph.w);
     }
 
     // Collectibles & progression.
@@ -674,7 +831,9 @@ export class Level {
           ? new PressBoss(bx, gy, this.arena.left, this.arena.right)
           : this.bossKind === 'shard'
             ? new CrystalBoss(bx, gy, this.arena.left, this.arena.right)
-            : new Boss(bx, gy, this.arena.left, this.arena.right);
+            : this.bossKind === 'mirage'
+              ? new MirageBoss(bx, gy, this.arena.left, this.arena.right)
+              : new Boss(bx, gy, this.arena.left, this.arena.right);
       this.arenaGates = new BossArena(this.arena.left, this.arena.right, this.groundAt(this.arena.left + 40));
       const ev = this.arenaGates.lock();
       if (ev) events.push(ev);

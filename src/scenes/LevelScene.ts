@@ -6,7 +6,7 @@ import { Camera } from '../core/Camera.ts';
 import { Level, type LevelTheme } from '../game/Level.ts';
 import { Player, NO_INPUT } from '../game/Player.ts';
 import { HUD } from '../game/HUD.ts';
-import { LEVELS } from '../levels/index.ts';
+import { LEVELS, BIOMES } from '../levels/index.ts';
 import { STORY_ENDING } from '../game/story.ts';
 import { Progress } from '../game/progress.ts';
 import {
@@ -25,6 +25,11 @@ import {
   drawDashPad,
   drawBoardPad,
   drawRail,
+  drawStalactite,
+  drawMinecart,
+  drawCartBuffer,
+  drawPhasePlatform,
+  drawHopper,
   drawSpikeTrap,
   drawCrumble,
   drawSwingBall,
@@ -84,7 +89,7 @@ export class LevelScene implements Scene {
     this.animate = !prefersReducedMotion();
     this.theme = def.theme;
     this.skyFill =
-      def.theme === 'gear' ? '#0d0d16' : def.theme === 'crystal' ? '#080513' : def.theme === 'neon' ? '#0a0618' : '#0b1026';
+      def.theme === 'gear' ? '#0d0d16' : def.theme === 'crystal' ? '#080513' : def.theme === 'neon' ? '#0a0618' : '#241a44';
     this.decor = buildDecor(this.level.map, def.theme, W, H);
     // Pre-rendered art — built once, behind the scene fade. The background is
     // rendered taller than the view for vertical parallax headroom.
@@ -299,6 +304,38 @@ export class LevelScene implements Scene {
     for (const c of level.crumbles) {
       if (visible(c.x)) drawCrumble(ctx, c.x, c.y, c.w, c.state, c.shakeOffset, c.fallY, this.theme);
     }
+    for (const pl of level.phasePlats) {
+      if (pl.x + pl.w > camX - 40 && pl.x < camX + W + 40) {
+        const flipIn = pl.solid ? pl.onFrames - pl.t : pl.period - pl.t;
+        drawPhasePlatform(ctx, pl.x, pl.y, pl.w, pl.solid, flipIn, this.frame);
+      }
+    }
+    for (const st of level.stalactites) {
+      if (visible(st.x)) {
+        drawStalactite(ctx, st.x + st.shakeOffset, st.y, st.state, this.frame, st.timer, this.theme);
+      }
+    }
+    for (const cart of level.carts) {
+      if (visible(cart.endX)) drawCartBuffer(ctx, cart.endX, cart.endY, this.frame);
+      if (visible(cart.x)) {
+        const pitch = Math.atan2(cart.endY - cart.startY, cart.endX - cart.startX);
+        drawMinecart(
+          ctx,
+          cart.x,
+          cart.y,
+          cart.state === 'running' ? 'riding' : cart.state,
+          this.frame,
+          pitch,
+          cart.timer,
+        );
+      }
+    }
+    for (const hop of level.hoppers) {
+      if (hop.alive && visible(hop.x)) {
+        const charge = hop.coiled ? (hop.t % hop.period) / 45 : 0;
+        drawHopper(ctx, hop.x, hop.y, hop.dir, hop.coiled, Math.min(1, charge), this.frame);
+      }
+    }
     for (const t of level.traps) {
       if (visible(t.x)) drawSpikeTrap(ctx, t.x, t.y, t.extension, t.phase === 'warning', this.frame);
     }
@@ -354,6 +391,28 @@ export class LevelScene implements Scene {
       ctx.font = '11px monospace';
       ctx.fillText(level.boss.subtitle, W / 2, 78);
       ctx.textAlign = 'left';
+    }
+
+    // Act title card: tells the player where they are for the first beat.
+    if (this.frame < 210 && !level.results) {
+      const a = this.frame < 30 ? this.frame / 30 : this.frame > 170 ? Math.max(0, (210 - this.frame) / 40) : 1;
+      const def = LEVELS[this.levelIndex];
+      const biome = BIOMES[def.biome];
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(10,10,16,0.72)';
+      ctx.beginPath();
+      ctx.roundRect(W / 2 - 190, H - 84, 380, 46, 10);
+      ctx.fill();
+      ctx.textAlign = 'center';
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#9aa3b2';
+      ctx.fillText(`${biome.name} · ${def.act} · ${biome.hour}`, W / 2, H - 66);
+      ctx.font = 'bold 15px monospace';
+      ctx.fillStyle = '#4be1ff';
+      ctx.fillText(def.title.toUpperCase(), W / 2, H - 48);
+      ctx.textAlign = 'left';
+      ctx.restore();
     }
 
     this.hud.draw(ctx, level, player);

@@ -111,36 +111,38 @@ describe('The look camera returns to neutral', () => {
   });
 });
 
-describe('Launch ramps ease back down', () => {
-  it.each(LEVELS.map((d) => [d.name, d] as const))(
-    '%s never leaves a cliff just past a launcher',
+describe('Launchers never fire toward the void', () => {
+  // The original rule ("no drop just past a launcher") predates quarter
+  // pipes and the deliberate leap-of-faith drops, which are exactly big
+  // drops past a launcher — always onto real ground below. What must still
+  // hold: within the flight corridor after any launcher there is never a
+  // bottomless strip wider than the route-continuity budget. Falling may
+  // cost height; it may never cost the run.
+  it.each(LEVELS.map((d, i) => [`${String(i + 1).padStart(2, '0')} ${d.title}`, d] as const))(
+    '%s',
     (_name, def) => {
-      // A launcher tops out above the surrounding ground. If the level drops
-      // straight back to the base row after the pad, anyone arriving too slow
-      // to fire the board walks off a multi-tile cliff.
       const level = new Level(def);
-      expect(level.launchers.length).toBeGreaterThan(0);
-
-      const surfaceAt = (px: number): number | null => {
+      const hasSurface = (tx: number): boolean => {
         for (let ty = 0; ty < level.map.h; ty++) {
-          const tile = level.map.get(Math.floor(px / T), ty, 0);
-          if (tile.oneWay) continue;
-          const h = tile.heights[px % T];
-          if (h > 0) return (ty + 1) * T - h;
+          const tile = level.map.get(tx, ty, 0);
+          if (tile.heights.some((h) => h > 0)) return true;
         }
-        return null;
+        return false;
       };
-
       for (const l of level.launchers) {
-        for (let px = Math.floor(l.x); px < l.x + 10 * T; px++) {
-          const a = surfaceAt(px);
-          const b = surfaceAt(px + 1);
-          if (a === null || b === null) continue;
-          const drop = b - a; // positive = ground falls away to the right
-          expect(
-            drop,
-            `cliff of ${drop}px at x=${px + 1} (tile ${Math.round((px + 1) / T)}), just past the launcher at tile ${Math.round(l.x / T)}`,
-          ).toBeLessThanOrEqual(8);
+        const from = Math.floor(l.x / T);
+        let gap = 0;
+        const start = l.dir === 1 ? from : Math.max(0, from - 24);
+        const end = l.dir === 1 ? Math.min(level.map.w, from + 24) : from;
+        for (let tx = start; tx < end; tx++) {
+          if (hasSurface(tx)) gap = 0;
+          else {
+            gap++;
+            expect(
+              gap,
+              `bottomless strip after the launcher at tile ${from} (column ${tx})`,
+            ).toBeLessThanOrEqual(9);
+          }
         }
       }
     },

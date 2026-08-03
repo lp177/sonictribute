@@ -131,6 +131,8 @@ export class Player {
   railing = false;
   /** Which way along the rail the ride is going. */
   railDir: 1 | -1 = 1;
+  /** Locked aboard a minecart: the Level drives the cart, jump is the only control. */
+  carting = false;
   /** Events emitted during the last update (sound/FX hooks). */
   events: string[] = [];
 
@@ -175,6 +177,12 @@ export class Player {
     // On a rail the level drives movement; jumping is the only control.
     if (this.railing) {
       if (input.jumpPressed) this.dismountRail(true);
+      return;
+    }
+    // Same deal aboard a minecart: the Level drives the cart and pins the
+    // rider to it; the jump button is the one and only way out.
+    if (this.carting) {
+      if (input.jumpPressed) this.dismountCart(true);
       return;
     }
     if (this.grounded) this.updateGround(map, input);
@@ -465,6 +473,7 @@ export class Player {
       this.rolling = false;
       this.jumping = false;
       this.spindashing = false;
+      this.carting = false;
       this.xsp = this.x < fromX ? -2 : 2;
       this.ysp = -4;
       this.events.push('board-lost');
@@ -478,6 +487,7 @@ export class Player {
       this.rolling = false;
       this.jumping = false;
       this.spindashing = false;
+      this.carting = false;
       this.xsp = this.x < fromX ? -2 : 2;
       this.ysp = -4;
       this.events.push('shield-lost');
@@ -495,6 +505,9 @@ export class Player {
     this.rolling = false;
     this.jumping = false;
     this.spindashing = false;
+    // Knockback needs normal air physics, so any ride lock is broken here —
+    // the Level notices `!p.carting` and lets the cart run on riderless.
+    this.carting = false;
     this.xsp = this.x < fromX ? -2 : 2;
     this.ysp = -4;
     this.events.push('hurt');
@@ -504,6 +517,7 @@ export class Player {
   die(): void {
     if (this.dead) return;
     this.dead = true;
+    this.carting = false;
     this.xsp = 0;
     this.ysp = -7;
     this.events.push('die');
@@ -546,6 +560,33 @@ export class Player {
     }
   }
 
+  /** Board a minecart: locked aboard, the Level drives from here. */
+  mountCart(dir: 1 | -1): void {
+    if (this.carting || this.dead) return;
+    if (this.rolling && !this.jumping) this.adjustHeight(false); // uncurl into the tub
+    this.carting = true;
+    this.rolling = false;
+    this.jumping = false;
+    this.spindashing = false;
+    this.facing = dir;
+    this.ysp = 0;
+  }
+
+  /** Leave the cart — by jumping out, or set down by the Level at the crash. */
+  dismountCart(jump = false): void {
+    if (!this.carting) return;
+    this.carting = false;
+    this.grounded = false;
+    // Momentum is kept: the cart's speed (written into gsp while carried)
+    // becomes the rider's launch speed.
+    this.xsp = this.gsp;
+    if (jump) {
+      this.ysp = -PHYS.jmp;
+      this.jumping = true;
+      this.events.push('jump');
+    }
+  }
+
   /** Step onto a Mag-Board (no-op if already riding). */
   mountBoard(): void {
     if (this.board || this.dead) return;
@@ -576,6 +617,7 @@ export class Player {
     this.rolling = this.jumping = this.spindashing = false;
     this.board = false;
     this.railing = false;
+    this.carting = false;
     this.layer = 0;
     this.dead = false;
     this.invuln = 60;

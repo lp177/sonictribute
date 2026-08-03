@@ -15,9 +15,10 @@ generated procedurally at boot, and the movement follows the community
 ground-speed model, slope factors, rolling, spin dash and 360° loops built
 from dual collision layers.
 
-> Dr. Yolk has stolen the **Chrono Core** and time is stuttering. Chase him
-> through three zones, recover the scattered Chrono Crystals, and take the
-> Core back.
+> The Chrono Core is the world's escapement — the mechanism that lets "now"
+> tick into "next". Dr. Yolk split it into four **Hour Shards** and froze four
+> regions at the hour that suits him best. Run the four stolen hours, pull the
+> shards, and take tomorrow back.
 
 ## Play
 
@@ -38,16 +39,23 @@ loads.
   annulus with dual collision layers. Running into one at any pace grants a
   speed boost and the channel holds you at speed, so you never stall
   upside-down: you commit, you get the whole ride, you come out fast.
-- **Three zones, no loading screens** — story cutscenes double as loading
-  screens: the next level is built behind the fade while the cinematic plays.
-  - *Verdant Rush* — hills, loops, stacked routes, Dr. Yolk's Wrecking Pod.
-  - *Cog Skyway* — Yolk's sky-factory: dash pads, Buzz Drones, the
-    **Mag-Board** hoverboard (a zone-exclusive vehicle that absorbs one hit),
-    and the Piston Crusher boss (armoured except after its slam — jump the
-    shockwaves, strike the open window).
-  - *The Chrono Vault* — the crystal cavern the Core was cut from, where
-    **grind rails** turn chasms into high-speed lines, and Yolk's Shard Drill
-    burrows out of sight, erupts, and rains crystal shards.
+- **A 42-act campaign across four biomes**, with no loading screens — each
+  biome's opening cutscene doubles as its loading screen, and between acts
+  the fade alone keeps the pace.
+  - *Duskmere Coast* (11 acts) — stuck at golden dusk over a frozen sea:
+    loops, launch ramps, quarter-pipes, and the Wrecking Pod.
+  - *Otherwhile Foundry* (11 acts) — the endless midnight shift: Mag-Board
+    sprints, dash pads, drones, steel stalactites, and the Piston Crusher.
+  - *The Underwhen* (10 acts) — the cavern with no hour at all: grind-rail
+    cascades, **minecarts that crash at the rail's end unless you jump out**,
+    falling stalactites, half-pipe bowls, and the Shard Drill.
+  - *Noon Tomorrow* (10 acts) — the neon city whose tomorrow never arrives:
+    hard-light phase platforms, sky-rail ribbons, and the Mirage Pacer, a
+    ground-race boss that fills the arena with hard-light afterimages.
+- **A level select that earns itself** — every act you clear unlocks a line
+  with a terrain postcard (the act's real map silhouette), its name, and your
+  best score/time/crystals/secrets; click any unlocked act to play it
+  directly. Progress persists in localStorage.
 - **Exploration rewards** — 5 Chrono Crystals and 3 secret rooms per zone,
   monitors, checkpoints, and a score/time-bonus results screen with
   achievements (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring
@@ -75,7 +83,7 @@ loads.
   states, and `prefers-reduced-motion` support (screen shake and afterimages
   off, fewer particles).
 - **Procedural audio** — a small WebAudio synth, no audio files.
-- **326 unit tests** — physics sensors, player state machine, entities,
+- **695 unit tests** — physics sensors, player state machine, entities,
   hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
   reachability, simulated loop rides, route-continuity contracts, and a flow
   test that fails if a bot holding right ever gets pinned by the terrain.
@@ -173,15 +181,15 @@ src/
               2 collision layers, loop stamper), sensor casts
   game/       Player state machine, Level + LevelBuilder, entities, bosses,
               loop tracker, scoring/achievements, story data
-  levels/     zone1 (Verdant Rush), zone2 (Cog Skyway), zone3 (Chrono
-              Vault), campaign roster
+  levels/     the motif kit plus dusk/, midnight/, never/, tomorrow/ —
+              42 acts in four biomes, campaign roster in index.ts
   render/     procedural art (themed terrain/backgrounds/sprites) and the
               FX layer (particles, screen shake)
   ui/         canvas menus: settings (key remapping) and pause
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
   core/       game shell (fixed timestep), input, key bindings, camera
   audio/      procedural WebAudio sound effects
-tests/        Vitest suites (326 tests)
+tests/        Vitest suites (695 tests)
 docs/         built site — this is what GitHub Pages serves
 ```
 

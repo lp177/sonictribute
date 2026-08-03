@@ -201,6 +201,44 @@ export class Sfx {
         this.blip(587, 0.1, 'square');
         this.blip(880, 0.18, 'square', 0, 0.1);
         break;
+      case 'stalactite-warn':
+        this.blip(1500, 0.05, 'square', 0, 0, 0.14);
+        this.blip(1500, 0.05, 'square', 0, 0.09, 0.14);
+        break;
+      case 'stalactite-fall':
+        this.blip(900, 0.16, 'sawtooth', -500, 0, 0.28);
+        break;
+      case 'stalactite-shatter':
+        this.noise(0.16, 0, 0.3);
+        this.blip(1800, 0.12, 'triangle', -900, 0, 0.22);
+        break;
+      case 'cart-board':
+        this.thud(120, 0.12, 0.5);
+        this.blip(240, 0.3, 'sawtooth', 60, 0.04, 0.2);
+        break;
+      case 'cart-crash':
+        this.thud(52, 0.5, 1.3);
+        this.noise(0.35, 0, 0.4);
+        break;
+      case 'phase-blink':
+        this.blip(1100, 0.06, 'sine', -200, 0, 0.16);
+        break;
+      case 'hopper-stomp':
+        this.noise(0.12);
+        this.blip(360, 0.12, 'square', -140);
+        this.thud(115, 0.12, 0.55);
+        break;
+      case 'boss-trace':
+        this.noise(0.2, 0, 0.3);
+        this.blip(400, 0.3, 'sawtooth', 500, 0, 0.3);
+        break;
+      case 'boss-derez':
+        this.blip(880, 0.3, 'square', -540, 0, 0.3);
+        this.blip(440, 0.35, 'square', -260, 0.08, 0.22);
+        break;
+      case 'boss-rez':
+        this.blip(340, 0.22, 'square', 420, 0, 0.26);
+        break;
       case 'crumble':
         this.noise(0.18, 0, 0.25);
         this.blip(150, 0.2, 'square', -80, 0, 0.25);

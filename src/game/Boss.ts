@@ -16,7 +16,7 @@ export interface BossLike {
   invuln: number;
   phase: string;
   /** Which procedural art/pattern this boss uses. */
-  readonly kind: 'pod' | 'press' | 'shard';
+  readonly kind: 'pod' | 'press' | 'shard' | 'mirage';
   /** Intro banner / health bar labels. */
   readonly title: string;
   readonly subtitle: string;
