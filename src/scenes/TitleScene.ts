@@ -35,8 +35,8 @@ const COL_X = 226;
 const COL_W = 232;
 const COL_LEFT = COL_X - COL_W / 2;
 const LOGO_Y = 106;
-const MENU_Y = 196;
-const ROW_H = 30;
+const MENU_Y = 190;
+const ROW_H = 28;
 const HERO_X = 498;
 const HERO_SCALE = 1.75;
 
@@ -135,7 +135,9 @@ export class TitleScene implements Scene {
     ctx.textAlign = 'center';
     ctx.font = '9px monospace';
     ctx.fillStyle = UI.textFaint;
-    ctx.fillText('↑↓ SELECT  ·  ENTER CONFIRM', COL_X, 268);
+    // Below the third menu row (the hint sat at the 2-row-menu height and
+    // overlapped SETTINGS once LEVEL SELECT joined the list).
+    ctx.fillText('↑↓ SELECT  ·  ENTER CONFIRM', COL_X, 288);
     ctx.textAlign = 'left';
 
     this.drawControlBar(ctx);
