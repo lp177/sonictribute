@@ -4,6 +4,8 @@
  * unit-testable headless.
  */
 
+import { layoutLabel } from './keyboardLayout.ts';
+
 export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'pause';
 export type Slot = 'primary' | 'secondary';
 
@@ -39,7 +41,8 @@ export const RESERVED_UI_KEYS = ['Enter'];
 /** Human-readable label for a key code (menus show these, not raw codes). */
 export function keyLabel(code: string | null): string {
   if (!code) return '—';
-  const named: Record<string, string> = {
+  // Fixed-function keys read the same on every layout.
+  const fixed: Record<string, string> = {
     ArrowLeft: '←',
     ArrowRight: '→',
     ArrowUp: '↑',
@@ -55,6 +58,15 @@ export function keyLabel(code: string | null): string {
     AltRight: 'R-ALT',
     Tab: 'TAB',
     Backspace: 'BKSP',
+  };
+  if (fixed[code]) return fixed[code];
+  if (code.startsWith('Numpad')) return `NUM ${code.slice(6)}`;
+  // Character keys show what the player's keyboard actually prints there:
+  // codes are positional, so 'KeyW' is the Z key on AZERTY — naming it "W"
+  // is how a correct positional default gets mistaken for WASD.
+  const printed = layoutLabel(code);
+  if (printed) return printed;
+  const punct: Record<string, string> = {
     Backquote: '`',
     Minus: '-',
     Equal: '=',
@@ -67,10 +79,9 @@ export function keyLabel(code: string | null): string {
     Period: '.',
     Slash: '/',
   };
-  if (named[code]) return named[code];
+  if (punct[code]) return punct[code];
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
-  if (code.startsWith('Numpad')) return `NUM ${code.slice(6)}`;
   return code.toUpperCase();
 }
 

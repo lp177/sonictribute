@@ -95,8 +95,8 @@ loads.
 
 | Action | Default keys |
 | --- | --- |
-| Move | Arrow keys / `WASD` |
-| Jump | `Space` or `Z` |
+| Move | Arrow keys / `WASD` (`ZQSD` on AZERTY) |
+| Jump | `Space` or `Z` (`W` on AZERTY) |
 | Roll | `Down` while moving |
 | Spin dash | `Down` + `Space` (tap `Space` to rev, release `Down`) |
 | Pause menu | `Esc` or `P` |
@@ -109,6 +109,13 @@ column, `Enter` captures the next key you press, `Backspace` clears an
 alternate, and there is a reset-to-defaults row. Bindings persist in
 `localStorage`. `Enter` stays reserved for menus so you can never lock
 yourself out, and an action can never be stripped of its last key.
+
+Bindings are **positional** (they use physical key codes), so the defaults
+land under the same fingers on every keyboard layout — on AZERTY they simply
+*are* `ZQSD`. The game detects your layout (Keyboard Layout API, with a
+language fallback) and labels every key by what it actually prints on your
+keyboard, so an AZERTY player sees `Z`/`Q`/`S`/`D` in the menus, not
+`W`/`A`/`S`/`D`.
 
 ## Getting started
 
