@@ -1,0 +1,21 @@
+{
+  "name": "BOLT — Chrono Rush",
+  "short_name": "BOLT",
+  "description": "A Sonic-style platformer that runs entirely in your browser: 42 acts across four biomes, every sprite and sound generated in code.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0b1026",
+  "theme_color": "#0b1026",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ install, no sign-up.
 
 **Locally:** `npm install && npm run dev`, then open the printed URL.
 
-The whole game is about 25 kB gzipped and runs entirely on your device —
+The whole game is about 66 kB gzipped and runs entirely on your device —
 there is no backend, no telemetry and no network traffic after the page
 loads.
 
@@ -86,7 +86,11 @@ loads.
   states, and `prefers-reduced-motion` support (screen shake and afterimages
   off, fewer particles).
 - **Procedural audio** — a small WebAudio synth, no audio files.
-- **695 unit tests** — physics sensors, player state machine, entities,
+- **Installable and playable offline** — a service worker caches the game on
+  first visit, so it loads instantly and runs with no network at all. It still
+  checks for new builds in the background, and offers an **UPDATE GAME** row on
+  the title screen rather than swapping versions mid-run.
+- **748 unit tests** — physics sensors, player state machine, entities,
   hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
   reachability, simulated loop rides, route-continuity contracts, and a flow
   test that fails if a bot holding right ever gets pinned by the terrain.
@@ -136,9 +140,9 @@ levels never touch the DOM, so tests run in plain Node without a browser.
 ## Deploying
 
 `npm run build` writes a **fully static site into [`docs/`](docs/)** — one
-HTML file, one JS bundle (~25 kB gzipped), one CSS file and a favicon. There
-is no server-side code, no build step at runtime, no external requests and no
-secrets.
+HTML file, one JS bundle (~66 kB gzipped), one CSS file, a favicon, a web app
+manifest and a service worker. There is no server-side code, no build step at
+runtime, no external requests and no secrets.
 
 ### GitHub Pages (no CI required)
 
@@ -161,6 +165,31 @@ GitHub serves the build verbatim.
 The [CI workflow](.github/workflows/ci.yml) typechecks, tests, builds, and
 fails if the committed `docs/` is stale — so the published site can't silently
 drift from `src/`.
+
+### Offline play, and how updates reach players
+
+The game installs a **service worker** ([src/pwa/](src/pwa/)), so after the
+first visit it loads from its own cache: instant, and fully playable with no
+network at all. That cache is also the fix for a real problem — GitHub Pages
+serves `index.html` with its own cache lifetime, so a plain refresh could hand
+you a stale build.
+
+Freshness is handled explicitly rather than left to HTTP headers:
+
+- The precache list is generated **at build time** from the files Rolldown
+  actually emitted, and the cache version is a fingerprint of their *contents* —
+  so editing only `index.html` still produces a new version.
+- Content-hashed bundles under `assets/` are served **cache-first** (a new build
+  means a new filename). Everything else is **stale-while-revalidate**.
+- The app asks the network for a newer worker on load, when the tab becomes
+  visible again, and every 15 minutes.
+- When a new build is found it is downloaded but **not applied**. An amber
+  **UPDATE GAME** row appears on the title screen; the swap and reload happen
+  only when the player chooses it, so a version never changes mid-run.
+
+To ship an update, just build and push as above — players get it on their next
+visit without clearing anything. To verify a deploy went out, compare the
+hashed bundle name in the live page against `git show HEAD:docs/index.html`.
 
 ### Anywhere else
 
@@ -199,7 +228,7 @@ src/
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
   core/       game shell (fixed timestep), input, key bindings, camera
   audio/      procedural WebAudio sound effects
-tests/        Vitest suites (695 tests)
+tests/        Vitest suites (748 tests)
 docs/         built site — this is what GitHub Pages serves
 ```
 

@@ -20,12 +20,20 @@ import { Progress } from '../game/progress.ts';
 import { CutsceneScene } from './CutsceneScene.ts';
 import { LevelScene } from './LevelScene.ts';
 import { LevelSelectScene } from './LevelSelectScene.ts';
+import { appUpdate, updateApplying, updateReady } from '../pwa/updateHandle.ts';
 
-const MENU = [
+type MenuId = 'start' | 'levels' | 'settings' | 'update';
+interface MenuItem {
+  id: MenuId;
+  label: string;
+  hint: string;
+}
+
+const MENU: MenuItem[] = [
   { id: 'start', label: 'START GAME', hint: '' },
   { id: 'levels', label: 'LEVEL SELECT', hint: '' },
   { id: 'settings', label: 'SETTINGS', hint: 'REBIND CONTROLS' },
-] as const;
+];
 
 /**
  * Composition: the key art (hero, sun, parallax) owns the right of the frame,
@@ -37,6 +45,12 @@ const COL_LEFT = COL_X - COL_W / 2;
 const LOGO_Y = 106;
 const MENU_Y = 190;
 const ROW_H = 28;
+/**
+ * The update row is a fourth entry that only exists when a new build is
+ * waiting, so the column shifts up to make room rather than colliding with the
+ * control bar. Everything vertical derives from the live row count.
+ */
+const UPDATE_SHIFT = 14;
 const HERO_X = 498;
 const HERO_SCALE = 1.75;
 
@@ -66,6 +80,19 @@ export class TitleScene implements Scene {
     this.bd = renderTitleBackdrop();
   }
 
+  /** The live menu: the update row exists only while a build is waiting. */
+  private menu(): MenuItem[] {
+    if (!updateReady() && !updateApplying()) return MENU;
+    return [
+      ...MENU,
+      {
+        id: 'update',
+        label: updateApplying() ? 'UPDATING…' : 'UPDATE GAME',
+        hint: updateApplying() ? 'PLEASE WAIT' : 'NEW VERSION',
+      },
+    ];
+  }
+
   update(): void {
     this.frame++;
 
@@ -74,10 +101,14 @@ export class TitleScene implements Scene {
       return;
     }
 
+    const menu = this.menu();
+    // The row count can change mid-session when an update finishes downloading.
+    if (this.index >= menu.length) this.index = menu.length - 1;
+
     const up = this.input.uiWasPressed('ArrowUp', 'KeyW');
     const down = this.input.uiWasPressed('ArrowDown', 'KeyS');
-    if (up) this.index = (this.index + MENU.length - 1) % MENU.length;
-    if (down) this.index = (this.index + 1) % MENU.length;
+    if (up) this.index = (this.index + menu.length - 1) % menu.length;
+    if (down) this.index = (this.index + 1) % menu.length;
     if (up || down) {
       // A key press IS the user gesture WebAudio waits for, so the menu blip
       // can arm the synth — the game then has sound from the very first frame.
@@ -87,7 +118,13 @@ export class TitleScene implements Scene {
 
     if (this.input.confirmPressed()) {
       this.sfx.ensure();
-      const id = MENU[this.index].id;
+      const id = menu[this.index].id;
+      if (id === 'update') {
+        // Only offered here, never mid-act: applying reloads the page, and a
+        // reload in a level would throw away the run.
+        appUpdate()?.apply();
+        return;
+      }
       if (id === 'settings') {
         this.settings = new SettingsPanel();
         return;
@@ -117,27 +154,31 @@ export class TitleScene implements Scene {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
+    const menu = this.menu();
+    // A fourth row would run into the control bar, so the whole column lifts.
+    const shift = menu.length > MENU.length ? UPDATE_SHIFT : 0;
+
     drawTitleBackdrop(ctx, this.bd, this.frame, this.reduced);
     drawTitleHero(ctx, HERO_X, TITLE_GROUND_Y, HERO_SCALE, this.frame, this.reduced);
 
-    this.drawColumnSurface(ctx);
+    this.drawColumnSurface(ctx, shift);
     drawTitleLogo(ctx, COL_X, LOGO_Y, this.frame, this.reduced);
 
     ctx.textAlign = 'center';
     ctx.font = '10px monospace';
     ctx.fillStyle = UI.textDim;
-    ctx.fillText('DR. YOLK STOLE THE CHRONO CORE.', COL_X, 168);
-    ctx.fillText(`${LEVELS.length} ZONES STAND BETWEEN YOU AND HIM.`, COL_X, 182);
+    ctx.fillText('DR. YOLK STOLE THE CHRONO CORE.', COL_X, 168 - shift);
+    ctx.fillText(`${LEVELS.length} ZONES STAND BETWEEN YOU AND HIM.`, COL_X, 182 - shift);
     ctx.textAlign = 'left';
 
-    this.drawMenu(ctx);
+    this.drawMenu(ctx, menu, shift);
 
     ctx.textAlign = 'center';
     ctx.font = '9px monospace';
     ctx.fillStyle = UI.textFaint;
-    // Below the third menu row (the hint sat at the 2-row-menu height and
+    // Below the last menu row (the hint sat at the 2-row-menu height and
     // overlapped SETTINGS once LEVEL SELECT joined the list).
-    ctx.fillText('↑↓ SELECT  ·  ENTER CONFIRM', COL_X, 288);
+    ctx.fillText('↑↓ SELECT  ·  ENTER CONFIRM', COL_X, MENU_Y - shift + menu.length * ROW_H + 14);
     ctx.textAlign = 'left';
 
     this.drawControlBar(ctx);
@@ -149,7 +190,7 @@ export class TitleScene implements Scene {
    * The text column sits over moving art, so it gets a Material-ish surface:
    * a soft wash to kill the contrast underneath plus a low-elevation card.
    */
-  private drawColumnSurface(ctx: CanvasRenderingContext2D): void {
+  private drawColumnSurface(ctx: CanvasRenderingContext2D, shift: number): void {
     const wash = ctx.createRadialGradient(COL_X, 158, 40, COL_X, 158, 250);
     wash.addColorStop(0, 'rgba(5,7,15,0.72)');
     wash.addColorStop(0.6, 'rgba(5,7,15,0.42)');
@@ -158,7 +199,9 @@ export class TitleScene implements Scene {
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     ctx.beginPath();
-    ctx.roundRect(COL_LEFT - 16, 52, COL_W + 32, 228, 12);
+    // Grows downward by the same amount the rows lift, so the extra row stays
+    // on the card instead of hanging off its bottom edge.
+    ctx.roundRect(COL_LEFT - 16, 52 - shift, COL_W + 32, 228 + shift * 2, 12);
     ctx.fillStyle = 'rgba(16,18,28,0.28)';
     ctx.fill();
     ctx.strokeStyle = 'rgba(75,225,255,0.12)';
@@ -166,12 +209,15 @@ export class TitleScene implements Scene {
     ctx.stroke();
   }
 
-  private drawMenu(ctx: CanvasRenderingContext2D): void {
+  private drawMenu(ctx: CanvasRenderingContext2D, menu: MenuItem[], shift: number): void {
     const pulse = this.reduced ? 1 : 0.5 + 0.5 * Math.sin(this.frame / 12);
-    MENU.forEach((item, i) => {
-      const y = MENU_Y + i * ROW_H;
+    menu.forEach((item, i) => {
+      const y = MENU_Y - shift + i * ROW_H;
       const selected = this.index === i;
       const h = ROW_H - 4;
+      // The update row earns a warm accent: it is the one entry that appeared
+      // on its own rather than always being there.
+      const flag = item.id === 'update';
 
       ctx.beginPath();
       ctx.roundRect(COL_LEFT, y, COL_W, h, 6);
@@ -180,13 +226,13 @@ export class TitleScene implements Scene {
       if (selected) {
         selectionRow(ctx, COL_LEFT, y, COL_W, h, pulse);
       } else {
-        ctx.strokeStyle = UI.outline;
+        ctx.strokeStyle = flag ? UI.warn : UI.outline;
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
       // Leading caret, so the selection reads even without colour.
-      ctx.fillStyle = selected ? UI.accent : UI.textFaint;
+      ctx.fillStyle = selected ? UI.accent : flag ? UI.warn : UI.textFaint;
       ctx.beginPath();
       ctx.moveTo(COL_LEFT + 12, y + h / 2 - 4);
       ctx.lineTo(COL_LEFT + 17, y + h / 2);
@@ -195,11 +241,11 @@ export class TitleScene implements Scene {
       ctx.fill();
 
       ctx.font = 'bold 13px monospace';
-      ctx.fillStyle = selected ? UI.text : UI.textDim;
+      ctx.fillStyle = selected ? UI.text : flag ? UI.warn : UI.textDim;
       ctx.fillText(item.label, COL_LEFT + 24, y + 17);
 
       ctx.font = '9px monospace';
-      ctx.fillStyle = selected ? UI.accent : UI.textFaint;
+      ctx.fillStyle = selected ? UI.accent : flag ? UI.warn : UI.textFaint;
       ctx.textAlign = 'right';
       const hint =
         item.id === 'start'

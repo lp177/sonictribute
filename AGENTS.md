@@ -8,7 +8,7 @@ procedurally at boot.
 
 - `npm run dev` — dev server (Vite)
 - `npm run build` — typecheck (tsc) + production build
-- `npx vitest run` — unit tests (695 tests, must stay green; add a test per
+- `npx vitest run` — unit tests (748 tests, must stay green; add a test per
   feature/level to prevent regressions)
 
 ## Architecture
@@ -34,9 +34,10 @@ procedurally at boot.
   gated per-act by `tests/actContract.ts` (structure minimums, 3 continuous
   routes, reachability, no-stall flow bot, idle silence). zone1/2/3.ts are
   retired from the roster but kept as engine-test fixtures.
-  LevelDef carries `theme` ('verdant' | 'gear'), `bossKind` ('pod' | 'press')
-  and its `intro` cutscene. Level owns entities, score, secrets, checkpoints,
-  boss, respawn, board mount/dismount.
+  LevelDef carries `theme` ('verdant' | 'gear' | 'crystal' | 'neon'),
+  `bossKind` ('pod' | 'press' | 'shard' | 'mirage'), the finale-only
+  `bossRage`, and its `intro` cutscene. Level owns entities, score, secrets,
+  checkpoints, boss, respawn, board mount/dismount.
 - `src/game/Boss.ts` / `src/game/PressBoss.ts` / `src/game/CrystalBoss.ts` —
   deterministic bosses
   (timer-driven patterns, no RNG) behind the shared `BossLike` interface.
@@ -64,6 +65,13 @@ procedurally at boot.
 - `src/core/Game.ts` — fixed 60 Hz timestep + fade transitions. `changeScene`
   takes a FACTORY and calls it only once the screen is fully black, so the
   level build/pre-render never hitches a visible frame.
+- `src/pwa/` — offline + update control. `sw.template.js` is the service
+  worker; its precache list and cache version are injected AT BUILD TIME by the
+  plugin in `vite.config.ts` (pure logic in `buildSw.ts`, unit tested), because
+  bundle filenames are content-hashed and a hand-written list would go stale
+  silently. `appUpdate.ts` is the page-side state machine (register → detect a
+  waiting worker → apply on the player's say-so → reload), fully injectable so
+  it tests headless; `updateHandle.ts` is the singleton the menus read.
 - `src/core/bindings.ts` — remappable controls (primary + optional secondary
   per action, conflict stealing, localStorage persistence). Pure/testable.
 - `src/core/Input.ts` — bindings-driven per-frame input + one-shot key capture
@@ -160,6 +168,21 @@ procedurally at boot.
 - Loop entry and exit lines are the same two lines, so exiting is gated on a
   lap actually being climbed (`LoopTracker.armed`). Without that, a fast
   runner is ejected one frame after entering.
+- **The service worker must never apply an update on its own.** `install` does
+  NOT call `skipWaiting()`; the new worker sits waiting until the player picks
+  UPDATE GAME on the title screen, and only then does the page reload. Swapping
+  the bundle mid-act would throw away the run, and an auto-reload is
+  indistinguishable from a crash. For the same reason the update row is offered
+  on the title screen only, never in the pause menu.
+- **The precache list is generated, never written by hand.** It comes from the
+  files actually emitted, and the cache version is a fingerprint of their
+  CONTENTS — not their names — because `index.html` is not content-hashed, so a
+  meta-tag-only edit would otherwise ship a new page under an old version and
+  never reach players. `renderServiceWorker` throws (failing the build) rather
+  than emit a worker with an empty precache or an unreplaced placeholder.
+- Anything added to `public/` needs its `docs/` twin `git add`ed explicitly:
+  CI's staleness check is `git diff --quiet -- docs`, which does not see NEW
+  untracked files, so a forgotten asset passes CI and 404s on the live site.
 
 ## Debug
 

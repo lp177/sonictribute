@@ -30,10 +30,15 @@ jobs:
 
       # docs/ is the published GitHub Pages site and is committed, so a PR
       # that changes src/ without rebuilding would silently ship stale code.
+      #
+      # Uses `git status --porcelain`, not `git diff`: diff only reports
+      # modified/deleted TRACKED files, so a newly generated asset (sw.js, the
+      # web manifest, a new public/ file) would pass while 404ing on the live
+      # site. Porcelain sees untracked files too.
       - name: Fail if the published docs/ build is stale
         run: |
-          if ! git diff --quiet -- docs; then
-            echo "::error::docs/ is out of date. Run 'npm run build' and commit the result."
-            git diff --stat -- docs
+          if [ -n "$(git status --porcelain -- docs)" ]; then
+            echo "::error::docs/ is out of date or has uncommitted files. Run 'npm run build' and commit the result."
+            git status --porcelain -- docs
             exit 1
           fi
