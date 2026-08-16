@@ -809,7 +809,11 @@ function browShelfPath() {
  * of white around a small iris is what made the last pass look googly.
  */
 const EYE_N = { cx: -42, cy: -34, rx: 53, ry: 36, rot: -0.30 };
-const EYE_F = { cx: 34, cy: -52, rx: 42, ry: 29, rot: -0.30 };
+/* The far eye. Small, pulled in close and drawn UNDER the near one, so the
+   near eye overlaps it and only a crescent of it clears the edge. It used to
+   be nearly the size of the near eye and sat clear of it, which put two full
+   front-facing eyes on a head whose muzzle is in hard profile. */
+const EYE_F = { cx: 12, cy: -50, rx: 30, ry: 24, rot: -0.30 };
 
 function eyeEllipse(e, grow) {
   ctx.beginPath();
@@ -864,7 +868,7 @@ function iris(e, ox, oy, r) {
 }
 
 function drawEyes() {
-  const eyes = [EYE_N, EYE_F];
+  const eyes = [EYE_F, EYE_N];   // far first: the near eye must occlude it
 
   /* union keyline: two grown fills of the same colour merge seamlessly */
   ctx.fillStyle = INK;
@@ -880,8 +884,8 @@ function drawEyes() {
 
   /* irises pushed forward and low: he is looking where he is going, and a
      centred iris in a big white field is exactly what reads as googly */
+  iris(EYE_F, -11, 6, 19);
   iris(EYE_N, -22, 9, 33);
-  iris(EYE_F, -16, 7, 27);
 
   /* the lid, then a soft shadow falling off it onto the ball */
   for (const e of eyes) {
@@ -1522,6 +1526,12 @@ function hero() {
   ctx.save();
   ctx.translate(HIP.x, HIP.y);
   ctx.rotate(LEAN);
+  /* The trailing arm goes BEHIND the torso. It used to be drawn after it, so
+     the whole limb sat on top of the chest and the figure read as a front-on
+     character with two complete arms pasted onto a body that is in profile.
+     He is sprinting across the frame: the near arm reads in full, and the far
+     one should only show the part that clears the shoulder. */
+  backArm();
   torso();
   ctx.save();
   ctx.translate(HEAD_AT.x, HEAD_AT.y);
@@ -1529,7 +1539,6 @@ function hero() {
   ctx.scale(HEAD_SCALE, HEAD_SCALE);
   drawHead();
   ctx.restore();
-  backArm();
   frontArm();
   ctx.restore();
 
