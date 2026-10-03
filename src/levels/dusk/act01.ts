@@ -1,27 +1,46 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
-import { skySteps, canopyRun } from '../motifs.ts';
+import { hazardGauntlet, secretPocket, signpostFinish, stackedChoice } from '../motifs.ts';
+import {
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  plunge,
+  longJump,
+  undercroft,
+  springCliff,
+  stairClimb,
+  tubeShot,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
 import { STORY_HOUR_OF_DUSK } from '../../game/story.ts';
 
 /**
  * DUSKMERE COAST — ACT 1 — "Tidebreak Run"
  *
- * The polished remake of the original Verdant Rush act 1: same golden-hour
- * shoreline, same three full-length routes, same landmarks (the triple loops,
- * the launch ramp, the pendulums over the hollow), but the pacing is tuned
- * with the campaign kit's lessons: every loop gets a feeder dash pad so it is
- * a toy rather than a skill check, and the act now ends at the signpost — the
- * biome's boss waits at acts 6 and 11, so the first level anyone plays stays
- * a pure joyride.
+ * The first level anyone plays, so it teaches the one thing the whole game
+ * runs on: the ground gives you speed, and speed decides which road you are
+ * on. No boss, no boosters — a golden-hour coast that rises and falls.
  *
- * ROUTES:
- *   SKY    (rows 3–12)  — entered off the launch ramp, a chain of hops.
- *   GROUND (rows 18–26) — the default road: hills, loops, gentle hazards.
- *   UNDER  (rows 28–34) — a gallery under the bedrock, entered by visible
- *                         shafts, exited by springs.
+ * BEATS (knot = tension, the rest is release):
+ *   opening   a safe apron tips downhill: slopes give speed.
+ *   valley 1  the first fork — walk it and you take the valley floor, run it
+ *             and the kicker throws you to the ledge, roll it for the prize.
+ *   knot      a ground road under a spring-fed shelf.
+ *   headland  a hill with the sea cave under it (crystal, secret room).
+ *   loop      fed by the hill's far slope; a shield on its roof.
+ *   leap      a long jump over the tide pool.           -- checkpoint
+ *   cliff     sprung up to the clifftop,
+ *   knot      past the pendulum gauntlet,
+ *   plunge    and straight back down it into valley 2 (crystal up top).
+ *   terraces  a jump-up climb.                           -- checkpoint
+ *   headland 2 and the tube that fires you out over the bay to the signpost.
  *
- * TERRAIN RULE: height changes on a running route use hill/dip/gentleUp/
- * gentleDown (~26.5°) — a 45° face reads as a wall at speed. BUILD ORDER:
- * ground first, then sky platforms, then the underworld is carved.
+ * ROADS: the middle road is the ground. The high road is the ledges over the
+ * valleys plus the catwalks stamped below; the low road is the caves under
+ * the two headlands and the gallery under the gauntlet.
  */
 export const act01: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -29,168 +48,54 @@ export const act01: LevelDef = {
   title: 'Tidebreak Run',
   biome: 0,
   theme: 'verdant',
-  width: 320,
+  width: 616,
+  height: WORLD_ROWS,
   intro: STORY_HOUR_OF_DUSK,
   build(b: LevelBuilder): void {
-    /* ============================ GROUND ROUTE ============================ */
-    b.floor(0, 12, 21);
-    b.start(4, 21);
-    b.ringsH(7, 11, 18);
-    b.hill(13, 21, 2, 5); // 13–25, crown row 19
-    b.ringsH(17, 21, 16);
-    b.floor(26, 32, 21);
-    b.enemy(29, 21, 3);
+    let c = rollingStart(b, 0, 22); // 0–29, down to row 26
+    c = launchValley(b, c.endX, c.endRow, { depth: 10, crabs: 1, prize: 'rings10' }); // row 28
+    const k1 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 22 }); // the first knot: a guarded road, a sprung shelf
+    b.checkpoint(c.endX - 2, c.endRow);
+    const hill = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 8, prize: 'crystal', secret: true }); // CRYSTAL 1 (cave), secret 1
+    const l0 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, roof: 'shield' });
+    c = longJump(b, c.endX, c.endRow, { gap: 12, fall: 2 });
+    const l1 = c.endX;
+    b.checkpoint(c.endX - 3, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 12, top: 6 });
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 20, density: 1 });
+    b.swingBall(g0 + 12, c.endRow - 11, 8, 150, 0); // Duskmere's pendulum: time the run under it
+    const g1 = c.endX;
+    c = plunge(b, c.endX, c.endRow, { drop: 10, runout: 2 });
+    c = launchValley(b, c.endX, c.endRow, { depth: 12, crabs: 2, prize: 'crystal' }); // CRYSTAL 2 (upper ledge)
+    const v2 = c.endX;
+    c = stairClimb(b, c.endX, c.endRow, { steps: 3, rise: 4 });
+    b.checkpoint(c.endX - 3, c.endRow);
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'crystal' }); // CRYSTAL 3, secret 2
+    const h2 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 10, prize: 'shoes', hazards: 2 });
+    c = tubeShot(b, c.endX, c.endRow, { drop: 8, runout: 40 });
+    signpostFinish(b, c.endX, c.endRow, { len: 24 });
 
-    b.gentleDown(33, 21, 3); // 33–38, down to row 24
-    b.floor(39, 84, 24);
-    b.ringsH(35, 39, 21);
-    // The feeder pad sits 8 tiles before the loop centre (outside the annulus
-    // wall): any entry pace gets the boost, so the loop always completes.
-    b.dashPad(38, 24, 1, 11);
-    b.loop(46, 24);
-    b.ringsH(56, 60, 21);
-    b.spring(62, 24, 12); // a second way up toward the sky route
-    b.enemy(74, 24, 4);
-    b.spikeTrap(79, 24, 150, 0); // telegraphed: it rattles before it strikes
-    b.spikeTrap(80, 24, 150, 0);
-    // Secret room 1, tucked under the corridor floor.
-    b.carve(70, 24, 71, 27);
-    b.carve(70, 25, 78, 27);
-    b.secret(70, 24, 78, 27);
-    b.crystal(75, 26); // CRYSTAL — ground secret
-    b.ringBox(72, 26, 2, 1);
-    b.monitor(77, 27, 'rings10');
-    b.spring(70, 28, 12);
-    b.spring(71, 28, 12);
-
-    b.gentleUp(85, 23, 3); // 85–90, back to row 21
-    b.floor(91, 96, 21);
-    b.checkpoint(93, 21);
-    b.hill(97, 21, 3, 6); // 97–114, crown row 18
-    b.ringsH(103, 108, 15);
-    b.enemy(105, 18, 3);
-    b.floor(115, 120, 21);
-    b.monitor(117, 21, 'shield');
-    b.launchRamp(121, 21, 3); // 121–128: run-up, then a shot into the sky
-    // Ease back down off the launch pad — dropping straight to the base row
-    // would leave a cliff for anyone who arrives too slow to fire.
-    b.gentleDown(129, 18, 3); // 129–134, back to row 21
-    b.floor(135, 140, 21);
-
-    b.gentleDown(141, 21, 3); // 141–146, down to row 24
-    b.floor(147, 200, 24);
-    b.dashPad(146, 24, 1, 11); // feeder for loop 2 (8 tiles out)
-    b.loop(154, 24);
-    b.ringsH(164, 168, 21);
-    b.swingBall(172, 14, 9, 150, 0); // visible pendulum: time the run under it
-    b.crumble(176, 178, 20); // ledge that gives way after a beat
-    b.ringsH(176, 178, 18);
-    b.enemy(186, 24, 4);
-    b.spikeTrap(196, 24, 150, 60);
-
-    b.gentleDown(201, 24, 2); // 201–204, down into the hollow
-    b.floor(205, 224, 26);
-    b.spikes(209, 211, 26);
-    b.platform(207, 213, 22);
-    b.ringsH(208, 212, 20);
-    b.monitor(206, 26, 'rings10');
-    b.enemy(215, 26, 4);
-    b.spikeTrap(218, 26, 140, 70);
-    // Secret room 2, below the hollow.
-    b.carve(220, 26, 221, 29);
-    b.carve(220, 27, 224, 29);
-    b.secret(220, 26, 224, 29);
-    b.crystal(223, 28); // CRYSTAL — ground secret 2
-    b.ringBox(221, 28, 2, 1);
-    b.spring(220, 30, 11);
-    b.spring(221, 30, 11);
-
-    b.gentleUp(225, 25, 2); // 225–228, back to row 24
-    b.floor(229, 266, 24);
-    b.dashPad(228, 24, 1, 11); // feeder for loop 3
-    b.loop(236, 24);
-    b.ringsH(246, 250, 21);
-    b.checkpoint(243, 24);
-    b.monitor(252, 24, 'shoes');
-    b.enemy(255, 24, 3);
-    b.swingBall(256, 14, 9, 160, 80); // its arc must never reach into the shaft mouth
-    // Mesa over the exit shaft of the underworld gallery.
-    b.platform(246, 254, 18);
-    b.ringsH(247, 253, 16);
-
-    b.gentleUp(267, 23, 3); // 267–272, up to row 21
-    b.floor(273, 319, 21);
-    b.ringsH(274, 279, 18);
-    // The finale is a signpost sprint, not a fight — the Wrecking Pod first
-    // shows up at act 6. A last checkpoint and a ring flourish send you out.
-    b.checkpoint(281, 21);
-    b.ringsH(285, 296, 18);
-    b.goal(310, 21);
-
-    /* ============================= SKY ROUTE ==============================
-     * A chain of one-way platforms, never more than ~6 tiles apart, from the
-     * launch ramp to the goal approach. Falling off drops you onto the
-     * ground route rather than killing you.
+    /* ============================== HIGH ROAD ==============================
+     * Catwalks that follow the ground, so a player who earned the height can
+     * keep it — each stretch with stepping ledges up to it, so it is a choice
+     * and not a rumour. Falling off any of them lands on the middle road.
      */
-    b.platform(136, 146, 7);
-    b.ringsH(137, 145, 5);
-    b.platform(152, 160, 5);
-    b.ringsH(153, 159, 3);
-    b.crystal(156, 3); // CRYSTAL — sky route
-    b.platform(166, 174, 8);
-    b.ringsH(167, 173, 6);
-    // The middle of the lane is now aimed jumps, not a flat catwalk: staggered
-    // steps with the height-keeper spring. Gentle teeth only in act 1 — the
-    // drone patrols but no clocked trap this early in the campaign.
-    const sk = skySteps(b, 180, 9, { steps: 5, stagger: 2, drone: true, trap: false }); // 180–217
-    b.monitor(197, 9, 'rings10'); // on the wide mid step, was the old shelf prize
-    canopyRun(b, sk.endX, 9, { len: 47 }); // 218–264: catwalks to the last hop
-    b.platform(268, 276, 12); // last step down to the goal approach
+    highRoad(b, k1 + 2, hill, { crumbleEvery: 3, monitors: ['rings10'] }); // over the first knot
+    c = droneBridge(b, hill + 30, { drones: 3, prize: 'rings10', onRamp: true }); // off the headland's crown
+    b.crystal(c.endX - 3, c.endRow - 3); // CRYSTAL 4 — past the drone bridge
+    highRoad(b, l0 + 4, l1 - 6, { droneEvery: 3, onRamp: true }); // over the loop (its roof prize is a drop from here) and the leap
+    highRoad(b, g0 + 2, g1 + 6, { droneEvery: 2, monitors: ['shield'], onRamp: true }); // over the gauntlet
+    highRoad(b, v2 + 14, h2 + 30, { crumbleEvery: 2, crystal: true, monitors: ['rings10'], onRamp: true }); // CRYSTAL 5
 
-    /* =========================== UNDER ROUTE =============================
-     * Carved out of the bedrock AFTER the surface exists, with visible drop
-     * shafts in and spring lifts out. Falling in costs time, never a life.
+    /* =============================== LOW ROAD ==============================
+     * The gallery under the clifftop gauntlet: drop in through the shaft at
+     * its head, spring out past its end. Holds the third secret.
      */
-    b.carve(150, 28, 262, 33);
-    b.floor(150, 262, 34);
-    // The gallery now runs back west under the whole mid-act, so the under
-    // route is a true second road, not a closet: it picks up within 9 columns
-    // of secret room 1 (cols 70-78), keeping the lane continuous per the act
-    // contract, and gets its own light-well shaft on the flat at 135-140.
-    b.carve(84, 28, 149, 33);
-    b.floor(84, 149, 34);
-    b.carve(136, 18, 138, 33); // drop shaft 0, clear of loop 1 (centre 46) and loop 2 (154)
-    b.spring(136, 34, 13);
-    b.spring(137, 34, 13);
-    b.ringsH(100, 110, 31);
-    b.enemy(112, 34, 4);
-    // A sea-cave grind line under the launch-ramp hill — the first taste of
-    // rails in the underworld. It sets the rider down on open floor.
-    b.rail(96, 31, 120, 32);
-    // Drop shafts must clear every loop footprint, or they punch a hole in
-    // the loop's run-up corridor.
-    b.carve(190, 24, 193, 33); // drop shaft 1, through the corridor deck
-    b.carve(244, 24, 247, 33); // drop shaft 2, past loop 3
-    b.carve(256, 24, 259, 33); // exit shaft
-    b.ringsH(196, 206, 31);
-    b.monitor(200, 34, 'rings10');
-    b.enemy(210, 34, 5);
-    b.crystal(214, 31); // CRYSTAL — underworld
-    b.ringBox(220, 30, 4, 2);
-    b.enemy(240, 34, 5);
-    b.spikes(250, 252, 34); // clear of shaft 2's landing columns AND its springs
-    b.ringsH(253, 258, 31);
-    b.spring(191, 34, 11); // lifts back through drop shaft 1
-    b.spring(192, 34, 11);
-    b.spring(245, 34, 11);
-    b.spring(246, 34, 11);
-    b.spring(257, 34, 11); // and out again near the mesa
-    b.spring(258, 34, 11);
-    // Secret room 3: a low crawl off the far end of the gallery.
-    b.carve(263, 31, 270, 33);
-    b.floor(263, 270, 34);
-    b.secret(263, 31, 270, 33);
-    b.crystal(267, 32); // CRYSTAL — deep secret
-    b.ringBox(265, 32, 2, 1);
+    lowRoad(b, g0 + 1, g1 - 2, { shafts: [g0 + 2], crabs: 1, traps: 1, prize: 'rings10', secret: true });
   },
 };

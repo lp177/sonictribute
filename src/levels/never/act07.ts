@@ -1,117 +1,87 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
-import {
-  runway,
-  stackedChoice,
-  hazardGauntlet,
-  sneakUnder,
-  stalactiteGallery,
-  phaseCrossing,
-  quarterPipeBowl,
-  leapOfFaith,
-  rollersRun,
-  secretPocket,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+import { phaseCrossing, signpostFinish } from '../motifs.ts';
+import { WORLD_ROWS, rollingStart, loopHill, plunge, longJump, springCliff, highRoad } from '../sections.ts';
+import { hollowHall, lightBridge, loopWalk, railDescent, valley } from './pieces.ts';
 
 /**
  * THE UNDERWHEN — ACT 7 — "Hollow Hour Halls"
  *
- * The underworld act: beneath a hundred columns of surface road runs a
- * hand-carved gallery — the Halls — entered by shafts, ridden by rail, and
- * left by spring lifts, zone-3 style. The UNDER lane is the fast one (the
- * surface above it is trapped and patrolled); a deeper crawl below the Halls
- * hides the act's second secret. The blind leap hangs a crystal in its arc.
+ * The halls are built in pairs, one over the other, and the floor between
+ * them is hard light: panes let into the upper hall's floor that are there
+ * for half of every clock and gone for the rest. So the act's two roads are
+ * not side by side, they are the SAME road seen at two times — cross a pane
+ * lit and you stay up; cross it dark and you are in the lower hall, with its
+ * own loot, its own crabs and a spring lift at the far end. From the second
+ * hall on there is a roof as well, and stalactites hang over the panes: Act
+ * 2's rule (keep moving) set directly against Act 4's (wait for the light).
+ * Between halls the act is steep and short — the terraces of a building, not
+ * the hills of a cave.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   an apron, a long first slope.
+ *   hall 1    knot: open to the sky, two panes on a slow clock.
+ *   valley    floor, ledge, crystal ledge; it climbs out higher than it
+ *             went in.                                       -- checkpoint
+ *   hall 2    knot: roofed, three panes, a spike over each. Secret below.
+ *   plunge    off the terrace,
+ *   leap      into a long jump over a trap pit.
+ *   knot      a plain pit of light (the old kind).           -- checkpoint
+ *   cliff     sprung up,
+ *   loop      through the loop.
+ *   hall 3    knot: a faster clock, a trap in the lower hall, a crystal.
+ *   plunge    down a terrace.
+ *   knot      a bridge of travelling light, a crystal over it.
+ *                                                            -- checkpoint
+ *   cliff     sprung up to the top terrace.
+ *   THE GREAT HALL
+ *             knot: four panes on the fastest clock, six spikes, two crabs
+ *             and a crystal below.
+ *   rail      out of the halls by the long rail,
+ *   home      one more loop, the last terrace, the signpost.
+ *
+ * ROADS: the middle road is the upper halls. The high road is their roofs
+ * and the ledges between; the low road is the lower halls and the pit
+ * floors.
  */
-const W = 396;
-
 export const act07: LevelDef = {
   name: 'THE UNDERWHEN',
   act: 'ACT 7',
   title: 'Hollow Hour Halls',
   biome: 2,
   theme: 'crystal',
-  width: W,
+  width: 718,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false });
-    b.start(4, 24);
-    c = stackedChoice(b, c.endX, c.endRow);
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 170 });
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true });
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // secret 1 (shield pocket)
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 18, count: 4 });
+    let c = rollingStart(b, 0, 26, { drop: 5 }); // 0–31, down to row 31
+    c = hollowHall(b, c.endX, c.endRow, { len: 38, panes: 2, period: 220, crabs: 0, prize: 'rings10' }); // hall 1: the lesson
+    c = valley(b, c.endX, c.endRow, { depth: 10, basin: 18, out: 12, crabs: 1, prize: 'crystal' }); // CRYSTAL 1 (upper ledge)
+    b.checkpoint(c.endX - 3, c.endRow);
+    const h2 = c.endX;
+    c = hollowHall(b, c.endX, c.endRow, { len: 40, panes: 3, period: 180, spikes: 3, crabs: 1, prize: 'shield', secret: true }); // hall 2 — secret 1
+    c = plunge(b, c.endX, c.endRow, { drop: 8, runout: 18 });
+    c = longJump(b, c.endX, c.endRow, { gap: 12, fall: 2, pit: 'trap' });
+    const k3 = c.endX;
+    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 160 });
+    b.checkpoint(c.endX - 3, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 13, top: 8 });
+    loopWalk(b, c.endX, c.endRow, 6); // from the clifftop onto the loop's roof, and on to hall 3's
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 3, roof: 'rings10' });
+    c = hollowHall(b, c.endX, c.endRow, { len: 44, panes: 3, period: 160, spikes: 4, crabs: 1, traps: 1, prize: 'crystal', secret: true }); // hall 3 — CRYSTAL 2, secret 2
+    const p3 = c.endX;
+    c = plunge(b, c.endX, c.endRow, { drop: 7, runout: 16 });
+    c = lightBridge(b, c.endX, c.endRow, { spans: 6, period: 170, sweep: true, pit: 6, crabs: 1, prize: 'crystal' }); // CRYSTAL 3 (over the travelling light)
+    b.checkpoint(c.endX - 3, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 12, top: 8 });
+    c = hollowHall(b, c.endX, c.endRow, { len: 50, panes: 4, period: 150, spikes: 6, crabs: 2, traps: 1, prize: 'crystal', secret: true }); // THE GREAT HALL — CRYSTAL 4, secret 3
+    c = railDescent(b, c.endX, c.endRow, { span: 52, drop: 10, pit: 6, crabs: 2, prize: 'crystal', runout: 10 }); // CRYSTAL 5 (catwalk)
+    loopWalk(b, c.endX, c.endRow, 6); // off the rail's landing onto the last loop's roof
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 4, roof: 'shield' });
+    c = plunge(b, c.endX, c.endRow, { drop: 6, runout: 24 });
+    signpostFinish(b, c.endX, c.endRow, { len: 40 });
 
-    /* ================= THE HALLS — surface road (84–200) ==================
-     * A long trapped road; the gallery below is carved AFTER the whole
-     * surface chain exists (build-order rule). Shafts at 96, 150; exit 193.
-     */
-    b.floor(84, 200, 24);
-    b.ringsH(86, 94, 21);
-    b.spikeTrap(105, 24, 160, 0);
-    b.ringsH(120, 128, 21);
-    b.swingBall(130, 14, 9, 170, 0);
-    b.enemy(140, 24, 3);
-    b.ringsH(160, 168, 21);
-    b.checkpoint(186, 24);
-
-    c = phaseCrossing(b, 201, 24, { gap: 7, period: 160 });
-    c = runway(b, c.endX, c.endRow, { len: 6, enemy: true });
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 4 });
-    const leapX = c.endX;
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 30 });
-    b.crystal(leapX + 18, 12); // crystal 1 — hung in the leap's arc (sky)
-    c = runway(b, c.endX, c.endRow, { len: 12 }); // flat landing room past the mesa
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 8, checkpoint: true });
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1, depth: 3 });
-    c = secretPocket(b, c.endX, c.endRow); // crystal 2, secret 3
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 3, period: 150 });
-    c = runway(b, c.endX, c.endRow, { len: W - 16 - c.endX, enemy: true });
-    signpostFinish(b, c.endX, c.endRow);
-
-    /* ================= THE HALLS — the gallery below ======================
-     * Carved last, out of the bedrock the surface road filled in.
-     */
-    b.carve(88, 29, 196, 33);
-    b.floor(88, 196, 34);
-    b.carve(96, 24, 98, 33); // entry shaft, onto the rail
-    b.carve(150, 24, 152, 33); // mid shaft
-    b.carve(193, 24, 196, 33); // exit shaft
-    b.rail(97, 29, 118, 33); // caught on the way down the entry shaft
-    b.ringsH(100, 114, 30);
-    b.crystal(130, 31); // crystal 3 — the Halls (under)
-    b.ringBox(133, 31, 3, 2);
-    b.enemy(126, 34, 4);
-    b.spikes(140, 142, 34);
-    b.enemy(160, 34, 4);
-    b.ringsH(156, 170, 31);
-    b.spring(151, 34, 11); // back up the mid shaft
-    b.spring(152, 34, 11);
-    b.spring(195, 34, 11); // the lift out
-    b.spring(196, 34, 11);
-    // Secret 2: the deeper crawl below the Halls' floor.
-    b.carve(170, 34, 178, 37);
-    b.floor(170, 178, 38);
-    b.secret(170, 34, 178, 37);
-    b.monitor(176, 38, 'rings10');
-    b.ringBox(172, 36, 3, 1);
-    b.spring(170, 38, 11);
-    b.spring(171, 38, 11);
-
-    // Sky overlay: two canopy stretches, each carrying a crystal.
-    const s = canopyRun(b, 28, 10, { len: 117, crystal: true }); // crystal 4 (sky)
-    canopyRun(b, s.endX, s.endRow, { len: 117, crystal: true }); // crystal 5 (sky)
-
-    /* ============== UNDER — THE HALLS RUN THE WHOLE ACT ====================
-     * The Halls were only ever a hundred columns; the underworld act deserves
-     * an underworld the length of the act. Three more carved runs at row 34
-     * join the existing gallery seamlessly on both sides (its exit shaft at
-     * 193-196 opens straight into the eastern run), and the sneak-under
-     * pocket's floor merges with the western one. Shafts avoid the gauntlet
-     * clocks, the bowl's pipes, the leap launcher and every patrol range.
-     */
-    underGallery(b, 14, { len: 74, row: 34, shafts: [11, 37], hazards: 1, rail: true, crystal: false });
-    underGallery(b, 197, { len: 84, row: 34, shafts: [17, 59], hazards: 1, rail: true, crystal: false });
-    underGallery(b, 281, { len: 80, row: 34, shafts: [3, 17], hazards: 1, rail: true, crystal: false });
+    /* ============================== HIGH ROAD ============================== */
+    highRoad(b, 34, 68, { lift: 9, monitors: ['rings10'] }); // over hall 1, where there is no roof to run on
+    highRoad(b, h2 + 40, k3 + 16, { droneEvery: 3, crumbleEvery: 3, monitors: ['rings10'] }); // off hall 2's roof, over the plunge, the leap and the pit
+    highRoad(b, p3 - 6, p3 + 20, { droneEvery: 2, monitors: ['shield'] }); // off hall 3's roof and down the terrace
   },
 };

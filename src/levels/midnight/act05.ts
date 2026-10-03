@@ -1,29 +1,47 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { hazardGauntlet, railCascade, rollersRun, signpostFinish, stackedChoice, stalactiteGallery } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  corridorLoop,
-  stackedChoice,
-  sneakUnder,
-  stalactiteGallery,
-  secretPocket,
-  hazardGauntlet,
-  quarterPipeBowl,
-  boardSprint,
-  cartCanyon,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  cave,
+  rollingStart,
+  loopHill,
+  plunge,
+  longJump,
+  undercroft,
+  springCliff,
+  highRoad,
+  lowRoad,
+} from '../sections.ts';
+import { slagChute, valley, vault } from './pieces.ts';
 
 /**
- * MIDNIGHT ACT 5 — "Coolant Undercroft"
+ * OTHERWHILE FOUNDRY — ACT 5 — "Coolant Undercroft"
  *
- * The cellars where the coolant runs. This act leans downward: a deep triple
- * dip right after the gate, TWO underworld pockets (one secret, one open
- * larder), and a stalactite roof to match act 3's. The under lane is the
- * scenic-fast route here — both sneak-under shafts pay out for divers, while
- * the surface pays in traps.
+ * The cellars where the coolant runs. This act goes DOWN EARLY AND STAYS
+ * DOWN: the pipe rails drop it under the works in its first tenth and the
+ * road never climbs back to the gate's height. Here the low road is the
+ * star. There is a cave under both hills, a rail gallery under the second
+ * gauntlet, and — the act's signature — the COOLANT MAIN: one gallery two
+ * hundred columns long that runs under a knot, a whole valley, a rhythm of
+ * humps and a second knot, with its own grind rails, crystal and store-room.
+ * Three of the five crystals are below ground; the catwalks are thin on
+ * purpose.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   door      apron, then the pipe rails: three grinds down into the cellars.
+ *   hill 1    over it, or through the sump beneath (crystal, secret).
+ *   knot      dripstone needles.                           -- checkpoint
+ *   loop      on its own slope.
+ *   knot      plates and a hopper — and the shaft into the COOLANT MAIN,
+ *   valley    which runs on under the valley (a second shaft in its floor),
+ *   humps     under the pump humps,
+ *   knot      and under the guarded deck beyond, where its lift comes up.
+ *                                                          -- checkpoint
+ *   sluice    a slag chute crossed by ore cart (crystal over the track).
+ *   lift      the spring back up,                          -- checkpoint
+ *   knot      a long plate walk with a rail gallery under it,
+ *   hill 2    the pump-house hill and its cellar,
+ *   outfall   a leap, a vault (crystal), and the plunge to the signpost.
  */
 export const midnight05: LevelDef = {
   name: 'OTHERWHILE FOUNDRY',
@@ -31,47 +49,78 @@ export const midnight05: LevelDef = {
   title: 'Coolant Undercroft',
   biome: 1,
   theme: 'gear',
-  width: 350,
+  width: 683,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: cellar door
-    b.start(4, 24);
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1, depth: 3, basin: 6 }); // 10–45: the deep dip
-    b.crystal(35, 25); // 1 (ground) — down in the coolant basin
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true }); // 46–51
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 52–63, crystal 2 (under), secret 1
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 18, count: 3 }); // 64–81: dripstone steel
-    c = corridorLoop(b, c.endX, c.endRow); // 82–109
-    b.drone(108, 22, 2); // guards the climb out of the loop corridor
-    c = stackedChoice(b, c.endX, c.endRow, { len: 24, crystal: true }); // 110–133, crystal 3 (sky shelf)
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 134–141
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 130 }); // 142–157
-    c = secretPocket(b, c.endX, c.endRow); // 158–167, crystal 4 (ground), secret 2
-    c = boardSprint(b, c.endX, c.endRow, { sections: 2 }); // 168–201: decks over coolant pits
-    b.drone(178, 20, 2);
-    b.drone(192, 20, 2);
-    c = quarterPipeBowl(b, c.endX, c.endRow); // 202–215
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'rings10' }); // 216–225, secret 3
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 }); // 226–245
-    c = sneakUnder(b, c.endX, c.endRow); // 246–257: the open larder (shield below)
-    c = runway(b, c.endX, c.endRow, { len: 8, enemy: true }); // 258–265
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 266–295
-    signpostFinish(b, c.endX, c.endRow, { len: 54 }); // 296–349
+    let c = rollingStart(b, 0, 24); // row 28
+    c = railCascade(b, c.endX, c.endRow, { steps: 3, run: 6, span: 7, dropEach: 3 }); // the pipe rails: row 37
+    c = undercroft(b, c.endX, c.endRow, { rise: 7, crown: 12, down: 9, prize: 'crystal', secret: true }); // CRYSTAL 1, secret 1; row 39
+    const n0 = c.endX;
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 18, count: 3 });
+    b.checkpoint(c.endX, c.endRow);
+    c = loopHill(b, c.endX, c.endRow, { drop: 5, up: 5, roof: 'shield' });
+    const m0 = c.endX;
+    const road = c.endRow; // the road over the head of the main
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 30, density: 2 });
+    const v0 = c.endX;
+    const hollow = c.endRow + 7; // the valley's floor
+    c = valley(b, c.endX, c.endRow, { depth: 7, out: 9, basin: 8, crabs: 1, prize: 'rings10' }); // floor row 46; out at row 37
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 2, rise: 2, crown: 6, depth: 2, basin: 6 }); // the pump humps
+    c = stackedChoice(b, c.endX, c.endRow, { len: 24 });
+    const m1 = c.endX;
+    b.checkpoint(c.endX, c.endRow);
+    c = slagChute(b, c.endX, c.endRow, { drop: 6, bed: 10, line: 'cart', prize: 'crystal' }); // CRYSTAL 2 — over the track; row 43
+    c = springCliff(b, c.endX, c.endRow, { rise: 9, top: 12 }); // row 34
+    b.checkpoint(c.endX - 5, c.endRow);
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 34, density: 2, period: 140 });
+    const g1 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 10, down: 10, prize: 'shoes', hazards: 2 }); // row 38
+    c = longJump(b, c.endX, c.endRow, { gap: 13, fall: 1, pit: 'crab' }); // the hill's far slope is the run-up; row 39
+    c = vault(b, c.endX, c.endRow, { reward: 'crystal' }); // CRYSTAL 3, secret 2
+    c = plunge(b, c.endX, c.endRow, { drop: 6, runout: 44 }); // the outfall: row 45
+    signpostFinish(b, c.endX, c.endRow, { len: 24 });
 
-    // Sky overlay at row 11 — the undercroft's service walk, thinner rewards
-    // than usual: this act pays underground.
-    let s = canopyRun(b, 76, 11, { len: 104, crystal: true }); // crystal 5 (sky)
-    s = canopyRun(b, s.endX, s.endRow, { len: 104 });
-    canopyRun(b, s.endX, s.endRow, { len: 52 });
+    /* ============================== HIGH ROAD ==============================
+     * Thin on purpose: a service walk over the needles and the loop, another
+     * over the plate walk. This act pays underground.
+     */
+    highRoad(b, n0 - 2, m0 - 4, { monitors: ['rings10'] });
+    highRoad(b, g0 + 2, g1 + 26, { crumbleEvery: 2, crystal: true }); // CRYSTAL 4 — over the plate walk, on ledges that give way
 
-    // The undercroft finally IS an undercroft: the coolant main runs the act
-    // in two bores either side of the cart canyon (its ledge at row 30 keeps
-    // its own springs). Both sneak-under pockets sit at floor 34 and merge
-    // straight into the bore — the under crystal (60) and the shield larder
-    // (254) are now stops along it. The west bore carries a grind rail down
-    // the pipe run. Shafts: between stalactites (69), the stacked-choice deck
-    // (128) and the run-out (312) — clear of the loop corridor (82–109), the
-    // bowl (202–215) and the board-deck pits.
-    underGallery(b, 4, { len: 227, row: 34, shafts: [65, 124], hazards: 1, rail: true, crystal: false });
-    underGallery(b, 239, { len: 106, row: 34, shafts: [73], hazards: 1, crystal: false });
+    /* ============================ THE COOLANT MAIN =========================
+     * One gallery from the head of the first gauntlet to the tail of the
+     * guarded deck beyond the humps, sixteen rows under the road and three
+     * under the valley's floor. In by the shaft among the plates or the one
+     * in the valley floor; out by the lift at its far end.
+     */
+    const F = road + 16;
+    const x0 = m0 + 1;
+    const x1 = m1 - 2;
+    cave(b, x0, x1, F, 6);
+    b.carve(m0 + 2, road, m0 + 4, F - 1); // the way in, among the plates
+    b.carve(v0 + 52, hollow, v0 + 54, F - 1); // and from the valley floor
+    b.ringsH(x0 + 8, x0 + 18, F - 2);
+    b.enemy(x0 + 24, F, 4);
+    b.spikeTrap(x0 + 36, F, 150, 0);
+    b.rail(x0 + 44, F - 3, x0 + 84, F - 2); // the pipe run: forty columns of grind
+    b.ringsH(x0 + 48, x0 + 80, F - 5);
+    b.crystal(x0 + 64, F - 6); // CRYSTAL 5 — over the rail: jump from the grind
+    b.enemy(x0 + 96, F, 4);
+    b.spikeTrap(x0 + 106, F, 150, 60);
+    b.rail(x0 + 120, F - 2, x0 + 150, F - 3); // a second run under the humps, climbing a row
+    b.ringsH(x0 + 124, x0 + 146, F - 5);
+    b.enemy(x0 + 160, F, 4);
+    b.monitor(x1 - 8, F, 'shield');
+    b.ringBox(x1 - 14, F - 2, 4, 1);
+    b.secret(x1 - 16, F - 6, x1 - 5, F - 1); // secret 3 — the store-room at the main's far end
+    b.carve(x1 - 2, road - 2, x1, F - 1); // the lift out, under the deck two rows higher
+    b.spring(x1 - 1, F, 13);
+    b.spring(x1, F, 13);
+
+    /* =============================== LOW ROAD ==============================
+     * The rail gallery under the plate walk.
+     */
+    lowRoad(b, g0 + 1, g1 - 2, { shafts: [g0 + 3], crabs: 2, traps: 1, rail: true, prize: 'rings10' });
   },
 };

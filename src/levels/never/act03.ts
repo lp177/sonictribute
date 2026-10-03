@@ -1,85 +1,114 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { cartCanyon, hazardGauntlet, railCascade, signpostFinish, stalactiteGallery } from '../motifs.ts';
 import {
-  runway,
-  cartCanyon,
-  railCascade,
-  corridorLoop,
-  sneakUnder,
-  quarterPipeBowl,
-  secretPocket,
-  hazardGauntlet,
-  rollersRun,
-  stackedChoice,
-  phaseCrossing,
-  leapOfFaith,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  loopHill,
+  undercroft,
+  springCliff,
+  stairClimb,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
+import { alcove, cartDrop, loopWalk, onRamp, valley } from './pieces.ts';
 
 /**
  * THE UNDERWHEN — ACT 3 — "Cartfall Chasm"
  *
- * The minecart act: three canyons, each wider than the last, each crossed by
- * a cart that WILL crash at its buffer — the first is right at the start so
- * "jump before the end" is learned with a six-tile fall as the only stake.
- * A rail cascade stitches the canyons together. Fast lane: the carts and
- * rails themselves; the canopy is the coward's bypass.
+ * The minecart act. A cart is a ride you cannot steer and that WILL crash at
+ * its buffer, so the only decision aboard is when to jump out: early and you
+ * are on the chasm floor, late and the cart throws you onto the ledge past
+ * the buffer, never and you pay a hit. The act is that decision made five
+ * times, the fall under it getting longer each time. Its shape is a mine
+ * section: flat workings cut by chasms, each one a step further down.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   an apron, a slope,
+ *   lesson    knot: a cart, a six-tile canyon, a buffer in plain sight.
+ *   hill      the first downhill, a cave under it.           -- checkpoint
+ *   chasm 1   the first track that DIVES: six rows down with the cart.
+ *   knot      a short gallery of hanging spikes (Act 2's toy, once).
+ *   valley    floor, ledge, or the crystal ledge — and it climbs out
+ *             higher than it went in.                        -- checkpoint
+ *   stair     knot: the pit-head stair,
+ *   loop      and off its top through the loop.
+ *   knot      a staircase of rails down to the next brink,
+ *   chasm 2   eight rows, crabs under the track, an alcove under the brink.
+ *   knot      the trapped workings, a gallery under them.    -- checkpoint
+ *   cliff     sprung up.
+ *   knot      the wide flat canyon: nine tiles, the same buffer.
+ *   valley 2  down again, and its climb-out is the last brink.
+ *                                                            -- checkpoint
+ *   CARTFALL  thirty-four columns of track, fourteen rows of fall. A crystal
+ *             on the ledge only a late jump reaches; another in the alcove
+ *             under the brink, for whoever jumped early and walked back.
+ *   home      the floor of the chasm country, the signpost.
+ *
+ * ROADS: the middle road is the ground and the carts. The high road is the
+ * bail ledges, the valley's ledges and the catwalks stamped below; the low
+ * road is every chasm floor, the cave under the first hill and the gallery
+ * under the workings.
  */
-const W = 400;
-
 export const act03: LevelDef = {
   name: 'THE UNDERWHEN',
   act: 'ACT 3',
   title: 'Cartfall Chasm',
   biome: 2,
   theme: 'crystal',
-  width: W,
+  width: 675,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 21, { len: 10, rings: false });
-    b.start(4, 21);
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 6 }); // the tutorial crash
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true });
-    c = railCascade(b, c.endX, c.endRow, { steps: 2, run: 6, span: 7, dropEach: 3 });
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 8, enemy: true });
-    c = corridorLoop(b, c.endX, c.endRow);
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // crystal 1 (under), secret 1
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 }); // the middle canyon
-    c = runway(b, c.endX, c.endRow, { len: 6, enemy: true });
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 6 });
-    c = secretPocket(b, c.endX, c.endRow); // crystal 2, secret 2
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 160 });
-    c = runway(b, c.endX, c.endRow, { len: 4 });
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 9 }); // the widest fall
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 });
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // crystal 3 (sky shelf)
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 170 });
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shield' }); // secret 3
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 26 });
-    c = runway(b, c.endX, c.endRow, { len: 12 }); // flat landing room past the mesa
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: W - 16 - 6 - c.endX });
-    signpostFinish(b, c.endX, c.endRow);
+    let c = rollingStart(b, 0, 22, { drop: 3 }); // 0–27, down to row 25
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 6 }); // the lesson
+    const h1 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 8, down: 9, prize: 'rings10', hazards: 1 });
+    b.checkpoint(c.endX - 4, c.endRow);
+    c = cartDrop(b, c.endX, c.endRow, { span: 22, drop: 6, pit: 6, crabs: 1, prize: 'rings10', runout: 14 }); // chasm 1
+    const g1 = c.endX;
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 });
+    c = valley(b, c.endX, c.endRow, { depth: 9, out: 13, crabs: 2, prize: 'crystal' }); // CRYSTAL 1 (upper ledge); it climbs out higher than it went in
+    b.checkpoint(c.endX - 3, c.endRow);
+    const s0 = c.endX;
+    c = stairClimb(b, c.endX, c.endRow, { steps: 2, rise: 4, tread: 8 }); // the pit-head stair
+    loopWalk(b, c.endX, c.endRow, 6); // from the top of the stair onto the loop's roof
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 2, roof: 'rings10' });
+    const k2 = c.endX;
+    c = railCascade(b, c.endX, c.endRow, { steps: 2, run: 6, span: 8, dropEach: 2 });
+    const d2 = c.endX;
+    c = cartDrop(b, c.endX, c.endRow, { span: 26, drop: 8, pit: 7, crabs: 2, prize: 'shield', runout: 14 }); // chasm 2
+    // The alcove under the brink: bail early, then walk BACK along the floor.
+    alcove(b, d2 + 1, d2 + 4, c.endRow + 7); // secret 1
+    b.crystal(d2 + 2, c.endRow + 5); // CRYSTAL 2
+    const k3 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 28, density: 2 });
+    b.checkpoint(c.endX - 2, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 13, top: 8 });
+    const k4 = c.endX;
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 9 }); // the wide one
+    c = valley(b, c.endX, c.endRow, { depth: 10, basin: 8, out: 6, crabs: 1, prize: 'rings10', retrySpring: false }); // its climb-out is the last brink
+    b.checkpoint(c.endX - 3, c.endRow);
+    const d3 = c.endX;
+    c = cartDrop(b, c.endX, c.endRow, { span: 34, drop: 14, pit: 8, crabs: 2, prize: 'crystal', runout: 30 }); // THE CARTFALL — CRYSTAL 3 (bail ledge)
+    alcove(b, d3 + 1, d3 + 4, c.endRow + 8); // secret 2: under the last brink, the longest walk back
+    b.crystal(d3 + 2, c.endRow + 6); // CRYSTAL 4
+    signpostFinish(b, c.endX, c.endRow, { len: 40 });
 
-    // Sky overlay: two canopy stretches, each carrying a crystal.
-    const s = canopyRun(b, 40, 10, { len: 117, crystal: true }); // crystal 4 (sky)
-    canopyRun(b, s.endX, s.endRow, { len: 117, crystal: true }); // crystal 5 (sky)
-
-    /* ================ UNDER — THE CARTFALL UNDERCUT (whole act) ============
-     * A biome-length carved route at row 34 beneath the canyons. It breaks
-     * only at the two deep canyon ledges (126-133 and 198-206, floor row 30)
-     * — those ledges are themselves standable under-lane floor, so they
-     * bridge the route across the skips. Shafts avoid the cart tracks and
-     * buffers, the loop's run-up corridor (81-108) and every patrol.
+    /* ============================== HIGH ROAD ==============================
+     * Catwalks between the bail ledges, so a good jump out of one cart can be
+     * carried toward the next brink.
      */
-    // The long western run: entered under the rail cascade's safety floors.
-    underGallery(b, 14, { len: 112, row: 34, shafts: [28], hazards: 1, rail: true, crystal: false });
-    // And, on theme, a cart crossing the undercut below the loop corridor.
-    b.cartRide(80, 34, 100, 34);
-    // Between the two deep canyons.
-    underGallery(b, 134, { len: 64, row: 34, shafts: [3, 55], hazards: 1, rail: true, crystal: false });
-    // The eastern runs, split so each stays stocked and entered.
-    underGallery(b, 207, { len: 84, row: 34, shafts: [2, 60], hazards: 1, rail: true, crystal: false });
-    underGallery(b, 291, { len: 86, row: 34, shafts: [24, 64, 78], hazards: 1, rail: true, crystal: false });
+    onRamp(b, h1 + 4);
+    highRoad(b, h1 + 8, h1 + 50, { droneEvery: 3, monitors: ['rings10'] }); // over the first hill
+    highRoad(b, g1 + 17, g1 + 44, { lift: 9, crumbleEvery: 3 }); // off the gallery's roof (a step down from the bail ledge) and out over the valley
+    highRoad(b, s0 + 3, s0 + 20, { lift: 5, monitors: ['shield'] }); // a low shelf over each terrace: the stair has a second storey
+    highRoad(b, k2 + 2, k2 + 30, { droneEvery: 2 }); // over the rail stair
+    highRoad(b, k3 + 2, k3 + 30, { droneEvery: 2, crystal: true }); // CRYSTAL 5 — over the workings
+    droneBridge(b, k4 - 4, { drones: 3, prize: 'rings10' }); // from the clifftop over the wide canyon: three bounces
+
+    /* =============================== LOW ROAD ==============================
+     * The gallery under the trapped workings: the safe way past them.
+     */
+    lowRoad(b, k3 + 1, k3 + 21, { shafts: [k3 + 7], crabs: 1, prize: 'rings10', secret: true }); // secret 3 — its lift comes up short of the hopper
   },
 };

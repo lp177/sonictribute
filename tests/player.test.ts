@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { PHYS } from '../src/physics/constants.ts';
 import { stampLoop, TileMap, TILE_FULL, makeTile } from '../src/physics/TileMap.ts';
-import { Player, NO_INPUT, ROLL } from '../src/game/Player.ts';
+import { Player, NO_INPUT, ROLL, START } from '../src/game/Player.ts';
 import { Camera } from '../src/core/Camera.ts';
 import { makeLoopZone, LoopTracker, LOOP } from '../src/game/loops.ts';
 import { makeFlatMap, fillRect, spawnOnGround, input, run, T, TILES } from './helpers.ts';
 
 describe('running physics (Sonic Physics Guide values)', () => {
   it('accelerates to the top speed of 6 px/frame', () => {
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 100, 240);
     run(map, p, 140, input({ right: true }));
     expect(p.grounded).toBe(true);
@@ -16,7 +16,7 @@ describe('running physics (Sonic Physics Guide values)', () => {
   });
 
   it('stops by friction when input is released', () => {
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 100, 240);
     run(map, p, 140, input({ right: true }));
     run(map, p, 200);
@@ -24,7 +24,7 @@ describe('running physics (Sonic Physics Guide values)', () => {
   });
 
   it('brakes hard when pushing against the direction of travel', () => {
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 100, 240);
     run(map, p, 140, input({ right: true }));
     const before = p.gsp;
@@ -38,6 +38,91 @@ describe('running physics (Sonic Physics Guide values)', () => {
     const x0 = p.x;
     run(map, p, 200, input({ right: true }));
     expect(p.x - x0).toBeGreaterThan(500);
+  });
+});
+
+describe('answering the stick (the departures from the guide)', () => {
+  // The guide's hero takes 128 frames to reach a run and 128 to coast to a
+  // stop. Play-testing called that heavy; these pin what replaced it.
+  const framesTo = (speed: number) => {
+    const map = makeFlatMap(120);
+    const p = spawnOnGround(map, 100, 240);
+    for (let f = 1; f <= 200; f++) {
+      p.update(map, input({ right: true }));
+      if (p.gsp >= speed) return f;
+    }
+    return Infinity;
+  };
+
+  it('is at a jog in a third of a second and at a run in about one', () => {
+    expect(framesTo(3)).toBeLessThanOrEqual(24);
+    expect(framesTo(PHYS.top - 0.01)).toBeLessThanOrEqual(70);
+    // ...but not instantly: it is still a run you build.
+    expect(framesTo(PHYS.top - 0.01)).toBeGreaterThan(40);
+  });
+
+  it('kicks off hardest from rest and not at all once running', () => {
+    const map = makeFlatMap(120);
+    const p = spawnOnGround(map, 100, 240);
+    p.update(map, input({ right: true }));
+    expect(p.gsp).toBeCloseTo(PHYS.acc * (1 + START.kick), 5);
+    p.gsp = START.until + 1;
+    const before = p.gsp;
+    p.update(map, input({ right: true }));
+    expect(p.gsp - before).toBeCloseTo(PHYS.acc, 5);
+  });
+
+  it('coasts to a stop from a run in about a second, not two', () => {
+    const map = makeFlatMap(120);
+    const p = spawnOnGround(map, 100, 240);
+    p.gsp = PHYS.top;
+    let f = 0;
+    while (p.gsp > 0 && f < 300) {
+      p.update(map, NO_INPUT);
+      f++;
+    }
+    expect(f).toBeLessThanOrEqual(70);
+    expect(f).toBeGreaterThan(40);
+  });
+
+  it('turns round in the air twice as hard as it pushes on', () => {
+    const map = makeFlatMap(120, 60, 900);
+    const fall = (xsp: number, hands: Parameters<typeof input>[0]) => {
+      const p = new Player(600, 100);
+      p.xsp = xsp;
+      p.update(map, input(hands));
+      return p.xsp - xsp;
+    };
+    expect(fall(3, { right: true })).toBeCloseTo(PHYS.air, 5); // with the flight: the guide's push
+    expect(fall(3, { left: true })).toBeCloseTo(-PHYS.airTurn, 5); // against it
+    expect(PHYS.airTurn).toBeGreaterThanOrEqual(PHYS.air * 2);
+    // And a flight faster than a run is still not cut down for holding forward.
+    expect(fall(9, { right: true })).toBe(0);
+  });
+
+  it('gives a jump from rest the same kick, and a fall off a ledge none', () => {
+    const map = makeFlatMap(120);
+    const jumper = spawnOnGround(map, 600, 240);
+    jumper.update(map, input({ jump: true, jumpPressed: true }));
+    jumper.update(map, input({ right: true, jump: true }));
+    expect(jumper.xsp).toBeCloseTo(PHYS.air * (1 + START.kick), 5);
+    const faller = new Player(600, 100);
+    faller.update(map, input({ right: true }));
+    expect(faller.xsp).toBeCloseTo(PHYS.air, 5);
+  });
+
+  it('finds no kick on a 45° face: speed is brought to a hill, not found on it', () => {
+    const map = makeFlatMap(80);
+    for (let i = 0; i < 8; i++) {
+      map.set(45 + i, 14 - i, 2);
+      fillRect(map, 45 + i, 15 - i, 45 + i, 14);
+    }
+    const p = spawnOnGround(map, 47 * T + 8, 12 * T);
+    expect(p.angle).toBeCloseTo(45, 0);
+    p.gsp = 0;
+    p.update(map, input({ right: true }));
+    expect(p.gsp).toBeLessThan(PHYS.acc); // the plain push, less the hill
+    expect(p.gsp).toBeGreaterThan(0); // ...which the legs still beat (CLIMB)
   });
 });
 
@@ -93,7 +178,7 @@ describe('slopes', () => {
       fillRect(map, 45 + i, 15 - i, 45 + i, 14);
     }
     const p = spawnOnGround(map, 100, 240);
-    run(map, p, 130, input({ right: true }));
+    run(map, p, 90, input({ right: true }));
     expect(p.gsp).toBeCloseTo(PHYS.top, 1);
     const speedBeforeClimb = p.gsp;
     let climbed = false;
@@ -108,7 +193,7 @@ describe('slopes', () => {
 
 describe('rolling & spin dash', () => {
   it('rolls when pressing down while moving', () => {
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 100, 240);
     run(map, p, 140, input({ right: true }));
     p.update(map, input({ right: true, down: true }));
@@ -135,7 +220,7 @@ describe('rolling & spin dash', () => {
 
   it('builds speed while rolling when the direction of travel is held', () => {
     // Raw SPG has no rolling acceleration: curling up slow left you stuck slow.
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 100, 240);
     run(map, p, 20, input({ right: true }));
     p.update(map, input({ right: true, down: true }));
@@ -162,6 +247,24 @@ describe('rolling & spin dash', () => {
     }
     expect(p.rolling).toBe(false);
     expect(seen).toContain('unroll');
+  });
+
+  it('a ball that runs out of speed on a 45° face gets up instead of freezing there', () => {
+    // Too steep to uncurl, too shallow to slide off, no control in a roll:
+    // it used to sit on the kicker for ever with forward held.
+    const map = makeFlatMap(80);
+    for (let i = 0; i < 8; i++) {
+      map.set(45 + i, 14 - i, 2);
+      fillRect(map, 45 + i, 15 - i, 45 + i, 14);
+    }
+    fillRect(map, 53, 7, 79, 14); // plateau flush with the top of the face
+    const p = spawnOnGround(map, 40 * T, 240);
+    run(map, p, 30, input({ right: true }));
+    p.update(map, input({ right: true, down: true }));
+    expect(p.rolling).toBe(true);
+    run(map, p, 600, input({ right: true }));
+    expect(p.rolling).toBe(false);
+    expect(p.x).toBeGreaterThan(53 * T); // and walked on over the top
   });
 
   it('ploughs through a gentle rise instead of being stalled by it', () => {
@@ -374,10 +477,10 @@ describe('look up / look down camera', () => {
     const cam = new Camera(640, 360);
     cam.snapTo(400, 500, 4000, 2000);
     const base = cam.viewY;
-    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, -1);
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 0, 4000, 2000, -1);
     expect(cam.viewY).toBeLessThan(base); // looking up = view moves up
     expect(base - cam.viewY).toBeCloseTo(cam.lookDist, 0);
-    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, 0);
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 0, 4000, 2000, 0);
     expect(cam.viewY).toBeCloseTo(base, 0);
   });
 
@@ -385,18 +488,18 @@ describe('look up / look down camera', () => {
     const cam = new Camera(640, 360);
     cam.snapTo(400, 500, 4000, 2000);
     const base = cam.viewY;
-    cam.update(400, 500, 0, 1, 4000, 2000, 1);
+    cam.update(400, 500, 0, 0, 4000, 2000, 1);
     const afterOne = cam.viewY - base;
     expect(afterOne).toBeGreaterThan(0);
     expect(afterOne).toBeLessThanOrEqual(cam.lookSpeed + 1e-6); // eased, not a snap
-    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 1, 4000, 2000, 1);
+    for (let i = 0; i < 60; i++) cam.update(400, 500, 0, 0, 4000, 2000, 1);
     expect(cam.viewY - base).toBeCloseTo(cam.lookDist, 0);
   });
 
   it('never scrolls the glance outside the level', () => {
     const cam = new Camera(640, 360);
     cam.snapTo(320, 180, 640, 360); // level exactly one screen: no room to pan
-    for (let i = 0; i < 60; i++) cam.update(320, 180, 0, 1, 640, 360, 1);
+    for (let i = 0; i < 60; i++) cam.update(320, 180, 0, 0, 640, 360, 1);
     expect(cam.viewY).toBe(0);
   });
 });

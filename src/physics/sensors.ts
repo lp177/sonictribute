@@ -163,18 +163,51 @@ function castWest(map: TileMap, px: number, py: number, layer: number): SensorHi
   return { depth, angle: norm360(angle), surface, oneWay: tile.oneWay };
 }
 
+/**
+ * A neighbouring column this far (px) above or below the one under the sensor
+ * is not the same surface: it is the lip of a ledge, the rim of a shaft, the
+ * end of a ramp. The steepest slope a height array carries is about 2 px per
+ * column, so 4 is unmistakably an edge.
+ */
+const EDGE = 4;
+
+/**
+ * The slope across three samples, one either side of the sensor's own. When
+ * a neighbour lies across an EDGE the slope is carried on from the side that
+ * still exists — a ramp keeps its angle right up to its lip, level ground
+ * stays level right up to the rim.
+ *
+ * Reading straight across the edge instead (16 px of ground, then 0) gave the
+ * last pixel column of every ledge an "angle" of 83 degrees. A hero whose one
+ * remaining foot sensor stood on that column was switched into wall mode and
+ * ran down the cliff face glued to it — or round the lip of a shaft and along
+ * its ceiling.
+ */
+function slopeAcross(prev: number, here: number, next: number): number {
+  const edgeP = Math.abs(prev - here) > EDGE;
+  const edgeN = Math.abs(next - here) > EDGE;
+  if (edgeP && edgeN) return 0;
+  if (edgeN) return deg(Math.atan2(2 * (here - prev), 2));
+  if (edgeP) return deg(Math.atan2(2 * (next - here), 2));
+  return deg(Math.atan2(next - prev, 2));
+}
+
 /** Angle in degrees from a height array (positive = climbing to the right). */
 function slopeAngle(map: TileMap, tx: number, ty: number, c: number, kind: 'heights' | 'heightsTop', layer: number): number {
-  const prev = map.sampleHeights(tx, ty, c - 1, kind, layer);
-  const next = map.sampleHeights(tx, ty, c + 1, kind, layer);
-  return deg(Math.atan2(next - prev, 2));
+  return slopeAcross(
+    map.sampleHeights(tx, ty, c - 1, kind, layer),
+    map.sampleHeights(tx, ty, c, kind, layer),
+    map.sampleHeights(tx, ty, c + 1, kind, layer),
+  );
 }
 
 /** Angle delta from a width array (positive = surface receding going down). */
 function slopeAngleW(map: TileMap, tx: number, ty: number, r: number, kind: 'widths' | 'widthsLeft', layer: number): number {
-  const prev = map.sampleWidths(tx, ty, r - 1, kind, layer);
-  const next = map.sampleWidths(tx, ty, r + 1, kind, layer);
-  return deg(Math.atan2(next - prev, 2));
+  return slopeAcross(
+    map.sampleWidths(tx, ty, r - 1, kind, layer),
+    map.sampleWidths(tx, ty, r, kind, layer),
+    map.sampleWidths(tx, ty, r + 1, kind, layer),
+  );
 }
 
 export function norm360(a: number): number {

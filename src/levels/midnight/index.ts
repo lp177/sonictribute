@@ -13,11 +13,13 @@ import { midnight11 } from './act11.ts';
 
 /**
  * BIOME 1 — OTHERWHILE FOUNDRY, the endless midnight shift. Eleven acts of
- * gear-theme foundry: dash pads and Mag-Board skyways, steel stalactites
- * under the gantry roofs, press machinery (swing balls, spike traps, hoppers),
- * ore carts, and late-biome shift-change catwalks (phase platforms). The
- * Piston Press guards act 6 (mid-shift inspection) and act 11 (the last
- * bell, behind a blind quarter-pipe drop into the arena approach).
+ * gear-theme foundry, built vertical: slag chutes with a cart or a skyhook
+ * rail over them, needle roofs (steel stalactites) that double as the high
+ * road, press halls a kicker carries you over, the coolant galleries
+ * underneath, and late-biome shift-change catwalks of hard light. The
+ * Mag-Board rides acts 3, 7, 10 and 11. The Piston Press guards act 6 (a
+ * descent into the pit) and act 11 (the climb to the last bell). Biome
+ * pieces live in `pieces.ts`.
  */
 export const midnightActs: LevelDef[] = [
   midnight01,

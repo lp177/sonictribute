@@ -30,7 +30,7 @@ describe('Looking up and crouching', () => {
   });
 
   it('never looks around while running', () => {
-    const map = makeFlatMap();
+    const map = makeFlatMap(80);
     const p = spawnOnGround(map, 200, 240);
     run(map, p, 120, input({ right: true }));
     p.update(map, input({ right: true, up: true }));
@@ -70,7 +70,7 @@ describe('The look camera returns to neutral', () => {
   function settled(look: -1 | 0 | 1, frames: number) {
     const cam = new Camera(W, H);
     cam.snapTo(1000, 900, LEVEL_W, LEVEL_H);
-    for (let i = 0; i < frames; i++) cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, look);
+    for (let i = 0; i < frames; i++) cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, look);
     return cam;
   }
 
@@ -78,7 +78,7 @@ describe('The look camera returns to neutral', () => {
     const cam = settled(-1, 120);
     expect(cam.lookOff).toBeLessThan(-50);
     const panned = cam.viewY;
-    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, 0);
+    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, 0);
     expect(cam.lookOff).toBe(0);
     expect(cam.viewY).toBe(cam.y);
     expect(cam.viewY).not.toBe(panned);
@@ -87,7 +87,7 @@ describe('The look camera returns to neutral', () => {
   it('pans down while down is held, and all the way back on release', () => {
     const cam = settled(1, 120);
     expect(cam.lookOff).toBeGreaterThan(50);
-    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, 0);
+    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, 0);
     expect(cam.lookOff).toBe(0);
     expect(cam.viewY).toBe(cam.y);
   });
@@ -95,7 +95,7 @@ describe('The look camera returns to neutral', () => {
   it('eases rather than snapping, in both directions', () => {
     const cam = new Camera(W, H);
     cam.snapTo(1000, 900, LEVEL_W, LEVEL_H);
-    cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, -1);
+    cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, -1);
     const afterOne = Math.abs(cam.lookOff);
     expect(afterOne).toBeGreaterThan(0);
     expect(afterOne).toBeLessThan(20); // a glide, not a jump cut
@@ -104,9 +104,9 @@ describe('The look camera returns to neutral', () => {
   it('recentres even if the key is released mid-pan', () => {
     const cam = new Camera(W, H);
     cam.snapTo(1000, 900, LEVEL_W, LEVEL_H);
-    for (let i = 0; i < 8; i++) cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, -1);
+    for (let i = 0; i < 8; i++) cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, -1);
     expect(cam.lookOff).not.toBe(0);
-    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 1, LEVEL_W, LEVEL_H, 0);
+    for (let i = 0; i < 200; i++) cam.update(1000, 900, 0, 0, LEVEL_W, LEVEL_H, 0);
     expect(cam.lookOff).toBe(0);
   });
 });

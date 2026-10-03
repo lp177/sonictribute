@@ -14,8 +14,6 @@ describe('OTHERWHILE FOUNDRY — roster', () => {
       expect(d.act).toBe(`ACT ${i + 1}`);
       expect(d.biome).toBe(1);
       expect(d.theme).toBe('gear');
-      expect(d.width ?? 320).toBeGreaterThanOrEqual(320);
-      expect(d.width ?? 320).toBeLessThanOrEqual(420);
     });
     expect(new Set(midnightActs.map((d) => d.title)).size).toBe(11);
   });

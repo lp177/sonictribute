@@ -1,28 +1,61 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { cartCanyon, hazardGauntlet, railCascade, runway, signpostFinish, sneakUnder, stalactiteGallery } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  cartCanyon,
-  secretPocket,
-  sneakUnder,
-  hazardGauntlet,
-  stalactiteGallery,
-  leapOfFaith,
-  signpostFinish,
-  canopyRun,
-  skySteps,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  longJump,
+  plunge,
+  undercroft,
+  springCliff,
+  stairClimb,
+  tubeShot,
+  highRoad,
+  droneBridge,
+  lowRoad,
+  cave,
+  groundRow,
+} from '../sections.ts';
+
 
 /**
  * DUSKMERE COAST — ACT 8 — "Sea-Cave Galleries"
  *
- * The minecart act, and now the galleries live up to the name: the very
- * first stretch is a cart canyon (each act opens differently — this one
- * opens on its toy), and beneath the whole shore runs a true sea-cave
- * corridor. It is hand-carved rather than stamped because the cart canyons'
- * consolation floors (row 30) must survive as shelves in its ceiling — the
- * second canyon's floor even has a carved door straight down into the cave.
- * The sky alternates catwalks and stepped platforms over the cave roofs.
+ * The act under the coast. The middle road itself goes into the rock here —
+ * twice through a bluff, in the dark — and under much of what stays in
+ * daylight there is a gallery: two headland caves, two long cave roads, a
+ * pocket in a clifftop, the floor of the cart canyon. Three of the five
+ * crystals are down there. The mine cart is the galleries' toy, and the
+ * hanging spikes are their roof: both appear once, alone.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   the apron tips downhill
+ *   tube 1    straight into the first bluff, and out over the bay.
+ *   headland  the first fork: over the hill or into the cave under it
+ *             (crystal, secret room).
+ *   knot      THE CART: ride it over the canyon and bail before the buffer.
+ *                                                            -- checkpoint
+ *   plunge    down to the low shelf and over the sump,
+ *   cliff     and sprung back up; a pocket in the clifftop (crystal) that
+ *             turns out to be the mouth of the first cave road.
+ *   knot      the roofed gallery: hanging spikes that fall behind a runner.
+ *             The first cave road beneath it, with its rail. -- checkpoint
+ *   loop      on its hill,
+ *   rails     a cascade of grind rails down the far side,
+ *   valley    into the kicker valley (shield on the upper ledge).
+ *   knot      hoppers and clocked traps; the second cave road beneath
+ *             (crystal, secret room).                         -- checkpoint
+ *   headland 2 the deep cave: clocked spikes, a secret room.
+ *   terraces  up the last bluff,
+ *   tube 2    the signature: the long tube, and the mouth of the sea cave.
+ *             The crystal hangs at the top of the fastest arc — only a roll
+ *             through the whole tunnel reaches it. Then the strand, and
+ *             the signpost.
+ *
+ * ROADS: the low road is the star — both headland caves, both cave roads,
+ * the canyon floor. The middle road is the ground and the two tunnels; the
+ * high road is the catwalks over the knots and the bluff roofs.
  */
 export const act08: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -30,97 +63,64 @@ export const act08: LevelDef = {
   title: 'Sea-Cave Galleries',
   biome: 0,
   theme: 'verdant',
-  width: 380,
+  width: 688,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 12, rings: false }); // 0–11: start apron
-    b.start(4, 24);
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 7 }); // 12–31: the cart, immediately
-    c = runway(b, c.endX, c.endRow, { len: 8, dashPad: true }); // 32–39
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 40–69
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 70–77 (shaft at 74)
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 4 }); // 78–93
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 9 }); // 94–113: wider canyon (cave door in its floor)
-    c = runway(b, c.endX, c.endRow, { len: 8, enemy: true }); // 114–121
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 122–133, secret 1 (opens into the cave)
+    let c = rollingStart(b, 0, 24, { drop: 4 }); // down to row 28
+    const t1 = c.endX;
+    c = tubeShot(b, c.endX, c.endRow, { drop: 8, runout: 32, top: 'rings10' });
+    const h1 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 12, down: 8, prize: 'crystal', hazards: 1, secret: true }); // CRYSTAL 1 (cave), secret 1
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 9 }); // the galleries' toy, alone
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
+    c = plunge(b, c.endX, c.endRow, { drop: 6, runout: 2 });
+    c = longJump(b, c.endX, c.endRow, { gap: 14, fall: 2, pit: 'trap' }); // the sump
+    c = springCliff(b, c.endX, c.endRow, { rise: 14, top: 4 });
+    c = sneakUnder(b, c.endX, c.endRow, { crystal: true }); // CRYSTAL 2 (clifftop pocket)
+    const s0 = c.endX;
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 32, count: 5 });
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
+    const s1 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 2, roof: 'rings10' });
+    c = railCascade(b, c.endX, c.endRow, { steps: 3, dropEach: 2 });
+    c = launchValley(b, c.endX, c.endRow, { depth: 8, out: 10, crabs: 2, prize: 'shield' });
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 30, density: 2, period: 150 });
+    b.hopper(g0 + 15, c.endRow); // a second hopper: the dark is theirs too
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
+    const g1 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 10, down: 10, prize: 'shoes', hazards: 2, secret: true }); // secret 3
+    c = stairClimb(b, c.endX, c.endRow, { steps: 3, rise: 4, tread: 8 }); // steps, not a spring: a spring's arc lands on the bluff's roof and misses the tunnel
+    const t2 = c.endX;
+    c = tubeShot(b, c.endX, c.endRow, { drop: 10, runout: 40, top: 'shield' });
+    b.crystal(t2 + 33 + 11, c.endRow - 12); // CRYSTAL 5 — the top of the rolled arc out of the mouth; a run passes a row under it
+    signpostFinish(b, c.endX, c.endRow, { len: 26 });
 
-    /* -------------------- The grand gallery (134–173) --------------------
-     * A roofed cavern with a long cart track over a deep bay. The roof drips
-     * stalactites armed by the passing rider; the bay floor below carries a
-     * monitor and a spring lift at the far wall. The track's buffer stands
-     * on solid far ground, so the crash always sets the rider down on floor.
+    /* ============================== HIGH ROAD ==============================
+     * Over the rooflines. The bluffs' own tops are part of it: a full jump
+     * up from the road, or a step off the bridges.
      */
-    b.floor(134, 139, 24); // boarding shelf, cart waiting
-    b.carve(140, 18, 167, 26); // the bay (floor row 27 keeps it in the ground band)
-    b.floor(140, 167, 27);
-    b.monitor(143, 27, 'rings10');
-    b.spring(166, 27, 12); // the lift out, right at the far wall
-    b.spring(167, 27, 12);
-    b.floor(168, 173, 24); // far side, carrying the buffer
-    b.slab(142, 165, 14, 2); // the cave roof
-    b.stalactite(146, 15);
-    b.stalactite(151, 15);
-    b.stalactite(156, 15);
-    b.stalactite(161, 15);
-    b.cartRide(137, 24, 169, 24);
-    b.ringsH(142, 165, 20); // the flight line for bailers
-    b.crystal(153, 22); // CRYSTAL 1 — over the bay, jump from the cart
-    b.drone(153, 17, 4); // patrols just under the roof
-    c = { endX: 174, endRow: 24 };
+    droneBridge(b, t1 - 10, { drones: 3, lift: 12, prize: 'rings10', onRamp: true }); // from over the apron onto the first bluff
+    highRoad(b, h1 - 12, h1 + 30, { droneEvery: 3, monitors: ['rings10'], onRamp: true }); // over the bay's landing, up the headland
+    highRoad(b, s0 - 8, s1 + 44, { lift: 12, crumbleEvery: 3, monitors: ['shield'], onRamp: true }); // over the roofed gallery and the loop (its roof is a drop from here)
+    highRoad(b, g0 - 10, g1 + 30, { droneEvery: 2, crystal: true, monitors: ['rings10'], onRamp: true }); // CRYSTAL 4 — over the last knot
+    droneBridge(b, t2 - 16, { drones: 3, lift: 8, prize: 'rings10', onRamp: true }); // off the last clifftop onto the bluff
 
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 174–181 (shaft at 178)
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 }); // 182–201
-    c = secretPocket(b, c.endX, c.endRow); // 202–211, CRYSTAL 2 + secret 2
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 140 }); // 212–227
-    c = stalactiteGallery(b, c.endX, c.endRow); // 228–241
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 20 }); // 242–269: blind drop to row 27
-    b.crystal(256, 13); // CRYSTAL 3 — riding the leap's ring arc
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 8 }); // 270–283, back to 24 (shaft at 278)
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shield' }); // 284–293, secret 3
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 294–323
-    c = runway(b, c.endX, c.endRow, { len: 22 }); // 324–345 (shaft at 338)
-    signpostFinish(b, c.endX, c.endRow, { len: 34 }); // 346–379
-
-    // Sky overlay over the rooflines: catwalks and stepped platforms taking
-    // turns, with the trapped set past the grand gallery.
-    const s1 = canopyRun(b, 70, 8, { len: 52 }); // 70–121
-    const k1 = skySteps(b, s1.endX, 9, { steps: 4, drone: true, trap: false }); // 122–152
-    const s2 = canopyRun(b, k1.endX, 8, { len: 78, crystal: true }); // 153–230, CRYSTAL 5 (sky)
-    const k2 = skySteps(b, s2.endX, 9, { steps: 5, trap: true, drone: false }); // 231–268
-    canopyRun(b, k2.endX, 8, { len: 52 }); // 269–320
-
-    /* ============================ UNDER ROUTE ============================
-     * The sea-cave proper, hand-carved LAST so nothing back-fills it. The
-     * ceiling is row 30 except beneath the two later cart canyons, where
-     * their consolation floors (row 30) survive as one-tile shelves and the
-     * corridor ducks a row lower. Entered by light-well shafts on the plain
-     * runways, by the sneak-under, and through the door in canyon 2's floor.
+    /* =============================== LOW ROAD ==============================
+     * The two cave roads. (No crab under the rail: a knock-back lands the
+     * walker on it, and the rail carries him the wrong way.)
      */
-    b.carve(28, 30, 98, 33);
-    b.carve(99, 31, 107, 33); // duck under canyon 2's floor
-    b.carve(108, 30, 186, 33);
-    b.carve(187, 31, 194, 33); // duck under canyon 3's floor
-    b.carve(195, 30, 343, 33);
-    b.floor(28, 343, 34);
-    // Light-well shafts (3 wide, carved from row 18 so they read from the
-    // surface), each with its spring lift back out.
-    for (const sx of [74, 178, 278, 338]) {
-      b.carve(sx, 18, sx + 2, 33);
-      b.spring(sx, 34, 13);
-      b.spring(sx + 1, 34, 13);
-    }
-    // The door in canyon 2's floor: fall past the consolation ledge into the
-    // cave; springs climb back to the ledge's own escape.
-    b.carve(102, 30, 103, 33);
-    b.spring(102, 34, 13);
-    b.spring(103, 34, 13);
-    // The cave pays its way: rings, a patrol, teeth, a grind line, and the
-    // under-lane crystal deep inside.
-    b.ringsH(44, 54, 32);
-    b.ringsH(210, 220, 32);
-    b.enemy(150, 34, 4);
-    b.spikes(160, 161, 34);
-    b.spikeTrap(250, 34, 150, 40);
-    b.rail(216, 31, 240, 32); // sets the rider down on open floor at 240
-    b.crystal(196, 32); // CRYSTAL 4 — past canyon 3's underside
+    // The first is cut by hand, so that its mouth can be the clifftop pocket:
+    // what looked like a closet goes on, under the roofed gallery, to a spring
+    // lift at its far end.
+    const fl = groundRow(b, s1 - 1) + 10;
+    cave(b, s0 - 3, s1 - 1, fl);
+    b.ringsH(s0 + 4, s0 + 12, fl - 2);
+    b.rail(s0 + 14, fl - 3, s0 + 26, fl - 2);
+    b.monitor(s1 - 8, fl, 'rings10');
+    b.carve(s1 - 3, fl - 10, s1 - 1, fl - 1);
+    b.spring(s1 - 2, fl, 13);
+    b.spring(s1 - 1, fl, 13);
+    lowRoad(b, g0 + 5, g1 - 1, { shafts: [g0 + 5], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 3, secret 2
   },
 };

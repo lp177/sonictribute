@@ -1,32 +1,56 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { hazardGauntlet, railCascade, rollersRun, runway, signpostFinish, stackedChoice } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  stackedChoice,
-  corridorLoop,
-  secretPocket,
-  sneakUnder,
-  hazardGauntlet,
-  stalactiteGallery,
-  phaseCrossing,
-  signpostFinish,
-  canopyRun,
-  skySteps,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  longJump,
+  plunge,
+  undercroft,
+  tubeShot,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
+import { crumbleSpan, thermalCliff } from './pieces.ts';
 
 /**
  * DUSKMERE COAST — ACT 3 — "Undertow Gallery"
  *
- * The undertow is the fast lane, and now it truly runs the act: the original
- * dash-padded gallery under the back half is extended west beneath the loop
- * and the phase crossing, so the under route is one continuous sea-cave from
- * the stacked shelves to the deep secret — with a grind line, its own rings
- * and light-well shafts on the plain runways. The act opens on the stacked
- * choice (no twin-runway apron), and the sky swaps its uniform catwalks for
- * catwalk/step alternation with a patrolling drone.
+ * The act that only goes one way: down. It starts high, and every release
+ * leaves it lower than the last, until the road runs out at the waterline —
+ * the undertow has you. And under each stretch of level ground there is a
+ * sea-cave gallery: the low road is the fast one here, two of the galleries
+ * carry a grind line, and three of the five crystals are below. The
+ * pendulum from act 1 comes back twice — once alone, to roll under, then as
+ * a pair in counterpoint over a crumbling shelf.
  *
- * Build order: ground chain first, then the gallery is CARVED, then the sky
- * overlay — carving last is what keeps the gallery from being back-filled.
+ * BEATS (knot = tension, the rest is release):
+ *   opening   the apron tips downhill; one swell before the pull.
+ *   headland  the first fork: over the hill, or down the shaft at its foot
+ *             into the first sea cave.
+ *   knot      one pendulum over a long flat — roll and it passes over you.
+ *             Gallery 1 runs beneath, with the first rail.   -- checkpoint
+ *   plunge    down the cliff, over planking that will not wait, into
+ *   valley    the kicker valley (crystal on the upper ledge, for a roll).
+ *   knot      a guarded road, a sprung shelf; gallery 2 beneath (crystal,
+ *             secret room, the second rail).                  -- checkpoint
+ *   loop      on its hill,
+ *   rails     and a cascade of grind rails down the far side,
+ *   leap      whose speed clears the sump at the bottom.
+ *   headland 2 the deep cave: crystal, secret room, clocked spikes.
+ *   knot      the pendulum pair over a crumbling shelf; gallery 3 beneath
+ *             (crystal, secret room).                         -- checkpoint
+ *   cliff     the one mercy — the sea wind, back up the face — which only
+ *             loads
+ *   tube      the signature: through the bluff in the dark and out over the
+ *             bay (crystal on the bluff's roof, a full jump over the mouth),
+ *   home      and the last valley, down to the water.
+ *
+ * ROADS: the middle road is the ground, sinking from row 22 to row 46. The
+ * low road is the star — two headland caves and three galleries. The high
+ * road is the catwalks over the knots, ending on the tube's bluff.
  */
 export const act03: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -34,88 +58,63 @@ export const act03: LevelDef = {
   title: 'Undertow Gallery',
   biome: 0,
   theme: 'verdant',
-  width: 350,
+  width: 726,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    // Ground chain.
-    let c = runway(b, 0, 24, { len: 12, rings: false }); // 0–11: start apron
-    b.start(4, 24);
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 12–33, CRYSTAL 1 (sky shelf)
-    c = runway(b, c.endX, c.endRow, { len: 8, dashPad: true }); // 34–41
-    c = corridorLoop(b, c.endX, c.endRow); // 42–69, loop centre 55
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 70–77
-    c = stalactiteGallery(b, c.endX, c.endRow); // 78–91: the hanging spikes debut
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 170 }); // 92–109
-    c = runway(b, c.endX, c.endRow, { len: 8 }); // 110–117 (shaft at 112)
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 118–147
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 148–159, secret 1 (opens into the gallery)
-    c = secretPocket(b, c.endX, c.endRow); // 160–169, CRYSTAL 2 + secret 2
-    c = runway(b, c.endX, c.endRow, { len: 10, checkpoint: true }); // 170–179
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 1, period: 160 }); // 180–195
+    let c = rollingStart(b, 0, 22, { drop: 4 }); // down to row 26
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 1, rise: 2, crown: 6, depth: 2, basin: 6 }); // the swell before the pull
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 14, down: 8, prize: 'rings10', hazards: 1 });
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 42, density: 1, period: 160 });
+    b.swingBall(g0 + 24, c.endRow - 11, 8, 160, 0); // one pendulum, alone: standing it hits, rolling it clears
+    const g1 = c.endX;
+    b.checkpoint(g1 - 2, c.endRow);
+    c = plunge(b, c.endX, c.endRow, { drop: 8, runout: 2 });
+    c = crumbleSpan(b, c.endX, c.endRow, { planks: 4, crab: true });
+    c = launchValley(b, c.endX, c.endRow, { depth: 10, out: 12, crabs: 2, prize: 'crystal' }); // CRYSTAL 1 (upper ledge)
+    const s0 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 38 });
+    const s1 = c.endX;
+    b.checkpoint(s1 - 2, c.endRow);
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 4, roof: 'shield' });
+    c = railCascade(b, c.endX, c.endRow, { steps: 2, dropEach: 3 });
+    c = longJump(b, c.endX, c.endRow, { gap: 14, fall: 2 }); // the rails' speed is what clears it
+    const h2 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 12, down: 8, prize: 'crystal', hazards: 2, secret: true }); // CRYSTAL 3 (deep cave), secret 2
+    // The pendulum pair: counter-phased, a crumbling shelf between them for
+    // whoever would rather jump the gap in the rhythm than read it.
+    const p0 = c.endX;
+    c = runway(b, c.endX, c.endRow, { len: 38, rings: false });
+    b.swingBall(p0 + 8, c.endRow - 11, 8, 150, 0);
+    b.swingBall(p0 + 25, c.endRow - 11, 8, 150, 75);
+    b.crumble(p0 + 15, p0 + 18, c.endRow - 4);
+    b.ringsH(p0 + 15, p0 + 18, c.endRow - 6);
+    b.ringsH(p0 + 3, p0 + 10, c.endRow - 2);
+    const p1 = c.endX;
+    b.checkpoint(p1 - 2, c.endRow);
+    c = thermalCliff(b, c.endX, c.endRow, { rise: 12, top: 6, prize: 'rings10' }); // the wind, not a spring: a spring's arc lands on the bluff's roof and misses the tunnel
+    const t0 = c.endX;
+    c = tubeShot(b, c.endX, c.endRow, { drop: 8, runout: 36, top: 'crystal' }); // CRYSTAL 4 (bluff roof)
+    c = launchValley(b, c.endX, c.endRow, { depth: 8, out: 4, crabs: 1, prize: 'shoes' });
+    signpostFinish(b, c.endX, c.endRow, { len: 26 });
 
-    // Pendulum stretch (196–215).
-    b.floor(196, 215, 24);
-    b.swingBall(201, 14, 9, 150, 0);
-    b.crumble(205, 207, 20);
-    b.ringsH(205, 207, 18);
-    b.swingBall(210, 14, 9, 150, 75);
-    b.ringsH(197, 204, 21);
-    c = { endX: 216, endRow: 24 };
-
-    c = runway(b, c.endX, c.endRow, { len: 12, enemy: true }); // 216–227
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 228–257
-    c = runway(b, c.endX, c.endRow, { len: 12 }); // 258–269
-    c = runway(b, c.endX, c.endRow, { len: 22 }); // 270–291
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 292–321
-    c = runway(b, c.endX, c.endRow, { len: 12, rings: false }); // 322–333
-    signpostFinish(b, c.endX, c.endRow, { len: 16 }); // 334–349
-
-    /* ------------------------ THE UNDERTOW (carved) ------------------------
-     * The classic back-half gallery, with its dash pads and deep secret …
+    /* ============================== HIGH ROAD ==============================
+     * Catwalks over the knots, for whoever kept the height a kicker or a
+     * shelf gave them. The last stretch sets you down on the tube's bluff.
      */
-    b.carve(175, 28, 280, 33);
-    b.floor(175, 280, 34);
-    b.carve(176, 24, 178, 33); // drop shaft, through the checkpoint runway
-    b.carve(262, 24, 264, 33); // drop shaft, the exit end
-    b.dashPad(185, 34, 1, 11);
-    b.dashPad(210, 34, 1, 11);
-    b.dashPad(235, 34, 1, 11);
-    b.ringsH(190, 206, 31);
-    b.ringsH(220, 232, 31);
-    b.monitor(200, 34, 'rings10');
-    b.crystal(220, 31); // CRYSTAL 3 — the undertow prize
-    b.enemy(230, 34, 4);
-    b.spring(176, 34, 11);
-    b.spring(177, 34, 11);
-    b.spring(262, 34, 11);
-    b.spring(263, 34, 11);
-    // Deep secret: a low crawl off the far end of the gallery.
-    b.carve(281, 31, 288, 33);
-    b.floor(281, 288, 34);
-    b.secret(281, 31, 288, 33);
-    b.crystal(285, 32); // CRYSTAL 4 — deep secret
-    b.ringBox(283, 32, 2, 1);
+    highRoad(b, g0 - 4, g1 + 2, { droneEvery: 2, monitors: ['rings10', 'shield'], onRamp: true }); // over the first pendulum
+    highRoad(b, s1 + 2, h2 - 34, { crumbleEvery: 3, monitors: ['rings10'], onRamp: true }); // over the loop (its roof is a drop from here) and the rails
+    highRoad(b, p0 - 6, p1 + 2, { droneEvery: 3, onRamp: true }); // over the pendulum pair
+    droneBridge(b, t0 - 22, { drones: 3, lift: 6, prize: 'rings10', onRamp: true }); // off the clifftop, onto the bluff
 
-    /* … now extended west under the loop and the phase crossing, so the
-     * under route spans the act instead of its last third. The extension's
-     * ceiling is one row lower (carve 30–33) so the phase pit's slow lower
-     * floor at row 29 survives as a shelf above the cave. */
-    b.carve(52, 30, 174, 33);
-    b.floor(52, 174, 34);
-    b.carve(112, 18, 114, 33); // light-well shaft on the plain runway at 110–117
-    b.spring(112, 34, 13);
-    b.spring(113, 34, 13);
-    b.ringsH(60, 70, 32);
-    b.enemy(140, 34, 3);
-    // The extension's grind line, mirroring the biome's underworld rails; it
-    // ends over open floor, clear of the gallery's spikes and pads.
-    b.rail(120, 31, 144, 32);
-
-    // Sky overlay: catwalks joined to the stacked shelves, then staggered
-    // steps under a drone, more catwalks, a trapped step set, catwalks out.
-    const s1 = canopyRun(b, 36, 10, { len: 52, crystal: true }); // 36–87, CRYSTAL 5 (sky)
-    const k1 = skySteps(b, s1.endX, 10, { steps: 5, drone: true, trap: false }); // 88–125
-    const s2 = canopyRun(b, k1.endX, 10, { len: 78 }); // 126–203
-    const k2 = skySteps(b, s2.endX, 10, { steps: 4, trap: true, drone: false }); // 204–234
-    canopyRun(b, k2.endX, 10, { len: 52 }); // 235–286
+    /* =============================== LOW ROAD ==============================
+     * The undertow: a gallery under every knot, each with its grind line.
+     * In by the shaft at its head, out by the springs past its end.
+     */
+    // (No crabs under a rail: a knock-back lands the walker on it, and the
+    // rail carries him the wrong way.)
+    lowRoad(b, g0 + 4, g1 - 1, { shafts: [g0 + 6], crabs: 0, rail: true, prize: 'rings10' });
+    lowRoad(b, s0 + 3, s1 - 1, { shafts: [s0 + 8], crabs: 0, rail: true, prize: 'crystal', secret: true }); // CRYSTAL 2, secret 1
+    lowRoad(b, p0 + 1, p1 - 4, { shafts: [p0 + 2], crabs: 0, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 5, secret 3
   },
 };

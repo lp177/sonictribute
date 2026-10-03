@@ -1,34 +1,56 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { hazardGauntlet, runway, secretPocket, signpostFinish } from '../motifs.ts';
 import {
-  runway,
-  stackedChoice,
-  corridorLoop,
-  secretPocket,
-  sneakUnder,
-  hazardGauntlet,
-  stalactiteGallery,
-  phaseCrossing,
-  quarterPipeBowl,
-  railCascade,
-  leapOfFaith,
-  signpostFinish,
-  canopyRun,
-  skySteps,
-  glideRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  plunge,
+  undercroft,
+  stairClimb,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
+import { crumbleSpan, gliderBay, reefBowl, thermalCliff, tideFlats } from './pieces.ts';
 
 /**
  * DUSKMERE COAST — ACT 10 — "Ebb-Light Ascent"
  *
- * The last ordinary act before the seawall, and the hardest: hazard clocks
- * run fast (140 frames), the pendulum alley swings in counterpoint over a
- * crumbling shelf, and two phase crossings bracket the stalactite roof. The
- * sky is the mercy route with teeth of its own now — the early launch ramp
- * (probed by tests/skylanes.test.ts, so the opener stays) boards catwalks
- * that hand off to a glide straight over the pendulum alley, its second
- * thermal blowing up through the swing-balls' reach. The sea-cave gallery
- * below spans nearly the whole ascent, grind line included.
+ * The last ordinary act, and the hardest. Where act 7 climbed in steps, this
+ * one climbs like a tide going out: two rows up, one back — every peak is
+ * followed by an ebb that hands some of the height away again, and the next
+ * lift has to win it back and more. Nothing here is new; everything is
+ * combined, and the clocks run fast (140 frames). Pendulums swing in
+ * counterpoint over a deck that will not wait for you, hoppers share their
+ * pools with clocked traps, and the wing's roost has a pendulum of its own.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   the apron tips down to the low-water line.
+ *   headland  the first fork, and the first rise: over the hill or through
+ *             the cave under it (crystal, secret room) — it ends higher.
+ *   knot      the pendulum alley: a counter-phased pair, traps, a hopper;
+ *             a gallery beneath (crystal, secret room).       -- checkpoint
+ *   cliff     up on the sea wind (crystal on the perch);
+ *   ebb       straight down the far side —
+ *   bowl      and the bowl at its foot throws you higher than you fell.
+ *                                                            -- checkpoint
+ *   knot      three tide pools, a hopper in each and a clocked trap where
+ *             its hop comes down.
+ *   loop      on its hill; the exit climbs ten rows.
+ *   valley    the kicker valley, climbing out past its own rim.
+ *   knot      rotten decking under a pendulum pair: no standing still to
+ *             read them — roll, and both pass over you.       -- checkpoint
+ *   ebb       twelve rows back down, on the long ramp to
+ *   bay       the signature: the wing, earned — no thermal, a pendulum over
+ *             the roost, the upper roost (crystal) only for a roll — and the
+ *             far shore stands four rows over the near one.   -- checkpoint
+ *   terraces  the last wall,
+ *   home      a pocket, the summit loop, the signpost.
+ *
+ * ROADS: the middle road is the ascent, row 46 to row 20. The high road is
+ * the catwalks over each ebb, where height already won can be kept; the low
+ * road is the headland's cave, the alley's gallery and the bay floor.
  */
 export const act10: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -36,86 +58,64 @@ export const act10: LevelDef = {
   title: 'Ebb-Light Ascent',
   biome: 0,
   theme: 'verdant',
-  width: 400,
+  width: 692,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: start apron
-    b.start(4, 24);
-    c = runway(b, c.endX, c.endRow, { len: 10, dashPad: true }); // 10–19
+    let c = rollingStart(b, 0, 40, { drop: 6 }); // down to row 46: low water
+    const h0 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 8, crown: 10, down: 4, prize: 'crystal', hazards: 2, secret: true }); // CRYSTAL 1 (cave), secret 1
+    const a0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 32, density: 2, period: 140 });
+    b.swingBall(a0 + 9, c.endRow - 11, 8, 140, 0); // the alley's pair: half a period apart, so the gap between them is the rhythm
+    b.swingBall(a0 + 22, c.endRow - 11, 8, 140, 70);
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
+    const a1 = c.endX;
+    c = thermalCliff(b, c.endX, c.endRow, { rise: 12, top: 6, prize: 'crystal' }); // CRYSTAL 3 (perch)
+    c = plunge(b, c.endX, c.endRow, { drop: 8, runout: 4 });
+    c = reefBowl(b, c.endX, c.endRow, { drop: 2, basin: 8, lift: 10, prize: 'rings10' });
+    b.checkpoint(c.endX - 4, c.endRow);
+    const f0 = c.endX;
+    c = tideFlats(b, c.endX, c.endRow, { pools: 3, depth: 2, prize: 'shield' });
+    for (let i = 0; i < 3; i++) b.spikeTrap(f0 + i * 16 + 11, c.endRow + 2, 140, i * 47); // and a trap at the far end of each pool floor, where its hop lands
+    const l0 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 10, roof: 'shield' });
+    const v0 = c.endX;
+    c = launchValley(b, c.endX, c.endRow, { depth: 10, out: 12, crabs: 2, prize: 'rings10' }); // an ebb that pays: it tops out two rows over where it began
+    const d0 = c.endX;
+    c = crumbleSpan(b, c.endX, c.endRow, { planks: 6, crab: true });
+    b.swingBall(d0 + 8, c.endRow - 11, 8, 140, 0); // over the rotten deck: the planks give you 34 frames, the pair wants 70
+    b.swingBall(d0 + 17, c.endRow - 11, 8, 140, 70);
+    b.checkpoint(c.endX - 2, c.endRow);
+    const e0 = c.endX;
+    // The bay lays its own ramp (a gentle one: off a cliff's brow a hopping
+    // runner overflies the run-up and comes down dead on the kicker).
+    const bay = c.endX + 24;
+    const brink = c.endRow + 12;
+    c = gliderBay(b, c.endX, c.endRow, { feed: 12, width: 56, depth: 10, out: 14, crabs: 2, thermal: false, prize: 'rings10', upper: 'crystal' }); // CRYSTAL 4 (upper roost)
+    b.swingBall(bay + 47, brink - 14, 7, 140, 35); // hung over the far end of the upper roost: a hit costs the wing
+    b.checkpoint(c.endX - 2, c.endRow);
+    c = stairClimb(b, c.endX, c.endRow, { steps: 3, rise: 4, tread: 8 });
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'shield' }); // secret 3
+    const top = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 6, roof: 'rings10' });
+    signpostFinish(b, c.endX, c.endRow, { len: 28 });
 
-    // Launch set piece (20–41): the sky door opens immediately this time.
-    b.launchRamp(20, 24, 3); // 20–27, pad tops out on row 21
-    b.gentleDown(28, 21, 3); // 28–33, back to 24
-    b.floor(34, 41, 24);
-    b.ringsH(35, 40, 21);
-    c = { endX: 42, endRow: 24 };
-
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 150 }); // 42–59
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 140 }); // 60–75
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true, lift: 9 }); // 76–97, CRYSTAL 1 (sky shelf)
-    c = corridorLoop(b, c.endX, c.endRow); // 98–125, loop centre 111
-
-    // Pendulum pressure alley (126–151): two counter-phased swings, a
-    // crumble shelf and a parting spike trap — read the rhythm, keep moving.
-    // The glide line crosses directly overhead; the wind column at 131–135
-    // lifts a bailed flyer up past the swings' reach — teeth both ways.
-    b.floor(126, 151, 24);
-    b.swingBall(131, 14, 9, 140, 0);
-    b.swingBall(140, 14, 9, 140, 70);
-    b.crumble(144, 147, 20);
-    b.ringsH(144, 147, 18);
-    b.ringsH(127, 138, 21);
-    b.spikeTrap(149, 24, 140, 45);
-    c = { endX: 152, endRow: 24 };
-
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true }); // 152–157 (shaft at 155)
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6 }); // 158–169, up to row 21
-    c = railCascade(b, c.endX, c.endRow); // 170–200, grind down to row 27
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6 }); // 201–212, back to 24 (shaft at 209)
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 213–224, secret 1 (opens into the gallery)
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 4 }); // 225–238
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 18, count: 5 }); // 239–256
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 140 }); // 257–275
-    c = secretPocket(b, c.endX, c.endRow); // 276–285, CRYSTAL 2 + secret 2
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 3, period: 140 }); // 286–303
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 304–311 (shaft at 308)
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 24 }); // 312–343: the longest blind drop
-    b.crystal(327, 12); // CRYSTAL 3 — riding the leap's ring arc
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 10 }); // 344–359, back to 24 (shaft at 352)
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shield' }); // 360–369, secret 3
-    c = runway(b, c.endX, c.endRow, { len: 14, rings: false }); // 370–383
-    signpostFinish(b, c.endX, c.endRow, { len: 16 }); // 384–399
-
-    b.drone(90, 12, 4); // guards the stacked shelves
-    b.drone(230, 18, 4); // sweeps the bowl's launch window
-
-    // The mercy route with its own teeth: catwalks where the ramp's arc
-    // lands (row 10, probed), the pendulum glide, then steps and catwalks.
-    const s1 = canopyRun(b, 50, 10, { len: 65, crystal: true }); // 50–114, CRYSTAL 5 (sky)
-    const g = glideRun(b, s1.endX, 9, { len: 56 }); // 115–170: over the pendulum alley
-    // Mercy mast-tops under the glide; the shaft at 155 stays just clear of
-    // the second thermal so its spring lift is never wind-capped.
-    for (const mx of [126, 134, 142, 150, 158]) b.platform(mx, mx + 1, 15);
-    const k1 = skySteps(b, g.endX + 1, 10, { steps: 5, drone: true, trap: true }); // 171–208
-    const s2 = canopyRun(b, k1.endX, 10, { len: 52 }); // 209–260
-    const k2 = skySteps(b, s2.endX, 10, { steps: 4, trap: true, drone: false }); // 261–291
-    canopyRun(b, k2.endX, 10, { len: 42 }); // 292–333
-
-    /* ============================ UNDER ROUTE ============================
-     * The sea-cave gallery under the whole ascent, carved last. Shafts sit
-     * on plain flats, clear of the ramp, the loop corridor (98–125), the
-     * cascade, the bowl and the leap mesa; the second phase crossing's pit
-     * floor carries a carved door down as well.
+    /* ============================== HIGH ROAD ==============================
+     * Over each ebb: the height the last lift won, kept by not coming down.
      */
-    underGallery(b, 40, {
-      len: 316, // 40–355, within 9 columns of the last secret pocket's room
-      shafts: [115, 169, 268, 312], // at 155, 209, 308, 352
-      hazards: 2,
-      rail: true,
-      crystal: true, // CRYSTAL 4 — under-lane prize below the rail runway
-    });
-    // Door in the second phase crossing's lower route (floor row 29).
-    b.carve(264, 29, 265, 33);
-    b.spring(264, 34, 13);
-    b.spring(265, 34, 13);
+    highRoad(b, h0 + 4, a1 + 2, { droneEvery: 3, crumbleEvery: 3, monitors: ['rings10'], onRamp: true }); // up the headland, over the alley
+    droneBridge(b, a1 + 18, { drones: 4, prize: 'rings10', onRamp: true }); // off the clifftop, over the first ebb
+    highRoad(b, f0 - 8, l0 + 4, { crumbleEvery: 3, droneEvery: 2, crystal: true, monitors: ['shield'], onRamp: true }); // CRYSTAL 5 — off the bowl's shelf, over the pools
+    highRoad(b, l0 + 20, v0 + 4, { crumbleEvery: 3, onRamp: true }); // over the loop: its roof is a drop from here
+    highRoad(b, d0 - 12, e0 - 2, { crumbleEvery: 3, droneEvery: 2, monitors: ['rings10'], onRamp: true }); // over the rotten deck
+    highRoad(b, bay + 80, top - 12, { crumbleEvery: 3, monitors: ['rings10'], onRamp: true }); // from the roost's end, up the far shore to the last wall
+    highRoad(b, top + 2, top + 50, { crumbleEvery: 3, droneEvery: 3, onRamp: true }); // the summit: the loop's roof is a drop from here
+
+    /* =============================== LOW ROAD ==============================
+     * The gallery under the pendulum alley: the way to skip the rhythm, at
+     * the price of its own trap. And a second, inside the reef.
+     */
+    lowRoad(b, a0 + 5, a1 - 1, { shafts: [a0 + 5], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 2, secret 2
+    lowRoad(b, f0 - 26, f0 - 3, { shafts: [f0 - 24], crabs: 0, traps: 1, prize: 'rings10' }); // and the cave inside the reef the bowl throws you onto
   },
 };

@@ -13,11 +13,14 @@ import { act10 } from './act10.ts';
 /**
  * BIOME 3 — NOON TOMORROW, the neon city whose tomorrow never comes.
  *
- * The campaign's final stretch: hard-light phase platforms grow from a
- * curiosity (act 1) into whole staircases and sky routes, grind-rail ribbons
- * hang between tower blocks, dash pads run like traffic lanes, and the late
- * acts mix carts, rails and phase gates in the same breath. Acts 5 and 10
- * are the Mirage's toll gate and the finale arena.
+ * The campaign's final stretch, a city built in the air: hard-light phase
+ * platforms grow from a curiosity (act 1) into whole staircases and sky
+ * routes, grind-rail ribbons hang between tower blocks, rooftops and road
+ * tunnels stand in for hills and caves, the Mag-Board owns act 7 (the
+ * terrain does the work the dash pads used to), and the late acts mix
+ * carts, rails and phase gates in the same breath. Acts 5 and 10 are the
+ * Mirage's toll gate and the finale arena. Biome pieces live in
+ * `pieces.ts`.
  */
 export const tomorrowActs: LevelDef[] = [
   act01,

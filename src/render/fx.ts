@@ -94,6 +94,9 @@ export class FxSystem {
   flashFrames = 0;
   flashTotal = 0;
   readonly reducedMotion: boolean;
+  /** Player options (Options > screen shake / flash effects). */
+  allowShake = true;
+  allowFlash = true;
   private seed = 1234567;
 
   constructor(reducedMotion = false) {
@@ -123,6 +126,7 @@ export class FxSystem {
   /* --------------------------------- Flash --------------------------------- */
 
   flash(color: string, frames: number): void {
+    if (!this.allowFlash) return;
     if (frames >= this.flashFrames) {
       this.flashColor = color;
       this.flashFrames = frames;
@@ -136,7 +140,7 @@ export class FxSystem {
   }
 
   shake(mag: number, frames: number): void {
-    if (this.reducedMotion) return;
+    if (this.reducedMotion || !this.allowShake) return;
     if (mag >= this.shakeMag) {
       this.shakeMag = mag;
       this.shakeFrames = frames;
@@ -237,6 +241,10 @@ export class FxSystem {
         break;
       case 'rail-on':
         this.emit(x, y, 8, { colors: ['#fff', '#b7f3ff', '#ffd94a'], speed: 2, life: 20, size: 2, kind: 'spark', grav: 0.12 });
+        break;
+      case 'skid':
+        // Heels dug in: a spray of dust thrown forward off the shoes.
+        this.emit(x, y + 10, 5, { colors: ['#cfd6e4', '#9aa3b2'], speed: 1.4, life: 20, size: 3, kind: 'smoke', up: 0.3 });
         break;
       case 'dash':
       case 'dash-pad':
@@ -379,21 +387,48 @@ export class FxSystem {
   render(ctx: CanvasRenderingContext2D): void {
     for (const p of this.particles) {
       const t = 1 - p.age / p.life;
-      ctx.globalAlpha = p.kind === 'smoke' ? 0.35 * t : Math.min(1, t * 1.4);
       ctx.fillStyle = p.color;
       if (p.kind === 'spark') {
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
-      } else if (p.kind === 'glow') {
+        // A spark is a streak along its own velocity: reads as energy, where a
+        // square reads as a stuck pixel.
+        const sp = Math.hypot(p.xsp, p.ysp);
+        const len = p.size * (1.2 + Math.min(3, sp * 0.9)) * (0.4 + 0.6 * t);
+        const w = p.size * 0.55 * (0.5 + 0.5 * t);
+        ctx.globalAlpha = Math.min(1, t * 1.6);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(Math.atan2(p.ysp, p.xsp));
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.moveTo(len / 2, 0);
+        ctx.lineTo(0, w);
+        ctx.lineTo(-len / 2, 0);
+        ctx.lineTo(0, -w);
+        ctx.closePath();
         ctx.fill();
-        ctx.globalAlpha *= 0.4;
+        ctx.restore();
+      } else if (p.kind === 'glow') {
+        ctx.globalAlpha = Math.min(1, t * 1.4) * 0.35;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * 2.2, 0, Math.PI * 2);
         ctx.fill();
-      } else {
+        ctx.globalAlpha = Math.min(1, t * 1.4);
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.kind === 'smoke') {
+        // Soft puff: a faint halo around a denser core.
+        ctx.globalAlpha = 0.16 * t;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 1.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.3 * t;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = Math.min(1, t * 1.4);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.6, 0, Math.PI * 2);
         ctx.fill();
       }
     }

@@ -1,31 +1,53 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { hazardGauntlet, rollersRun, runway, secretPocket, signpostFinish, stackedChoice } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  stackedChoice,
-  corridorLoop,
-  secretPocket,
-  sneakUnder,
-  hazardGauntlet,
-  signpostFinish,
-  canopyRun,
-  skySteps,
-  glideRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  longJump,
+  undercroft,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
+import { crumbleSpan, gliderBay, thermalCliff } from './pieces.ts';
 
 /**
  * DUSKMERE COAST — ACT 2 — "Gullwing Causeway"
  *
- * The hang glider's debut. The causeway opens straight into rolling swells
- * (no dash-pad apron this time — each act now opens differently), and the sky
- * lane is a real journey: catwalks to a launch perch where the wing waits,
- * a simple first glide held up by two thermals, then more catwalks and a set
- * of staggered steps. Below the shore, a full-length sea-cave gallery is the
- * third road — carved after the ground chain, entered by visible light-well
- * shafts, with a grind line and spring lifts back out. One shaft sits inside
- * a thermal, making it a wind elevator straight from the cave to the glide
- * line — the discovery the act is named for.
+ * The hang glider's debut, and nothing else is new: a broken causeway of
+ * mesas with tide water between them, where every crossing can be flown.
+ * The act teaches the wing in two steps — first a bay with a thermal in it,
+ * which carries even a strolled wing to the roost, then one at the foot of
+ * a long ramp with no thermal at all, where the speed you bring decides
+ * which roost you come down on. Hazards stay at act-1 levels.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   the apron tips into the biome's longest opening slope,
+ *   leap      and that slope is what clears the first tide pool.
+ *   knot      a guarded road under a sprung shelf.            -- checkpoint
+ *   headland  a hill with the sea cave under it (crystal, secret room);
+ *   bay 1     its far slope runs out at THE WING. Off the lip with jump
+ *             held, up the thermal, onto the roost (crystal). Without it:
+ *             the bay floor, a sandbar, a climb.              -- checkpoint
+ *   knot      planking over a channel.
+ *   valley    the kicker valley (shield on the upper ledge),
+ *   cliff     and the sea wind up the face beyond it (crystal on the perch);
+ *             a pocket in the clifftop.
+ *   bay 2     The causeway crossing — the signature: twelve rows of ramp
+ *             down the cliff's back, the lip, the wide bay; no thermal, two
+ *             roosts. A run lands on the first; only a ROLL of the whole
+ *             ramp is thrown high enough for the upper one (crystal).
+ *                                                            -- checkpoint
+ *   knot      one clocked trap, a gallery beneath (secret room).
+ *   home      the loop on its hill (crystal on the roof), two swells, the
+ *             long slope down, the signpost.
+ *
+ * ROADS: the middle road is the mesas and the bay floors. The high road is
+ * the gulls' — both roosts, the catwalks that run on from them, the cliff
+ * perch. The low road is the headland's cave and the gallery under the
+ * last knot.
  */
 export const act02: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -33,75 +55,49 @@ export const act02: LevelDef = {
   title: 'Gullwing Causeway',
   biome: 0,
   theme: 'verdant',
-  width: 340,
+  width: 661,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    // Ground chain, left to right (each motif lays its own ground).
-    let c = runway(b, 0, 24, { len: 8, rings: false }); // 0–7: the start apron
-    b.start(4, 24);
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 8–37: straight into the swells
-    c = runway(b, c.endX, c.endRow, { len: 14, dashPad: true }); // 38–51 (shaft at 46)
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 52–73, CRYSTAL 1 (sky shelf)
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 74–81
-    c = corridorLoop(b, c.endX, c.endRow); // 82–109, loop centre 95
-    c = secretPocket(b, c.endX, c.endRow); // 110–119, CRYSTAL 2 + secret 1
-    c = runway(b, c.endX, c.endRow, { len: 10 }); // 120–129 (the wind-elevator shaft at 124)
-    c = runway(b, c.endX, c.endRow, { len: 20, enemy: true }); // 130–149: flat under the glide line
+    let c = rollingStart(b, 0, 22, { drop: 6 }); // down to row 28
+    c = longJump(b, c.endX, c.endRow, { gap: 12, fall: 2 });
+    const k1 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 24 });
+    b.checkpoint(c.endX - 2, c.endRow);
+    const hill = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 10, down: 8, prize: 'crystal', secret: true }); // CRYSTAL 1 (cave), secret 1
+    c = gliderBay(b, c.endX, c.endRow, { width: 48, depth: 10, crabs: 1, prize: 'crystal' }); // CRYSTAL 2 (roost)
+    const shore1 = c.endX;
+    b.checkpoint(c.endX - 2, c.endRow);
+    c = crumbleSpan(b, c.endX, c.endRow, { planks: 4 });
+    const v0 = c.endX;
+    c = launchValley(b, c.endX, c.endRow, { depth: 10, out: 6, crabs: 1, prize: 'shield' });
+    c = thermalCliff(b, c.endX, c.endRow, { rise: 12, top: 4, prize: 'crystal' }); // CRYSTAL 3 (perch)
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'rings10' }); // secret 2
+    c = gliderBay(b, c.endX, c.endRow, { feed: 12, width: 56, depth: 12, out: 8, crabs: 2, thermal: false, prize: 'rings10', upper: 'crystal' }); // CRYSTAL 4 (upper roost)
+    const shore2 = c.endX;
+    c = runway(b, c.endX, c.endRow, { len: 10, checkpoint: true });
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 22, density: 1 });
+    const g1 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 2, roof: 'crystal' }); // CRYSTAL 5 (loop roof)
+    const l1 = c.endX;
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 2, rise: 2, crown: 4, depth: 2, basin: 6 });
+    c = runway(b, c.endX, c.endRow, { drop: 5, len: 14 });
+    signpostFinish(b, c.endX, c.endRow, { len: 28 });
 
-    // Launch set piece (150–171): the ramp arc lands on the canopy past the
-    // glide deck. Ease back down off the pad — a hard step after a launcher
-    // strands slow arrivals.
-    b.launchRamp(150, 24, 3); // 150–157, pad tops out on row 21
-    b.gentleDown(158, 21, 3); // 158–163, back to row 24
-    b.floor(164, 171, 24);
-    b.ringsH(165, 170, 21);
-    c = { endX: 172, endRow: 24 };
-
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 172–183, secret 2 (opens into the gallery)
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 12, density: 1 }); // 184–195: one telegraphed trap
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 196–205, secret 3
-    c = runway(b, c.endX, c.endRow, { len: 10, checkpoint: true }); // 206–215 (shaft at 211)
-
-    // Pendulum reef (216–235): two swing balls bracketing a crumble ledge —
-    // pure timing, fully visible, and far enough in that clocks never chirp
-    // at an idle hero on the apron.
-    b.floor(216, 235, 24);
-    b.swingBall(221, 14, 9, 160, 0);
-    b.crumble(226, 228, 20);
-    b.ringsH(226, 228, 18);
-    b.swingBall(231, 14, 9, 160, 80);
-    b.ringsH(217, 224, 21);
-    c = { endX: 236, endRow: 24 };
-
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 236–265
-    c = runway(b, c.endX, c.endRow, { len: 20, enemy: true }); // 266–285 (shaft at 281)
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 286–315
-    c = runway(b, c.endX, c.endRow, { len: 8, rings: false }); // 316–323 (shaft at 318)
-    signpostFinish(b, c.endX, c.endRow, { len: 16 }); // 324–339
-
-    /* ============================= SKY ROUTE =============================
-     * Catwalks in, a first gentle glide, catwalks out, staggered steps —
-     * never the same texture for long.
+    /* ============================== HIGH ROAD ==============================
+     * The roosts are where a wing sets you down; these catwalks are what it
+     * was for. Walk off any ledge with jump held and the next gap is flown.
      */
-    const s1 = canopyRun(b, 54, 10, { len: 52 }); // 54–105, joined to the stacked shelves
-    const g = glideRun(b, s1.endX, 9, { len: 56, crystal: true }); // 106–161, CRYSTAL 5 mid-glide
-    // Mercy mast-tops under the glide gap: a folded wing lands on a shelf,
-    // not in a pit, and the sky lane stays continuous for the route contract.
-    for (const mx of [118, 126, 134, 142, 150]) b.platform(mx, mx + 1, 15);
-    const s2 = canopyRun(b, g.endX + 1, 10, { len: 65, crystal: true }); // 162–226, CRYSTAL 4
-    skySteps(b, s2.endX, 10, { steps: 4, drone: true, trap: false }); // 227–257
+    highRoad(b, k1 + 26, hill + 30, { crumbleEvery: 4, monitors: ['rings10'], onRamp: true }); // off the knot's shelf, up the headland
+    droneBridge(b, hill + 34, { drones: 3, prize: 'shield', onRamp: true }); // and off its crown
+    highRoad(b, shore1 - 2, v0 + 4, { monitors: ['rings10'], onRamp: true }); // on from the first roost, to the valley's brink (a drop from here lands on its downhill, never on its kicker)
+    highRoad(b, shore2 + 2, l1 + 40, { droneEvery: 3, monitors: ['rings10'], onRamp: true }); // on from the bay, over the loop: its roof is a drop from here
 
-    /* ============================ UNDER ROUTE ============================
-     * The sea-cave gallery, carved last so nothing back-fills it. Shafts sit
-     * on plain runways, clear of the loop corridor (82–109), the launch ramp
-     * and the pendulums. The shaft at 124 rises through a thermal: springs
-     * plus wind carry you from the cave floor all the way to the glide line.
+    /* =============================== LOW ROAD ==============================
+     * The gallery under the last knot: in by the shaft at its head, out by
+     * the springs past its end. Holds the third secret.
      */
-    underGallery(b, 40, {
-      len: 284, // 40–323, spanning the whole causeway
-      shafts: [6, 84, 171, 241, 278], // at 46, 124, 211, 281, 318
-      hazards: 1, // early act: static spikes only, no clocked traps below
-      rail: true, // first underworld grind line of the biome
-      crystal: true, // CRYSTAL 3 — the under-lane prize lives IN the gallery
-    });
+    lowRoad(b, g0 + 5, g1 - 1, { shafts: [g0 + 6], crabs: 0, prize: 'rings10', secret: true }); // secret 3
   },
 };

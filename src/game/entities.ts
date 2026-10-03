@@ -195,6 +195,9 @@ export class Launcher {
 
 /* ------------------------------- Grind rail -------------------------------- */
 
+/** `invuln` counts down from 120 after a hit; above this the knock-back arc is still in flight. */
+const KNOCKBACK_GRACE = 90;
+
 /** Grind rail tuning (game feel, not SPG). */
 export const RAIL = {
   /** Speed you are carried at, at minimum, once locked on. */
@@ -254,6 +257,9 @@ export class Rail {
   tryCatch(p: Player): boolean {
     if (p.dead || p.railing) return false;
     if (p.ysp < 0) return false; // rising: pass through
+    // Thrown back by a hit, he is not boarding anything: a rail that caught
+    // the knock-back rode its victim backwards at full rail speed.
+    if (p.invuln > KNOCKBACK_GRACE) return false;
     const y = this.yAt(p.x);
     if (y === null) return false;
     const feet = p.y + p.h;

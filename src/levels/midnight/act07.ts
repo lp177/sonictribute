@@ -1,30 +1,45 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { boardSprint, hazardGauntlet, runway, signpostFinish, stackedChoice } from '../motifs.ts';
 import {
-  runway,
-  boardSprint,
-  leapOfFaith,
-  corridorLoop,
-  stackedChoice,
-  sneakUnder,
-  railCascade,
-  hazardGauntlet,
-  secretPocket,
-  cartCanyon,
-  stalactiteGallery,
-  rollersRun,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  loopHill,
+  longJump,
+  springCliff,
+  stairClimb,
+  highRoad,
+  droneBridge,
+  lowRoad,
+} from '../sections.ts';
+import { slagChute, valley, vault } from './pieces.ts';
 
 /**
- * MIDNIGHT ACT 7 — "Skyhook Expressway"
+ * OTHERWHILE FOUNDRY — ACT 7 — "Skyhook Expressway"
  *
- * Back on the skyway, but higher: the sky lane is the fast lane this act.
- * The Mag-Board fires seconds after the gate, a leap of faith launches the
- * runner straight into catwalk altitude, and the catwalks themselves carry
- * monitors — the reward for staying up. The ground chain runs a row high
- * (22) the whole way to keep the climb into the sky short.
+ * The expressway is strung, not built: skyhook rails zip from tower to tower
+ * over the slag channels. The act's shape is a SAWTOOTH — a spring or a
+ * stair hauls the road up a tower in a few columns, and a hook spends the
+ * height over forty. Three hooks, each longer than the last; a rail always
+ * hands you on faster than it took you, so what follows each is a release
+ * (a loop, a valley), never a knot. The Mag-Board returns for the middle of
+ * the act and rides the second hook. Under every hook the channel is the low
+ * road: let go of the line and you are on it.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   gate      apron, and the first tower: sprung up twelve rows.
+ *   hook 1    the short line — and what a rail's exit speed is for:
+ *   loop      the loop at its foot.
+ *   knot      plates and a hopper, a cable duct under them. -- checkpoint
+ *   tower 2   terraces up to the depot deck, and the board.
+ *   valley    fourteen rows down on the board (crystal on the top shelf),
+ *   hook 2    and straight onto the second line, board and all.
+ *                                                          -- checkpoint
+ *   knot      a guarded deck and its sprung shelf (crystal), a vault.
+ *   tower 3   the tallest lift, a leap between its two heads,
+ *   HOOK 3    and the long line: twelve rows over the widest channel
+ *             (crystal perched over the middle — let go for it).
+ *   valley    the line's speed, spent: thrown to a valley's top shelf,
+ *   loop      then the last loop and the run home.
  */
 export const midnight07: LevelDef = {
   name: 'OTHERWHILE FOUNDRY',
@@ -32,52 +47,55 @@ export const midnight07: LevelDef = {
   title: 'Skyhook Expressway',
   biome: 1,
   theme: 'gear',
-  width: 380,
+  width: 697,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 22, { len: 10, rings: false }); // 0–9: expressway ramp
-    b.start(4, 22);
-    c = runway(b, c.endX, c.endRow, { len: 6, rings: false, dashPad: true }); // 10–15
-    c = boardSprint(b, c.endX, c.endRow, { sections: 3, board: true }); // 16–63: board out of the gate
-    b.drone(26, 17, 2);
-    b.drone(54, 17, 2);
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 64–71
-    c = leapOfFaith(b, c.endX, c.endRow, { drop: 3, glide: 22 }); // 72–101: fling into catwalk height
-    b.crystal(94, 6); // 1 (sky) — above the catwalk the leap lands beside
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6, enemy: true }); // 102–113, back to row 22
-    c = corridorLoop(b, c.endX, c.endRow, { drop: 3, corridor: 24 }); // 114–149
-    c = stackedChoice(b, c.endX, c.endRow, { len: 26, crystal: true }); // 150–175, crystal 2 (sky shelf)
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 176–187, crystal 3 (under), secret 1
-    c = railCascade(b, c.endX, c.endRow, { steps: 2, run: 7, span: 8, dropEach: 2 }); // 188–222, to row 26
-    c = runway(b, c.endX, c.endRow, { rise: 2, len: 6 }); // 223–232, back to row 24
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 3, period: 130 }); // 233–250
-    c = secretPocket(b, c.endX, c.endRow); // 251–260, crystal 4 (ground), secret 2
-    c = cartCanyon(b, c.endX, c.endRow); // 261–280
-    b.drone(269, 21, 2);
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 281–290, secret 3
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 }); // 291–306
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 307–314
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // 315–344
-    signpostFinish(b, c.endX, c.endRow, { len: 35 }); // 345–379
+    let c = rollingStart(b, 0, 34, { drop: 2 }); // row 36
+    c = springCliff(b, c.endX, c.endRow, { rise: 12, top: 10 }); // tower 1, row 24
+    const k1 = c.endX;
+    c = slagChute(b, c.endX, c.endRow, { drop: 8, bed: 10, line: 'rail', prize: 'rings10', crabs: 1 }); // hook 1; row 32
+    b.monitor(k1 + 22, c.endRow + 4, 'shield'); // on the channel bed, for whoever let go
+    b.secret(k1 + 20, c.endRow + 1, k1 + 29, c.endRow + 3); // secret 1 — the bed under the first hook
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 2, roof: 'shield' }); // row 36
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 24, density: 2 });
+    const g1 = c.endX;
+    b.checkpoint(c.endX + 1, c.endRow);
+    c = stairClimb(b, c.endX, c.endRow, { steps: 3, rise: 4, tread: 7 }); // tower 2, row 24
+    const d0 = c.endX;
+    c = boardSprint(b, c.endX, c.endRow, { sections: 2, board: true });
+    c = valley(b, c.endX, c.endRow, { depth: 14, out: 10, crabs: 2, prize: 'crystal' }); // CRYSTAL 1 — the shelf over a board's reach; row 28
+    c = slagChute(b, c.endX, c.endRow, { drop: 10, bed: 14, line: 'rail', prize: 'shoes', crabs: 1 }); // hook 2, on the board; row 38
+    b.boardEnd(c.endX - 3);
+    b.checkpoint(c.endX - 1, c.endRow);
+    const s0 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 24, crystal: true }); // CRYSTAL 2
+    const s1 = c.endX;
+    c = vault(b, c.endX, c.endRow, { reward: 'rings10' }); // secret 2
+    c = springCliff(b, c.endX, c.endRow, { rise: 14, top: 8 }); // tower 3, row 24
+    b.checkpoint(c.endX - 4, c.endRow);
+    c = longJump(b, c.endX, c.endRow, { gap: 14, fall: 2 }); // between the tower's two heads; row 26
+    const k3 = c.endX;
+    c = slagChute(b, c.endX, c.endRow, { drop: 12, bed: 20, line: 'rail', prize: 'crystal', crabs: 2 }); // HOOK 3; CRYSTAL 3; row 38
+    b.crystal(k3 + 30, c.endRow + 2); // CRYSTAL 4 — on the channel bed under the long line
+    c = valley(b, c.endX, c.endRow, { depth: 8, out: 8, crabs: 1, prize: 'shield' }); // a rail's exit speed is a rolled hill's: the top shelf, for once, on foot
+    c = loopHill(b, c.endX, c.endRow, { drop: 4, up: 2, roof: 'rings10' }); // row 40
+    const home = c.endX;
+    c = runway(b, c.endX, c.endRow, { len: 30 });
+    signpostFinish(b, c.endX, c.endRow, { len: 24 });
 
-    // The express catwalks sit at row 8 — above the leap arc's ring trail
-    // (rows 9+) so no platform tile can bury a leap ring — and carry the
-    // monitors that make the sky line worth holding.
-    let s = canopyRun(b, 84, 8, { len: 104, crystal: true }); // crystal 5 (sky)
-    b.monitor(56, 8, 'rings10');
-    s = canopyRun(b, s.endX, s.endRow, { len: 104 });
-    b.monitor(160, 8, 'shoes');
-    canopyRun(b, s.endX, s.endRow, { len: 104 });
+    /* ============================== HIGH ROAD ============================== */
+    highRoad(b, g0 - 40, g1 + 6, { droneEvery: 3, monitors: ['rings10'] }); // over the first loop and the plates
+    highRoad(b, d0 - 22, d0 - 2, {}); // up tower 2
+    droneBridge(b, d0 + 4, { drones: 3, lift: 9, prize: 'rings10' }); // over the board decks
+    highRoad(b, s0 + 2, s1 + 12, { lift: 12, crumbleEvery: 3, monitors: ['shield'] }); // over the guarded deck, towards tower 3
+    highRoad(b, k3 - 44, k3 - 2, { droneEvery: 2 }); // across tower 3's two heads
+    highRoad(b, home - 38, home + 24, { monitors: ['rings10'] }); // over the last loop
 
-    // Under the expressway: the utility bore, three segments. The sneak-under
-    // pocket (floor 32, cols 178–185) and the cart canyon ledge (floor 30,
-    // cols 266–272) stay as raised side-chambers — each opens onto the bore
-    // with a two-to-four-row hop, so they are doors, not breaks. Shafts: the
-    // gate runway (8), under the stacked-choice west platform (155), the
-    // climb-out runway (229), between stalactites (296) and the run-out
-    // (358) — clear of the board decks (16–63), the leap (72–101), the loop
-    // corridor (114–149), the rail steps and the full-density gauntlet.
-    underGallery(b, 4, { len: 174, row: 34, shafts: [4, 151], hazards: 2, crystal: false });
-    underGallery(b, 186, { len: 80, row: 34, shafts: [43], hazards: 2, crystal: false });
-    underGallery(b, 273, { len: 100, row: 34, shafts: [23, 85], hazards: 2, crystal: false });
+    /* =============================== LOW ROAD ==============================
+     * The cable ducts: one under the plates, one under the guarded deck.
+     */
+    lowRoad(b, g0 + 1, g1 - 2, { shafts: [g0 + 2], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 5, secret 3
+    lowRoad(b, s0 + 1, s1 - 3, { shafts: [s0 + 3], crabs: 1, prize: 'rings10' }); // and a second under the guarded deck
   },
 };

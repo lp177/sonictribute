@@ -35,7 +35,7 @@ import { Boss, type BossLike } from './Boss.ts';
 import { PressBoss } from './PressBoss.ts';
 import { CrystalBoss } from './CrystalBoss.ts';
 import { MirageBoss } from './MirageBoss.ts';
-import { SCORE, type LevelStats } from './Score.ts';
+import { SCORE, parTime, type LevelStats } from './Score.ts';
 import type { Cutscene } from './story.ts';
 
 export type LevelTheme = 'verdant' | 'gear' | 'crystal' | 'neon';
@@ -54,9 +54,12 @@ const BACKTRACK_SLACK = 560;
  * How close a scenery hazard must be to the player before it is allowed to
  * make a noise. Traps run on their own clock all over the level; without
  * this, every one of them chirps at the player from half a zone away and the
- * result is meaningless repeating noise.
+ * result is meaningless repeating noise. It is the reach of the view: at
+ * full camera lead the frame ends some 340 px ahead of the hero (the world
+ * is drawn at WORLD_ZOOM, 427 px across), and a hazard heard just before it
+ * scrolls in is a warning — one heard from further off is the noise again.
  */
-const AMBIENT_RANGE = 420;
+const AMBIENT_RANGE = 340;
 
 /* ------------------------------- Level builder ----------------------------- */
 
@@ -567,6 +570,8 @@ export class Level {
   timeFrames = 0;
   ringsCollected = 0;
   tookDamage = false;
+  /** Respawns this run (feeds the rank). */
+  deaths = 0;
   /** Set when the goal sign is hit. */
   results: LevelStats | null = null;
   /**
@@ -577,6 +582,10 @@ export class Level {
   readonly eventSources = new Map<string, { x: number; y: number }>();
 
   private prevX = 0;
+  /** Held against an arena gate last frame (so the bump sounds once). */
+  private wasAtGate = false;
+  /** Carried by a crumbling or hard-light ledge last frame. */
+  private riding = false;
 
   constructor(def: LevelDef) {
     this.name = def.name;
@@ -675,12 +684,18 @@ export class Level {
     // Springs & monitors.
     for (const s of this.springs) {
       s.update();
-      if (s.tryTrigger(p)) events.push('spring');
+      if (s.tryTrigger(p)) {
+        events.push('spring');
+        this.eventSources.set('spring', { x: s.x, y: s.y });
+      }
     }
     for (const m of this.monitors) {
-      if (m.tryBreak(p)) {
+      const kind = m.tryBreak(p);
+      if (kind) {
         this.score += SCORE.monitor;
-        events.push('monitor');
+        // The box breaking, then what was in it.
+        events.push('monitor', kind);
+        this.eventSources.set('monitor', { x: m.x, y: m.y });
       }
     }
 
@@ -828,12 +843,17 @@ export class Level {
     }
 
     // Crumbling ledges: they carry the player until they let go.
+    let riding = false;
     for (const c of this.crumbles) {
+      // Carry first, THEN let the ledge feel the weight: the player comes
+      // unstuck from these every frame (the tile map knows nothing of them),
+      // so a ledge that looked for grounded feet before setting him down
+      // never saw any — and never crumbled under anyone who landed on it.
+      if (c.solid && !p.dead && this.standOn(p, c.x, c.y, c.w)) riding = true;
       if (c.update(p) === 'crumble') {
         events.push('crumble');
         this.eventSources.set('crumble', { x: c.x + c.w / 2, y: c.y });
       }
-      if (c.solid && !p.dead) this.standOn(p, c.x, c.y, c.w);
     }
 
     // Phase platforms: hard light, solid half the time. Like the crumble
@@ -844,8 +864,13 @@ export class Level {
         events.push('phase-blink');
         this.eventSources.set('phase-blink', { x: ph.x + ph.w / 2, y: ph.y });
       }
-      if (ph.solid && !p.dead) this.standOn(p, ph.x, ph.y, ph.w);
+      if (ph.solid && !p.dead && this.standOn(p, ph.x, ph.y, ph.w)) riding = true;
     }
+    // The tile map knows nothing of these ledges, so the player comes unstuck
+    // and is set down again every frame he stands on one. Only the first
+    // frame is a landing.
+    if (riding && !this.riding) events.push('land');
+    this.riding = riding;
 
     // Collectibles & progression.
     for (const c of this.crystals) {
@@ -884,11 +909,13 @@ export class Level {
       this.arenaGates = new BossArena(this.arena.left, this.arena.right, this.groundAt(this.arena.left + 40));
       const ev = this.arenaGates.lock();
       if (ev) events.push(ev);
-      events.push('boss');
+      events.push('boss', 'warning');
     }
     if (this.arenaGates) {
       this.arenaGates.update();
-      if (this.arenaGates.confine(p)) events.push('gate-bump');
+      const atGate = this.arenaGates.confine(p);
+      if (atGate && !this.wasAtGate) events.push('gate-bump');
+      this.wasAtGate = atGate;
     }
     if (this.boss) {
       if (!this.boss.defeated) {
@@ -939,6 +966,7 @@ export class Level {
     }
     if (p.dead && p.y > this.map.pixelH + 96) {
       p.respawn(this.respawnPos.x, this.respawnPos.y);
+      this.deaths++;
       this.loopTracker.reset();
       this.prevX = p.x;
       events.push('respawn');
@@ -967,6 +995,7 @@ export class Level {
       // event stream for anything raised during Level.update.
       if (boardLost) events.push('board-lost');
       else if (shieldLost) events.push('shield-lost');
+      if (p.events.includes('glider-lost')) events.push('glider-lost');
       events.push('hurt');
       this.scatterRings(p, lost);
     }
@@ -975,21 +1004,24 @@ export class Level {
   /**
    * Carries the player on a moving/temporary surface the tile map knows
    * nothing about (crumbling ledges). Behaves like a one-way platform: only
-   * catches feet arriving from above.
+   * catches feet arriving from above. Returns true while it is carrying the
+   * player; the caller turns the first such frame into a 'land' in the
+   * level's own events (anything pushed to `p.events` here would be cleared
+   * before it is read).
    */
-  private standOn(p: Player, x: number, y: number, w: number): void {
-    if (p.ysp < 0) return;
-    if (p.x < x - 4 || p.x > x + w + 4) return;
+  private standOn(p: Player, x: number, y: number, w: number): boolean {
+    if (p.ysp < 0) return false;
+    if (p.x < x - 4 || p.x > x + w + 4) return false;
     const feet = p.y + p.h;
-    if (feet < y - 2 || feet > y + 14) return;
+    if (feet < y - 2 || feet > y + 14) return false;
     p.y = y - p.h;
     p.ysp = 0;
     if (!p.grounded) {
       p.grounded = true;
       p.angle = 0;
       p.gsp = p.xsp;
-      p.events.push('land');
     }
+    return true;
   }
 
   private scatterRings(p: Player, count: number): void {
@@ -1024,6 +1056,8 @@ export class Level {
       secretsFound: this.secrets.filter((s) => s.found).length,
       secretsTotal: this.secrets.length,
       tookDamage: this.tookDamage,
+      parFrames: parTime(this.goal.x, this.bossKind !== null),
+      deaths: this.deaths,
     };
   }
 }

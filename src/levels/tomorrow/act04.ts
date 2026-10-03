@@ -1,29 +1,57 @@
 import type { LevelBuilder, LevelDef } from '../../game/Level.ts';
+import { cartCanyon, hazardGauntlet, runway, signpostFinish, stackedChoice, stalactiteGallery } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  corridorLoop,
-  stackedChoice,
-  phaseCrossing,
-  leapOfFaith,
-  cartCanyon,
-  sneakUnder,
-  stalactiteGallery,
-  secretPocket,
-  hazardGauntlet,
-  quarterPipeBowl,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  plunge,
+  longJump,
+  undercroft,
+  springCliff,
+  highRoad,
+  droneBridge,
+  lowRoad,
+  ringArc,
+} from '../sections.ts';
+import { lightBridge, roofedTube, rooftops, skyRail } from './pieces.ts';
 
-const W = 352;
+const W = 755;
 
 /**
- * NOON TOMORROW — ACT 4: the maintenance district. Longer roller runs feed a
- * cart canyon, a bigger stalactite awning and the act's mid-course leap of
- * faith. Difficulty knob: hazard clocks tighten to 150–160 and the gauntlet
- * runs at density 2. Fast lane: GROUND (roll everything).
+ * NOON TOMORROW — ACT 4 — "Static Signal Yards"
+ *
+ * The maintenance district: flat yards where everything runs on a clock —
+ * awning spikes, pop-up teeth, a crane hook, a cart on its buffer — joined by
+ * the cuttings the trains used. The yards are the knots; the cuttings are the
+ * speed. The silhouette is a W cut square: two deep yards, a plateau between.
+ *
+ * BEATS:
+ *   opening    a safe apron tips downhill.
+ *   cutting 1  a short ribbon across the first cutting.
+ *   yard       the signal gantry: awning spikes that fall as you pass.
+ *                                                               -- checkpoint
+ *   embankment over the hill or through the vault (crystal), and the loop its
+ *              far slope feeds.
+ *   yard       the buffer stop: ride the cart and bail, or pay.
+ *   lift       sprung up to the plateau.                        -- checkpoint
+ *   yard       the trap line, a hopper at the end of it (a service gallery
+ *              under it, a bridge of drones over it),
+ *   bluff      and the tunnel through the signal bluff.
+ *   yard       the signal bridge: hard light on the fast clock over a dip.
+ *   cutting 2  THE DROP: twelve rows down the cutting wall and straight off a
+ *              ramp — a rolled descent carries the sixteen-tile gap without a
+ *              jump, and its arc passes through the crystal.    -- checkpoint
+ *   yard       two decks in the deep yard (a gallery under them),
+ *   heap       the slag heap, hollow underneath,
+ *   lift       and sprung back out,
+ *   sheds      the roofs of the engine sheds, a street between them,
+ *   home       and the last cutting: a deep valley that never climbs back, and
+ *              a straight to the signpost.
+ *
+ * ROADS: the middle road is the yards and cuttings. The high road is the
+ * gantry catwalks and a bridge of drones over the plateau; the low road is
+ * the galleries under the yards, the vault and the street.
  */
 export const act04: LevelDef = {
   name: 'NOON TOMORROW',
@@ -32,54 +60,59 @@ export const act04: LevelDef = {
   biome: 3,
   theme: 'neon',
   width: W,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: start apron
-    b.start(4, 24);
-    c = runway(b, c.endX, c.endRow, { len: 10, dashPad: true, enemy: true }); // 10–19
-    c = rollersRun(b, c.endX, c.endRow); // 20–77: two full cycles
-    c = secretPocket(b, c.endX, c.endRow); // 78–87, crystal 1 (ground), secret 1
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true }); // 88–93
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 }); // 94–113
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 }); // 114–129
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 160 }); // 130–147
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true, enemy: true }); // 148–153
-    c = corridorLoop(b, c.endX, c.endRow, { drop: 2, corridor: 24 }); // 154–185
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 186–197, crystal 2 (under), secret 2
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 2, period: 150 }); // 198–215
-    c = runway(b, c.endX, c.endRow, { len: 8, dashPad: true }); // 216–223
-    b.hopper(220, 24);
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 20 }); // 224–251: blind drop to row 27
-    c = runway(b, c.endX, c.endRow, { len: 6, rise: 3, checkpoint: true }); // 252–263, up to 24
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 264–285, crystal 3 (sky shelf)
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 6 }); // 286–301
-    c = secretPocket(b, c.endX, c.endRow); // 302–311, crystal 4 (ground), secret 3
-    c = runway(b, c.endX, c.endRow, { len: 16, enemy: true }); // 312–327
-    const fin = signpostFinish(b, c.endX, c.endRow, { len: 24 }); // 328–351
-    if (fin.endX !== W) throw new Error(`act04 chain ends at ${fin.endX}, not ${W}`);
+    let c = rollingStart(b, 0, 22); // → row 26
+    c = skyRail(b, c.endX, c.endRow, { drop: 4, len: 52, depth: 10, hoppers: 2, prize: 'shield', runout: 12 }); // → row 30
+    const y1 = c.endX;
+    c = stalactiteGallery(b, c.endX, c.endRow, { len: 26, count: 5 });
+    b.checkpoint(c.endX - 2, c.endRow);
+    const e0 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 12, down: 12, prize: 'crystal', hazards: 2 }); // CRYSTAL 1 (vault) → row 36
+    const l0 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 4, roof: 'rings10' }); // → row 38
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 8 });
+    c = springCliff(b, c.endX, c.endRow, { rise: 14, top: 12 }); // → row 24, the plateau (a long top: the spring's flight lands on it, not in the traps)
+    b.checkpoint(c.endX - 2, c.endRow);
+    const p0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 20, density: 2, period: 150 });
+    c = roofedTube(b, c.endX, c.endRow, { drop: 8, runout: 34, top: 'rings10' }); // → row 32
+    const p1 = c.endX;
+    c = lightBridge(b, c.endX, c.endRow, { depth: 6, basin: 16, period: 150, hazards: 2, prize: 'shield' }); // the signal bridge
+    c = plunge(b, c.endX, c.endRow, { drop: 12, runout: 9 }); // → row 44
+    const jump = c.endX;
+    c = longJump(b, c.endX, c.endRow, { gap: 16, fall: 0 });
+    ringArc(b, jump + 12, c.endRow - 2, 6, -4.9, 8, 5); // the rolled line: it passes through the crystal
+    b.crystal(jump + 20, c.endRow - 6); // CRYSTAL 2
+    b.checkpoint(c.endX - 3, c.endRow);
+    const d0 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 24, crystal: true }); // CRYSTAL 3 (upper deck)
+    const h0 = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 8, crown: 10, down: 8, prize: 'rings10', hazards: 1 }); // the slag heap
+    c = springCliff(b, c.endX, c.endRow, { rise: 14, top: 6 }); // → row 30
+    const r0 = c.endX;
+    c = rooftops(b, c.endX, c.endRow, { steps: [0, 2, -3, 1, -2, 2], width: 6, alley: 3, crabs: 2, room: 'crystal', secret: true }); // CRYSTAL 4, secret 1
+    const r1 = c.endX;
+    c = launchValley(b, c.endX, c.endRow, { depth: 14, out: 4, crabs: 2, prize: 'shoes' }); // → row 40
+    c = runway(b, c.endX, c.endRow, { len: 24 });
+    c = signpostFinish(b, c.endX, c.endRow, { len: 24 });
+    if (c.endX !== W) throw new Error(`act04 chain ends at ${c.endX}, not ${W}`);
 
-    // Sky overlay — lengths are 13k+8 so each chained seam stays a standard
-    // 5-tile hop. The last run rides high over the leap zone (row 9 clears
-    // the ring trail at rows 11–14) and hands the sky lane to the
-    // stackedChoice shelves at 266.
-    const s = canopyRun(b, 40, 9, { len: 112, crystal: true }); // crystal 5 (sky)
-    const s2 = canopyRun(b, s.endX, s.endRow, { len: 60 });
-    canopyRun(b, s2.endX, s2.endRow, { len: 60 });
-    b.phasePlatform(48, 52, 9, 180, 0);
-    b.phasePlatform(160, 164, 9, 180, 90); // aligned to the real 160-164 seam
-    b.drone(110, 6, 3);
-    b.drone(240, 7, 4);
+    /* ============================== HIGH ROAD ============================== */
+    highRoad(b, y1 + 2, y1 + 24, { lift: 6, monitors: ['rings10'] }); // the gantry catwalk: a jump over the awning's own roof
+    b.spring(y1 - 2, 30, 11);
+    highRoad(b, e0 + 4, e0 + 40, { crumbleEvery: 3 }); // and on over the embankment
+    highRoad(b, l0 + 34, l0 + 60, { droneEvery: 2 }); // over the buffer stop
+    c = droneBridge(b, p0 + 2, { drones: 4, lift: 8, prize: 'crystal' }); // CRYSTAL 5 — over the trap line, stone by stone
+    b.spring(p0 - 4, 24, 11);
+    highRoad(b, p1 - 4, p1 + 44, { monitors: ['shield'] }); // over the signal bridge, clear of the tunnel's ring cloud
+    highRoad(b, h0 + 20, h0 + 44, { crumbleEvery: 2 }); // off the heap's crown
+    b.spring(h0 + 23, 36, 11);
+    highRoad(b, r0 - 2, r1 + 4, { lift: 9, droneEvery: 3, monitors: ['rings10'] }); // over the sheds
+    b.spring(r0 - 3, 30, 10);
 
-    // Undercity metro gallery, split around the cart canyon (99-106, ledge
-    // floor on row 30 — inside the gallery carve band); the ledge itself
-    // carries the under lane across the 2-tile seams. Segment A shafts: 68
-    // (in the second roller dip's basin, springs lift back to the dip floor)
-    // and 91 (plain runway past the checkpoint). Segment B shafts: 280
-    // (under a stackedChoice shelf, clear of the crab at 271-277 and the
-    // shelf crystal at 279) and 313 (clear of the crab patrol at 317-323) —
-    // all clear of the loop at 154-185, the leap zone at 224-251 and the
-    // bowl at 286-301. The sneakUnder pocket at 188-195 merges into segment
-    // B as its mid-act entrance.
-    underGallery(b, 12, { len: 87, shafts: [56, 79], hazards: 1, crystal: false });
-    underGallery(b, 109, { len: 214, shafts: [171, 204], hazards: 1, crystal: false });
+    /* =============================== LOW ROAD ============================== */
+    lowRoad(b, p0 + 1, p0 + 18, { shafts: [p0 + 2], crabs: 1, prize: 'rings10', secret: true }); // secret 2 — under the trap line
+    lowRoad(b, d0 + 1, d0 + 22, { shafts: [d0 + 4], depth: 8, crabs: 1, traps: 2, prize: 'rings10', secret: true }); // secret 3
   },
 };

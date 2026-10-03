@@ -9,8 +9,8 @@ plugins, no downloads, no accounts, nothing to install — open the page and
 play.
 
 It is built with **vanilla TypeScript and Canvas 2D**: no game engine, no
-downloaded art or audio. Every sprite, background, sound effect and level is
-generated procedurally at boot, and the movement follows the community
+downloaded art, fonts or audio. Every sprite, background, letter, sound effect,
+music track and level is generated procedurally in code, and the movement follows the community
 [Sonic Physics Guide](https://info.sonicretro.org/Sonic_Physics_Guide) — the
 ground-speed model, slope factors, rolling, spin dash and 360° loops built
 from dual collision layers.
@@ -27,18 +27,43 @@ install, no sign-up.
 
 **Locally:** `npm install && npm run dev`, then open the printed URL.
 
-The whole game is about 66 kB gzipped and runs entirely on your device —
+The whole game — art, music and all — is about 110 kB gzipped and runs entirely on your device —
 there is no backend, no telemetry and no network traffic after the page
 loads.
 
 ## Features
 
-- **Authentic feel** — Sonic Physics Guide constants at a fixed 60 Hz
-  timestep: momentum, slope physics, rolling and spin dash.
+- **Sharp at any size** — the game thinks in a 640×360 logical view but
+  draws at your screen's real resolution (up to 1080p backing, quarter-step
+  render scale), so curves, text and outlines stay crisp from a phone to a
+  4K monitor. Terrain is built as smooth polygons from the collision tiles —
+  no staircase slopes — with per-zone procedural materials, turf lips,
+  ambient occlusion and back walls behind underground galleries.
+- **An original soundtrack, made in code** — ten tracks (title, one per zone,
+  story, boss, finale rematch, act clear, ending) from a small WebAudio
+  tracker, mixed through a limiter with a separate music / effects bus. The
+  music speeds up under speed shoes and ducks while paused.
+- **Its own typeface** — *BOLT Display*, a heavy rounded italic face stroked
+  from centre-lines, so titles and the HUD look the same on every OS.
+- **Classic momentum, quick hands** — Sonic Physics Guide slope physics,
+  rolling and spin dash at a fixed 60 Hz timestep: speed is made and lost on
+  the terrain. Three constants are deliberately not the guide's — the hero is
+  at a run in about a second instead of two, stops in one, and can check a
+  jump in mid-air — because faithful felt heavy.
+- **Framed like the classics** — the playfield is 427×240 world pixels (the
+  HUD and menus stay in 640×360), so speed reads as speed and an act is
+  twenty-odd screens long. The camera leads the run, looks down a slope
+  before you do, and pulls back to show the whole arena for a boss.
+- **Smooth on any screen** — the simulation runs at 60 Hz, but every frame is
+  drawn *between* two steps, so the scroll is even on a 60, 144 or 240 Hz
+  display. The game rations its own draws and, on a GPU that cannot keep an
+  even cadence, steps down to 60 fps and then to a lower render resolution
+  rather than stutter.
 - **Loops that always feel good** — full-height 360° loops built from a real
-  annulus with dual collision layers. Running into one at any pace grants a
-  speed boost and the channel holds you at speed, so you never stall
-  upside-down: you commit, you get the whole ride, you come out fast.
+  annulus with dual collision layers, each one standing at the foot of the
+  hill that feeds it. Running into one at any pace grants a speed boost and
+  the channel holds you at speed, so you never stall upside-down: you commit,
+  you get the whole ride, you come out fast.
 - **A 42-act campaign across four biomes**, with no loading screens — each
   biome's opening cutscene doubles as its loading screen, and between acts
   the fade alone keeps the pace.
@@ -56,25 +81,43 @@ loads.
   with a terrain postcard (the act's real map silhouette), its name, and your
   best score/time/crystals/secrets; click any unlocked act to play it
   directly. Progress persists in localStorage.
-- **Exploration rewards** — 5 Chrono Crystals and 3 secret rooms per zone,
-  monitors, checkpoints, and a score/time-bonus results screen with
+- **Exploration rewards** — 5 Chrono Crystals and 3 secret rooms per act,
+  monitors, checkpoints, and a results ceremony: bonuses tally into the score,
+  then an **S–D rank** stamps the act (pace against a par time, crystals,
+  damage, rings), with NEW BEST flags against your saved record and
   achievements (Untouchable, Speed Demon, Crystal Hunter, Explorer, Ring
-  Master).
-- **Three routes through every zone** — a sky route of precise platform hops
-  reached off a launch ramp, the ground road, and an underground gallery you
-  drop into through visible shafts and spring back out of. The Chrono
-  Crystals are spread across all three, so no single lane collects them all.
-- **A world with depth** — run-up ramps that fling you into the sky, holes
-  that drop you into the underworks rather than killing you, and a void far
-  below that only ever catches a genuinely bottomless fall.
+  Master). Best ranks show in the level select.
+- **Levels shaped like the classics** — every act is a roller coaster, not a
+  corridor: long descents, valleys, cliffs you run down, hills with a cave
+  under them. Speed is something the ground *gives* you (roll a downhill and
+  you leave it two px/frame faster than if you ran it), and what you do with
+  it decides which road you are on: carry it over a kicker and you are thrown
+  to the high ledge and its prize; lose it and you take the valley floor —
+  slower, never dead. Tight platforming knots are the tension, the long
+  downhills between them the release.
+- **Roads that cross** — a high road of ledges that follows the ground, the
+  middle road, and caves you drop into through visible shafts and spring back
+  out of. They fork and merge all the way through an act, and the Chrono
+  Crystals are spread across them, so no single road collects them all.
+  Nothing is bottomless: a missed jump costs time, never the run.
 - **The deltaplane** — a hang-glider pickup on the sky routes: hold jump
   while falling to deploy, ride rising-air columns to soar, and weave the
   ring lines. Lost when you take a hit, like everything good.
+- **A villain you have heard gloat** — Dr. Yolk arrives as a silhouette with
+  lit goggles on a thunderclap, steals the world's clock, and laughs about
+  it: every line of his gets an arcade-style close-up acting it out, and he
+  taunts you again at the gates of every boss arena.
 - **Game juice** — hit-stop on impact, screen shake, impact flashes, speed
   streaks and a tunnel vignette at pace, squash-and-stretch, run dust,
   spin-dash smoke, board wake, explosion particles and speed afterimages.
-  Audio is dynamic too: chained ring pickups climb a pitch ladder, spin-dash
-  revs wind up, and impacts are bass-heavy.
+- **Arcade sound** — eighty-odd effects from a small FM + PSG toolkit in the
+  Mega Drive mould (see [SOUND_DESIGN.md](SOUND_DESIGN.md)): an FM bell for
+  rings that climbs a pitch ladder as you chain them, a rubbery spring, revs
+  that wind up, metal and sub-bass for bosses — mixed in four loudness tiers
+  and panned to where each thing happened.
+- **A CRT glaze** — scanlines, a hint of aperture grille, a soft vignette and
+  rounded tube corners, dosed to be felt more than seen (and one option away
+  from off).
 - **Living scenery** — grass and flowers bending in the wind, fireflies,
   guttering torches, steam vents, turning cogs and drifting clouds.
 - **Hazards you can read** — pop-up spikes that rattle a warning first,
@@ -82,18 +125,25 @@ loads.
   on a readable arc. Every one is dodgeable on sight.
 - **A boss arena that locks** — gates slam down at both ends when the fight
   starts and grind back up when it ends.
-- **Accessible** — fully keyboard-driven, remappable controls, visible focus
-  states, and `prefers-reduced-motion` support (screen shake and afterimages
-  off, fewer particles).
-- **Procedural audio** — a small WebAudio synth, no audio files.
+- **Play it your way** — keyboard (fully remappable), **gamepad** (standard
+  mapping, rumble on hits) and **touch** (floating stick, jump and pause
+  buttons on phones and tablets); menus also take the mouse. Every on-screen
+  prompt shows the device you are actually using.
+- **Accessible** — options for music and effects volume, screen shake, flash
+  effects (photosensitivity), the CRT filter, touch controls and timer
+  precision;
+  `prefers-reduced-motion` sets the comfort defaults. The game pauses itself
+  when the tab is hidden or loses focus, and restart / quit ask twice.
 - **Installable and playable offline** — a service worker caches the game on
   first visit, so it loads instantly and runs with no network at all. It still
   checks for new builds in the background, and offers an **UPDATE GAME** row on
   the title screen rather than swapping versions mid-run.
-- **748 unit tests** — physics sensors, player state machine, entities,
+- **~1000 unit tests** — physics sensors, player state machine, entities,
   hazards, bosses, key bindings, menus, scoring, level structure, flood-fill
-  reachability, simulated loop rides, route-continuity contracts, and a flow
-  test that fails if a bot holding right ever gets pinned by the terrain.
+  reachability, simulated loop rides, frame pacing, and an act contract that
+  plays every level three ways (a first-timer, one who never jumps, one who
+  rolls every slope) and fails it for a dead end, a booster-fed loop or a
+  flat corridor.
 
 ## Controls
 
@@ -105,6 +155,12 @@ loads.
 | Spin dash | `Down` + `Space` (tap `Space` to rev, release `Down`) |
 | Pause menu | `Esc` or `P` |
 | Confirm / advance cutscene | `Enter` or the jump key |
+| Skip a cutscene | `Esc` |
+
+**Gamepad:** stick or d-pad to move, any face button to jump (the Sonic
+convention), down to roll, Start to pause; in menus South confirms and East
+goes back. **Touch:** drag anywhere on the left half for a floating stick,
+the big button bottom-right jumps, the button top-right pauses.
 
 **Every control is remappable**, with a primary and an optional alternate key
 per action. Open **Settings** from the title screen or from the pause menu
@@ -140,7 +196,7 @@ levels never touch the DOM, so tests run in plain Node without a browser.
 ## Deploying
 
 `npm run build` writes a **fully static site into [`docs/`](docs/)** — one
-HTML file, one JS bundle (~66 kB gzipped), one CSS file, a favicon, a web app
+HTML file, one JS bundle (~110 kB gzipped), one CSS file, a favicon, a web app
 manifest and a service worker. There is no server-side code, no build step at
 runtime, no external requests and no secrets.
 
@@ -222,13 +278,16 @@ src/
               loop tracker, scoring/achievements, story data
   levels/     the motif kit plus dusk/, midnight/, never/, tomorrow/ —
               42 acts in four biomes, campaign roster in index.ts
-  render/     procedural art (themed terrain/backgrounds/sprites) and the
-              FX layer (particles, screen shake)
-  ui/         canvas menus: settings (key remapping) and pause
+  render/     procedural art: smooth terrain chunks, layered parallax
+              backdrops, the BOLT Display font, the hero rig, objects,
+              bosses, story characters, and the FX layer
+  ui/         HUD, title card, results, pause / options / controls menus,
+              touch controls and device-aware prompt glyphs
   scenes/     Title → Cutscene → Level flow (fade transitions, no loading)
-  core/       game shell (fixed timestep), input, key bindings, camera
-  audio/      procedural WebAudio sound effects
-tests/        Vitest suites (748 tests)
+  core/       game shell (fixed timestep, render scale), input (keyboard,
+              gamepad, pointer, touch), key bindings, settings, camera
+  audio/      mixer, music tracker + the ten songs, sound effects
+tests/        Vitest suites (~1000 tests)
 docs/         built site — this is what GitHub Pages serves
 ```
 

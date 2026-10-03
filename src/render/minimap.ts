@@ -5,10 +5,10 @@ const T = PHYS.tile;
 
 /** Per-theme colours for the level-select thumbnails. */
 const MINI: Record<LevelTheme, { sky: [string, string]; ground: string; cap: string; deco: string }> = {
-  verdant: { sky: ['#1b2c50', '#6b4a3f'], ground: '#2b2016', cap: '#3fae5a', deco: '#ffd94a' },
-  gear: { sky: ['#0d0d16', '#3a2620'], ground: '#23262e', cap: '#7b8496', deco: '#e8c832' },
-  crystal: { sky: ['#080513', '#241640'], ground: '#221739', cap: '#45c3e2', deco: '#ff6bd6' },
-  neon: { sky: ['#0a0618', '#33104a'], ground: '#161420', cap: '#ff4fa3', deco: '#41f0ff' },
+  verdant: { sky: ['#3d2050', '#e07a3e'], ground: '#8a4628', cap: '#4caf50', deco: '#ffd94a' },
+  gear: { sky: ['#121125', '#5a2a22'], ground: '#434a5a', cap: '#c9d0dc', deco: '#ffc22e' },
+  crystal: { sky: ['#120a26', '#2b1a52'], ground: '#2b2050', cap: '#2fb8dc', deco: '#e05ad8' },
+  neon: { sky: ['#e4ad92', '#4d3166'], ground: '#1a1724', cap: '#ff4fa8', deco: '#41f0ff' },
 };
 
 /**

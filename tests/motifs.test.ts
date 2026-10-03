@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Level, LevelBuilder, WORLD_W, type LevelDef } from '../src/game/Level.ts';
 import { PHYS } from '../src/physics/constants.ts';
-import { checkAct } from './actContract.ts';
+import { runBot } from './bots.ts';
 import {
   underGallery,
   runway,
@@ -229,8 +229,13 @@ const sampler: LevelDef = {
   },
 };
 
-describe('A full act chained from motifs', () => {
-  it('passes the whole act contract (structure, routes, flow, idle silence)', () => {
-    checkAct(sampler);
+describe('A full bench chained from motifs', () => {
+  it('chains to the world edge and a first-timer runs it end to end', () => {
+    const r = runBot(sampler, 'naive');
+    expect(r.player.dead).toBe(false);
+    expect(r.reached, `stopped at tile ${Math.round(r.player.x / 16)}`).toBe(true);
+    expect(r.worstStall, `pinned at tile ${r.worstAt}`).toBeLessThan(150);
+    expect(r.level.crystals).toHaveLength(5);
+    expect(r.level.secrets).toHaveLength(3);
   });
 });

@@ -7,6 +7,7 @@ import {
   STORY_HOUR_OF_NEVER,
   STORY_HOUR_OF_TOMORROW,
   STORY_ENDING,
+  speakerOf,
 } from '../src/game/story.ts';
 
 /** In-memory localStorage so persistence is testable headless. */
@@ -63,6 +64,35 @@ describe('Campaign shape — the four stolen hours', () => {
     // The scenario's own vocabulary, not the borrowed one.
     expect(STORY_HOUR_OF_DUSK.lines.join(' ')).toMatch(/HOUR SHARDS/);
     expect(STORY_ENDING.lines.join(' ')).toMatch(/Tomorrow|tomorrow/);
+  });
+
+  it('the villain is heard: an entrance, a boast and a laugh in the opener, a taunt in every beat', () => {
+    const beats = [
+      STORY_HOUR_OF_DUSK,
+      STORY_HOUR_OF_MIDNIGHT,
+      STORY_HOUR_OF_NEVER,
+      STORY_HOUR_OF_TOMORROW,
+      STORY_ENDING,
+    ];
+    for (const b of beats) {
+      expect(b.speakers, b.id).toHaveLength(b.lines.length);
+      const spoken = b.lines.filter((_, i) => speakerOf(b, i)?.who === 'yolk');
+      expect(spoken.length, `${b.id}: Yolk never speaks`).toBeGreaterThanOrEqual(1);
+      // The narrator opens and closes every beat: Yolk interrupts, he does not host.
+      expect(speakerOf(b, 0)).toBeNull();
+      expect(speakerOf(b, b.lines.length - 1)).toBeNull();
+    }
+    const moods = STORY_HOUR_OF_DUSK.speakers!.map((s) => s?.mood ?? null);
+    const first = moods.findIndex((m) => m !== null);
+    // He arrives before the Core is cracked, and laughs before he cracks it.
+    const crack = STORY_HOUR_OF_DUSK.lines.findIndex((l) => /HOUR SHARDS/.test(l));
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(crack);
+    expect(moods.indexOf('laugh')).toBeGreaterThan(first);
+    expect(moods.indexOf('laugh')).toBeLessThan(crack);
+    expect(moods.filter((m) => m !== null).length).toBeGreaterThanOrEqual(4);
+    // Beaten, he is not laughing any more.
+    expect(STORY_ENDING.speakers!.find((s) => s)?.mood).toBe('sad');
   });
 });
 

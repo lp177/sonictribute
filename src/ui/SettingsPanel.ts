@@ -1,17 +1,30 @@
 import type { Input } from '../core/Input.ts';
 import { ACTIONS, keyLabel, type Action, type Slot } from '../core/bindings.ts';
-import { prefersReducedMotion } from '../core/prefs.ts';
-import { UI, panel, selectionRow, keyChip } from './theme.ts';
+import { VIEW_W, VIEW_H } from '../core/view.ts';
+import { drawText } from '../render/font.ts';
+import { drawPadButton } from './glyphs.ts';
+import { UI, keycap, panel, promptRow, selectionBar, inRect, type Rect } from './theme.ts';
 
 /** Extra rows below the action list. */
 const ROW_RESET = ACTIONS.length;
 const ROW_CLOSE = ACTIONS.length + 1;
 const ROW_COUNT = ACTIONS.length + 2;
 
+const PW = 470;
+const PH = 300;
+const PX = (VIEW_W - PW) / 2;
+const PY = (VIEW_H - PH) / 2;
+const TOP = PY + 50;
+const ROW_H = 22;
+const COL_X = [PX + PW - 196, PX + PW - 104];
+const CHIP_W = 84;
+
 /**
- * Key-remapping panel, shared by the title screen and the pause menu. Purely
- * keyboard-driven: arrows move between rows and the primary/secondary
- * columns, Enter starts a capture, Backspace clears a slot, Escape closes.
+ * Keyboard remapping (Options > Controls). Arrows / pad move between rows
+ * and the primary / alternate columns, confirm starts a capture, Backspace
+ * clears a slot, back closes. The mouse can point and click any key slot.
+ * Gamepad buttons are fixed (Sonic convention: every face button jumps) and
+ * shown at the bottom so pad players know where everything is.
  *
  * Update returns 'close' when the panel is finished, otherwise null.
  */
@@ -19,19 +32,36 @@ export class SettingsPanel {
   row = 0;
   col: 0 | 1 = 0;
   private frame = 0;
+  private age = 99;
   /** Row/slot currently waiting for a key press, or null. */
   private capturing: { action: Action; slot: Slot } | null = null;
   /** Transient message (e.g. a reserved key was refused). */
   private notice = '';
   private noticeFrames = 0;
-  private reduced = prefersReducedMotion();
+
+  private rowRect(i: number): Rect {
+    const y = i < ACTIONS.length ? TOP + i * ROW_H : TOP + ACTIONS.length * ROW_H + 8 + (i - ACTIONS.length) * ROW_H;
+    return { x: PX + 12, y, w: PW - 24, h: ROW_H - 3 };
+  }
+
+  private chipRect(i: number, col: 0 | 1): Rect {
+    const r = this.rowRect(i);
+    return { x: COL_X[col], y: r.y, w: CHIP_W, h: r.h };
+  }
 
   update(input: Input): 'close' | null {
     this.frame++;
+    this.age++;
     if (this.noticeFrames > 0) this.noticeFrames--;
 
     // --- Waiting for a key to bind ---
     if (this.capturing) {
+      // A pad has no keys to bind; its back button must still get out.
+      if (input.isCapturing && input.menuBack() && input.lastDevice === 'gamepad') {
+        input.cancelCapture();
+        this.capturing = null;
+        return null;
+      }
       const code = input.takeCaptured();
       if (!code) return null;
       const { action, slot } = this.capturing;
@@ -45,27 +75,41 @@ export class SettingsPanel {
       return null;
     }
 
-    if (input.uiWasPressed('Escape')) return 'close';
+    // Backspace clears a slot; it must be checked before "back" claims it.
+    if (input.uiWasPressed('Backspace', 'Delete')) {
+      if (this.row < ACTIONS.length) this.clearSlot(input);
+      return null;
+    }
+    if (input.menuBack()) return 'close';
 
-    if (input.uiWasPressed('ArrowUp', 'KeyW')) this.row = (this.row + ROW_COUNT - 1) % ROW_COUNT;
-    if (input.uiWasPressed('ArrowDown', 'KeyS')) this.row = (this.row + 1) % ROW_COUNT;
-    if (input.uiWasPressed('ArrowLeft', 'KeyA')) this.col = 0;
-    if (input.uiWasPressed('ArrowRight', 'KeyD')) this.col = 1;
+    const prev = this.row;
+    if (input.menuUp()) this.row = (this.row + ROW_COUNT - 1) % ROW_COUNT;
+    if (input.menuDown()) this.row = (this.row + 1) % ROW_COUNT;
+    if (input.menuLeft()) this.col = 0;
+    if (input.menuRight()) this.col = 1;
 
-    if (input.uiWasPressed('Backspace', 'Delete') && this.row < ACTIONS.length) {
-      const action = ACTIONS[this.row].id;
-      const slot: Slot = this.col === 0 ? 'primary' : 'secondary';
-      const bound = input.bindings.get(action);
-      // Refuse to strip an action's last key — it would be untriggerable.
-      if (slot === 'primary' && !bound.secondary) {
-        this.flash('EACH ACTION NEEDS AT LEAST ONE KEY');
-      } else {
-        input.bindings.clear(action, slot);
-        input.bindings.save();
+    // Pointer: hover picks the row (and the column under the cursor).
+    const p = input.pointer;
+    let clicked = false;
+    if (p.visible) {
+      for (let i = 0; i < ROW_COUNT; i++) {
+        if (!inRect(this.rowRect(i), p.x, p.y)) continue;
+        if (p.moved) {
+          this.row = i;
+          if (i < ACTIONS.length) {
+            if (inRect(this.chipRect(i, 0), p.x, p.y)) this.col = 0;
+            if (inRect(this.chipRect(i, 1), p.x, p.y)) this.col = 1;
+          }
+        }
+        if (p.released && inRect(this.rowRect(i), p.pressX, p.pressY)) {
+          this.row = i;
+          clicked = true;
+        }
       }
     }
+    if (this.row !== prev) this.age = 0;
 
-    if (input.uiWasPressed('Enter')) {
+    if (input.menuConfirm() || clicked) {
       if (this.row === ROW_CLOSE) return 'close';
       if (this.row === ROW_RESET) {
         input.bindings.reset();
@@ -82,101 +126,104 @@ export class SettingsPanel {
     return null;
   }
 
+  private clearSlot(input: Input): void {
+    const action = ACTIONS[this.row].id;
+    const slot: Slot = this.col === 0 ? 'primary' : 'secondary';
+    const bound = input.bindings.get(action);
+    // Refuse to strip an action's last key — it would be untriggerable.
+    if (slot === 'primary' && !bound.secondary) {
+      this.flash('EACH ACTION NEEDS AT LEAST ONE KEY');
+    } else {
+      input.bindings.clear(action, slot);
+      input.bindings.save();
+    }
+  }
+
   private flash(msg: string): void {
     this.notice = msg;
     this.noticeFrames = 150;
   }
 
   render(ctx: CanvasRenderingContext2D, input: Input): void {
-    const w = ctx.canvas.width;
-    const h = ctx.canvas.height;
-    const pulse = this.reduced ? 1 : 0.5 + 0.5 * Math.sin(this.frame / 12);
-
     ctx.save();
     ctx.fillStyle = UI.scrim;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    panel(ctx, PX, PY, PW, PH);
 
-    const pw = 460;
-    const ph = 300;
-    const px = (w - pw) / 2;
-    const py = (h - ph) / 2;
-    panel(ctx, px, py, pw, ph);
+    drawText(ctx, 'CONTROLS', PX + 20, PY + 28, { size: 13, fill: '#ffffff', outline: UI.ink, outlineWidth: 2 });
+    drawText(ctx, 'KEYBOARD', PX + 20, PY + 41, { size: 6, fill: UI.accent });
+    drawText(ctx, 'PRIMARY', COL_X[0] + CHIP_W / 2, PY + 41, { size: 6, fill: UI.textDim, align: 'center' });
+    drawText(ctx, 'ALTERNATE', COL_X[1] + CHIP_W / 2, PY + 41, { size: 6, fill: UI.textDim, align: 'center' });
 
-    ctx.font = 'bold 15px monospace';
-    ctx.fillStyle = UI.accent;
-    ctx.fillText('SETTINGS — CONTROLS', px + 20, py + 30);
-    ctx.font = '10px monospace';
-    ctx.fillStyle = UI.textDim;
-    ctx.textAlign = 'right';
-    ctx.fillText('PRIMARY', px + pw - 104, py + 30);
-    ctx.fillText('ALTERNATE', px + pw - 20, py + 30);
-    ctx.textAlign = 'left';
-
-    // Action rows.
-    const rowH = 26;
-    const top = py + 42;
     ACTIONS.forEach((a, i) => {
-      const y = top + i * rowH;
+      const r = this.rowRect(i);
       const selected = this.row === i;
-      if (selected) selectionRow(ctx, px + 10, y, pw - 20, rowH - 4, pulse);
-
-      ctx.font = 'bold 11px monospace';
-      ctx.fillStyle = selected ? UI.text : UI.textDim;
-      ctx.fillText(a.label, px + 22, y + 15);
-      if (a.hint) {
-        ctx.font = '9px monospace';
-        ctx.fillStyle = UI.textFaint;
-        ctx.fillText(a.hint, px + 22 + ctx.measureText(a.label).width + 44, y + 15);
-      }
+      if (selected) selectionBar(ctx, r.x + 4, r.y, 150, r.h, this.age / 8);
+      drawText(ctx, a.label, r.x + 12, r.y + r.h / 2 + 3.5, {
+        size: 7,
+        fill: selected ? UI.accentInk : UI.text,
+        outline: selected ? undefined : UI.ink,
+      });
+      if (a.hint) drawText(ctx, a.hint.toUpperCase(), r.x + 12, r.y + r.h + 4, { size: 4.5, fill: UI.textFaint });
 
       const b = input.bindings.get(a.id);
       const capturingHere = this.capturing?.action === a.id;
-      const chip = (slot: Slot, cx: number, col: 0 | 1) => {
+      (['primary', 'secondary'] as const).forEach((slot, col) => {
         const code = b[slot];
-        const isCapturing = capturingHere && this.capturing?.slot === slot;
+        const cap = capturingHere && this.capturing?.slot === slot;
         const focused = selected && this.col === col;
-        keyChip(
-          ctx,
-          cx,
-          y + 1,
-          78,
-          isCapturing ? 'PRESS KEY' : keyLabel(code),
-          isCapturing ? 'capturing' : focused ? 'focus' : code ? 'normal' : 'empty',
-        );
-      };
-      chip('primary', px + pw - 182, 0);
-      chip('secondary', px + pw - 98, 1);
+        const cr = this.chipRect(i, col as 0 | 1);
+        ctx.save();
+        if (focused && !cap) {
+          ctx.strokeStyle = UI.accent;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(cr.x - 3, cr.y - 1, cr.w + 6, cr.h + 2, 4);
+          ctx.stroke();
+        }
+        ctx.restore();
+        const label = cap ? (this.frame % 40 < 26 ? 'PRESS A KEY' : '') : keyLabel(code);
+        const w = Math.min(CHIP_W, 18 + label.length * 5.5);
+        keycap(ctx, cr.x + (CHIP_W - w) / 2, cr.y + cr.h / 2, label || ' ', 6.5, cap ? 'capture' : code ? (focused ? 'focus' : 'normal') : 'empty');
+      });
     });
 
     // Reset / close rows.
-    const resetY = top + ACTIONS.length * rowH + 6;
-    const closeY = resetY + rowH;
-    const actionRow = (y: number, label: string, index: number, color: string) => {
-      if (this.row === index) selectionRow(ctx, px + 10, y, pw - 20, rowH - 4, pulse);
-      ctx.font = 'bold 11px monospace';
-      ctx.fillStyle = this.row === index ? color : UI.textDim;
-      ctx.fillText(label, px + 22, y + 15);
+    const actionRow = (i: number, label: string, color: string) => {
+      const r = this.rowRect(i);
+      const sel = this.row === i;
+      if (sel) selectionBar(ctx, r.x + 4, r.y, 180, r.h, this.age / 8, color);
+      drawText(ctx, label, r.x + 12, r.y + r.h / 2 + 3.5, { size: 7, fill: sel ? UI.accentInk : UI.text, outline: sel ? undefined : UI.ink });
     };
-    actionRow(resetY, 'RESET TO DEFAULTS', ROW_RESET, UI.warn);
-    actionRow(closeY, 'BACK', ROW_CLOSE, UI.accent);
+    actionRow(ROW_RESET, 'RESET TO DEFAULTS', UI.gold);
+    actionRow(ROW_CLOSE, 'BACK', UI.accent);
 
-    // Footer: notice, else the key hints.
-    ctx.font = '9px monospace';
-    ctx.textAlign = 'center';
+    // Gamepad reference: fixed layout, shown so nobody has to guess.
+    const gy = PY + PH - 44;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(PX + 12, gy - 12, PW - 24, 24);
+    drawText(ctx, 'GAMEPAD', PX + 22, gy + 3, { size: 6, fill: UI.accent });
+    let gx = PX + 78;
+    const pad = (glyph: Parameters<typeof drawPadButton>[4], label: string) => {
+      gx += drawPadButton(ctx, gx, gy, 13, glyph) + 4;
+      gx += drawText(ctx, label, gx, gy + 3, { size: 6, fill: UI.textDim }) + 12;
+    };
+    pad('lstick', 'MOVE');
+    pad('south', 'JUMP (ANY FACE BUTTON)');
+    pad('dpad-down', 'ROLL');
+    pad('start', 'PAUSE');
+
     if (this.noticeFrames > 0) {
-      ctx.fillStyle = UI.warn;
-      ctx.fillText(this.notice, px + pw / 2, py + ph - 12);
+      drawText(ctx, this.notice, VIEW_W / 2, PY + PH - 12, { size: 6.5, fill: UI.gold, outline: UI.ink, align: 'center' });
+    } else if (this.capturing) {
+      drawText(ctx, 'PRESS THE KEY TO BIND · ESC CANCELS', VIEW_W / 2, PY + PH - 12, { size: 6.5, fill: UI.accent, outline: UI.ink, align: 'center' });
     } else {
-      ctx.fillStyle = UI.textFaint;
-      ctx.fillText(
-        this.capturing
-          ? 'PRESS A KEY TO BIND  ·  ESC CANCELS'
-          : '↑↓ ROW  ·  ←→ COLUMN  ·  ENTER REBIND  ·  BKSP CLEAR  ·  ESC BACK',
-        px + pw / 2,
-        py + ph - 12,
-      );
+      promptRow(ctx, input, VIEW_W / 2, PY + PH - 14, [
+        { action: 'confirm', label: 'REBIND' },
+        { action: 'back', label: 'BACK' },
+      ], 'center', 6);
+      drawText(ctx, 'BKSP CLEARS', PX + PW - 16, PY + PH - 11, { size: 5, fill: UI.textFaint, align: 'right' });
     }
-    ctx.textAlign = 'left';
     ctx.restore();
   }
 }

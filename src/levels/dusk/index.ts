@@ -15,9 +15,13 @@ import { act11 } from './act11.ts';
  * BIOME 0 — DUSKMERE COAST, the stolen hour of dusk. Eleven acts:
  * act 1 carries the biome's story intro, acts 6 and 11 are the Wrecking Pod
  * fights (mid-biome check and the finale), everything else ends at the
- * signpost. The difficulty knobs turn steadily: hazard periods 170 → 140,
- * gauntlet density 1 → 3, hoppers from act 4, quarter pipes from act 4's
- * leap of faith, the cart galleries at act 8, the Mag-Board at act 9.
+ * signpost. A coast of headlands and bays, each act with its own shape:
+ * the wing arrives in act 2 (`gliderBay`, `thermalCliff`), the caves in act
+ * 3, hoppers in tide pools in act 4, slope-fed reef bowls in act 5; the
+ * second half climbs (7, 10), goes through the rock (8), takes the high
+ * road (9) and comes back down the seawall (11). Hazard clocks tighten
+ * 170 → 140 and gauntlet density runs 1 → 3 along the way. Biome pieces
+ * live in `pieces.ts`.
  */
 export const duskActs: LevelDef[] = [
   act01,

@@ -8,11 +8,15 @@
  * directly — that is what makes per-act completion runs practical.
  */
 
+import { betterRank, RANKS, type Rank } from './Score.ts';
+
 export interface ActBest {
   score: number;
   timeFrames: number;
   crystals: number;
   secrets: number;
+  /** Best rank earned (absent on saves from before ranks existed). */
+  rank?: Rank;
 }
 
 const STORAGE_KEY = 'bolt.progress.v1';
@@ -58,6 +62,7 @@ export class Progress {
             timeFrames: Math.min(prev.timeFrames, run.timeFrames),
             crystals: Math.max(prev.crystals, run.crystals),
             secrets: Math.max(prev.secrets, run.secrets),
+            rank: run.rank && betterRank(run.rank, prev.rank) ? run.rank : prev.rank,
           }
         : { ...run },
     );
@@ -96,6 +101,7 @@ export class Progress {
               timeFrames: v.timeFrames,
               crystals: v.crystals ?? 0,
               secrets: v.secrets ?? 0,
+              ...(RANKS.includes(v.rank as Rank) ? { rank: v.rank } : {}),
             });
           }
         }

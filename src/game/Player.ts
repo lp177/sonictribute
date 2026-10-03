@@ -83,6 +83,59 @@ export const GLIDE = {
   soar: -4.5,
 } as const;
 
+/**
+ * Hill-climb assist (arcade feel, not SPG). Raw SPG slope drag on a 26.5°
+ * ramp is a hair stronger than running acceleration, so a hero who arrives
+ * slow — or is knocked to a stop halfway up — cannot walk up a gentle hill at
+ * all: he decelerates to nothing and has to go back for a run-up. In a game
+ * whose roads are hills that is a dead stop on ordinary ground. While the
+ * player pushes UP a gentle slope the drag is capped below the acceleration,
+ * fading back to the full SPG value by `speed`: anyone can always climb (at a
+ * jog), and a hero with momentum loses exactly what SPG says he should.
+ *
+ * It covers 45° faces too. They were left out at first ("a run-up, by
+ * design"), and every level author then built the same trap three different
+ * ways: a hero set down at the foot of a kicker — by a spring, off a ledge,
+ * by a hit — could not get over it and had nowhere to back up to. What a 45°
+ * face costs a slow hero is the LAUNCH off its lip, not the road.
+ */
+export const CLIMB = {
+  /** Steepest slope assisted, as sin(angle): 0.72 takes in the 45° faces. */
+  maxSin: 0.72,
+  /** Share of running acceleration the drag is capped to at a standstill. */
+  floor: 0.5,
+  /** Ground speed at which the cap reaches full acceleration (SPG takes over). */
+  speed: 4,
+} as const;
+
+/**
+ * The kick off the line (arcade feel, not SPG). A flat acceleration is either
+ * sluggish from a standstill or so strong that a hill costs nothing at speed.
+ * So it is strongest at rest — `1 + kick` times `PHYS.acc` — and fades to the
+ * plain value by `until`: a jog in a third of a second, a run in one, and
+ * from there up the slopes take their toll exactly as before.
+ *
+ * It is a kick off LEVEL ground. It fades out with the slope too, gone by
+ * `flatSin`: with it, a hero standing at the foot of a kicker left the lip
+ * at a run, and every gap in the game was cleared from a standstill — speed
+ * must still be brought to a hill, not found on it. The same kick steers a
+ * JUMP from rest (a hop onto a ledge beside you); a flight he did not jump
+ * into, off a lip or a ledge, gets none.
+ */
+export const START = { kick: 1.5, until: 4, flatSin: 0.4 } as const;
+
+function startKick(speed: number, sinA = 0): number {
+  const slow = Math.max(0, 1 - Math.abs(speed) / START.until);
+  const level = Math.max(0, 1 - Math.abs(sinA) / START.flatSin);
+  return 1 + START.kick * slow * level;
+}
+
+/** Ground speed from which turning against the run is a skid (SPG: 4). */
+const SKID_SPEED = 4;
+
+/** Rebound off a stomped enemy, px/frame: never less than a hop, never a rocket. */
+export const BOUNCE = { min: 4, max: 9 } as const;
+
 export const ROLL = {
   /** Max lip (px) ridden over instead of stopping dead. */
   stepUp: 8,
@@ -152,6 +205,8 @@ export class Player {
   railDir: 1 | -1 = 1;
   /** Locked aboard a minecart: the Level drives the cart, jump is the only control. */
   carting = false;
+  /** Braking hard against the run (latched, so the skid sounds once). */
+  private skidding = false;
   /** Events emitted during the last update (sound/FX hooks). */
   events: string[] = [];
 
@@ -277,7 +332,12 @@ export class Player {
         sf *= 1 - Math.min(1, Math.abs(this.gsp) / ROLL.plow);
       }
       if (Math.abs(this.gsp) > 0.001) this.gsp -= sf * sinA;
-      if (Math.abs(this.gsp) < PHYS.unrollSpeed && Math.abs(sinDeg(this.angle)) < 0.7) {
+      // Out of speed: he gets up — on anything the legs can climb. The limit
+      // used to be 0.7, a hair UNDER a 45° face (0.707), while sliding off
+      // only starts a hair over it: a ball that came to rest on a kicker was
+      // too steep to uncurl and too shallow to slide, and with no control in
+      // a roll it froze there for good.
+      if (Math.abs(this.gsp) < PHYS.unrollSpeed && Math.abs(sinDeg(this.angle)) <= CLIMB.maxSin) {
         this.adjustHeight(false);
         this.rolling = false;
         this.gsp = 0;
@@ -288,17 +348,30 @@ export class Player {
       // SPG: acceleration only applies BELOW top speed. Holding the direction
       // you are already over-speeding in (spin dash, spring, dash pad, loop
       // boost) must never brake you back down to `top`.
+      // Heels dug in: pushing against a real run. Once per skid.
+      const braking = !this.board && ((input.left && this.gsp >= SKID_SPEED) || (input.right && this.gsp <= -SKID_SPEED));
+      if (braking && !this.skidding) this.events.push('skid');
+      this.skidding = braking || (this.skidding && ((input.left && this.gsp > 0) || (input.right && this.gsp < 0)));
+      const acc = PHYS.acc * startKick(this.gsp, sinDeg(this.angle));
       if (input.left) {
         if (this.gsp > 0) this.gsp -= PHYS.dec;
-        else if (this.gsp > -top) this.gsp = Math.max(this.gsp - PHYS.acc, -top);
+        else if (this.gsp > -top) this.gsp = Math.max(this.gsp - acc, -top);
         this.facing = -1;
       } else if (input.right) {
         if (this.gsp < 0) this.gsp += PHYS.dec;
-        else if (this.gsp < top) this.gsp = Math.min(this.gsp + PHYS.acc, top);
+        else if (this.gsp < top) this.gsp = Math.min(this.gsp + acc, top);
         this.facing = 1;
       }
-      if (Math.abs(this.gsp) > 0.05 || Math.abs(sinDeg(this.angle)) > 0.719) {
-        this.gsp -= PHYS.slp * sinDeg(this.angle);
+      const sinA = sinDeg(this.angle);
+      if (Math.abs(this.gsp) > 0.05 || Math.abs(sinA) > 0.719) {
+        let drag = PHYS.slp * sinA;
+        // Pushing up a gentle hill: never more drag than the legs can beat.
+        const uphill = (input.right && drag > 0 && this.gsp >= 0) || (input.left && drag < 0 && this.gsp <= 0);
+        if (uphill && Math.abs(sinA) <= CLIMB.maxSin) {
+          const cap = PHYS.acc * (CLIMB.floor + (1 - CLIMB.floor) * Math.min(1, Math.abs(this.gsp) / CLIMB.speed));
+          drag = sign(drag) * Math.min(Math.abs(drag), cap);
+        }
+        this.gsp -= drag;
       }
       if (!input.left && !input.right) {
         this.gsp -= sign(this.gsp) * Math.min(Math.abs(this.gsp), PHYS.frc);
@@ -417,9 +490,15 @@ export class Player {
 
     // --- Hang glider: HOLD jump while falling to deploy, release to fold ---
     if (this.hasGlider) {
-      if (!this.gliding && input.jump && !this.jumping && this.ysp > 0) {
+      // Falling with jump held — from a ledge, a spring, or the top of his
+      // own jump. (It used to refuse after a jump, so the one natural way to
+      // open the wing, jump and keep holding, did nothing.)
+      if (!this.gliding && input.jump && this.ysp > 0) {
         this.gliding = true;
+        // Under the wing he hangs upright, not curled.
+        this.adjustHeight(false);
         this.rolling = false;
+        this.jumping = false;
         this.events.push('glide');
       } else if (this.gliding && !input.jump) {
         this.gliding = false;
@@ -428,12 +507,23 @@ export class Player {
       this.gliding = false;
     }
 
-    const steer = this.gliding ? PHYS.air * GLIDE.steer : PHYS.air;
+    // Air steering accelerates only BELOW top speed — the same rule as on the
+    // ground. Clamping to `top` (the Sonic 1 air cap) cut any flight faster
+    // than a run down to running speed the instant the player held forward:
+    // every kicker, rail and spring launch lost a third of its distance for
+    // doing the natural thing. Steering against the motion always brakes.
+    // Against the flight it brakes twice as hard as it pushes (`airTurn`):
+    // checking a jump, or changing your mind in one, is the control a player
+    // misses most. Under the wing the glider's own steering applies both ways.
+    const steer = this.gliding ? PHYS.air * GLIDE.steer : PHYS.air * (this.jumping ? startKick(this.xsp) : 1);
+    const turn = this.gliding ? steer : PHYS.airTurn;
     if (input.left) {
-      this.xsp = Math.max(this.xsp - steer, -PHYS.top);
+      if (this.xsp > 0) this.xsp -= Math.min(turn, this.xsp + steer);
+      else if (this.xsp > -PHYS.top) this.xsp = Math.max(this.xsp - steer, -PHYS.top);
       this.facing = -1;
     } else if (input.right) {
-      this.xsp = Math.min(this.xsp + steer, PHYS.top);
+      if (this.xsp < 0) this.xsp += Math.min(turn, steer - this.xsp);
+      else if (this.xsp < PHYS.top) this.xsp = Math.min(this.xsp + steer, PHYS.top);
       this.facing = 1;
     }
     if (this.jumping && !input.jump && this.ysp < -PHYS.jrel) this.ysp = -PHYS.jrel;
@@ -495,6 +585,12 @@ export class Player {
     // Project velocity onto the surface tangent t = (cos a, -sin a).
     this.gsp = this.xsp * cosDeg(a) - this.ysp * sinDeg(a);
     this.ysp = 0;
+    // A ball stays a ball. The ground is hills and lips, so a rolling hero
+    // leaves it for a frame or two all the time; standing him up on every
+    // touchdown (tried, as "the classic way") uncurled a player who was
+    // holding the roll a dozen times an act, at full speed — the rhythm of
+    // the whole game broken on every bump. The roll ends when it runs out of
+    // speed, or when the player wants it to.
     this.adjustHeight(this.rolling);
     this.jumping = false;
     this.events.push(this.landImpact > 7 ? 'land-hard' : 'land');
@@ -569,10 +665,16 @@ export class Player {
     this.events.push('die');
   }
 
-  /** Bounce after stomping something (enemy/boss from above). */
+  /**
+   * Bounce after stomping something (enemy/boss from above). As in the
+   * classics the rebound is the fall reversed: land on a badnik from a height
+   * and you spring back up to it, which is what turns a row of them into a
+   * bridge. It is a jump, so it is yours to keep — hold the button for the
+   * full rebound, let go and it is cut to the usual small hop.
+   */
   bounce(): void {
     this.grounded = false;
-    this.ysp = -4;
+    this.ysp = -Math.max(BOUNCE.min, Math.min(BOUNCE.max, Math.abs(this.ysp)));
     this.adjustHeight(true);
     this.jumping = true;
   }

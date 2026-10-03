@@ -1,29 +1,44 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { cartCanyon, hazardGauntlet, runway, signpostFinish, stackedChoice } from '../motifs.ts';
 import {
-  runway,
-  quarterPipeBowl,
-  railCascade,
-  stackedChoice,
-  sneakUnder,
-  cartCanyon,
-  stalactiteGallery,
-  secretPocket,
-  hazardGauntlet,
-  leapOfFaith,
-  rollersRun,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  loopHill,
+  plunge,
+  longJump,
+  undercroft,
+  stairClimb,
+  tubeShot,
+  highRoad,
+  lowRoad,
+} from '../sections.ts';
+import { valley, vault } from './pieces.ts';
 
 /**
- * MIDNIGHT ACT 4 — "Rivet Gantry Rush"
+ * OTHERWHILE FOUNDRY — ACT 4 — "Rivet Gantry Rush"
  *
- * The riveting yard: gantries, grind rails and the biome's first ore cart.
- * Opens with a sunken half-pipe bowl straight off the gate ramp, drops three
- * rail steps to the yard floor, and introduces the minecart canyon — ride the
- * cart over the gap and bail before the buffer, or pay the crash. Ends on a
- * second leap of faith with a crystal at the top of the arc.
+ * The riveting yard is a gantry, and a gantry is climbed. The act's shape is
+ * one long CLIMB, THEN ONE CHUTE: sixty percent of it wins height a lift at a
+ * time — a valley that comes out higher than it went in, a loop whose exit
+ * outclimbs its run-up, terraces, a hill — and the last forty percent spends
+ * every row of it in a single unbroken rush to the yard floor. The high road
+ * is the star: the catwalk runs the whole climb. First ore cart of the biome
+ * (alone, with a crystal for whoever bails at the right moment), and the
+ * first press tackle: one crane hook over the plates.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   gate      apron, and a valley that climbs out two rows up.
+ *   knot      the first ore cart, over a canyon (crystal over the track).
+ *                                                          -- checkpoint
+ *   loop      a loop on the way UP, and a vault past it.
+ *   terraces  three jump-up steps, and a gap in the gantry to leap.
+ *   knot      plates under the crane hook, the rivet store beneath
+ *             (crystal).                                   -- checkpoint
+ *   summit    the last hill (cellar: crystal, secret), and the top gantry:
+ *             a guarded deck under a sprung shelf (crystal). -- checkpoint
+ *   RUSH      the plunge, the great valley (crystal on its top shelf), the
+ *             loop and the tube out through the yard wall — no knot, no
+ *             stop, from the summit to the signpost.
  */
 export const midnight04: LevelDef = {
   name: 'OTHERWHILE FOUNDRY',
@@ -31,49 +46,45 @@ export const midnight04: LevelDef = {
   title: 'Rivet Gantry Rush',
   biome: 1,
   theme: 'gear',
-  width: 340,
+  width: 629,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: yard gate
-    b.start(4, 24);
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6, rings: false, dashPad: true }); // 10–21, up to row 21
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 6 }); // 22–37: the rivet bowl
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true, enemy: true }); // 38–43
-    c = railCascade(b, c.endX, c.endRow, { steps: 3, run: 6, span: 7, dropEach: 2 }); // 44–88, down to row 27
-    b.drone(67, 21, 2); // hovers over the middle rail line
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6 }); // 89–100, back to row 24
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 101–122, crystal 1 (sky shelf)
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 123–134, crystal 2 (under), secret 1
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 7 }); // 135–154: the first ore cart
-    b.drone(143, 22, 2); // patrols the canyon airspace the bailers fly through
-    // Tail deliberately runs act 2's beats in a different order and lands
-    // them differently: pressure first, the leap feeds a grind, dips close.
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true, enemy: true }); // 155–162
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 2, period: 140 }); // 163–180
-    c = secretPocket(b, c.endX, c.endRow); // 181–190, crystal 3 (ground), secret 2
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 3 }); // 191–206
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 207–216, secret 3
-    c = leapOfFaith(b, c.endX, c.endRow, { drop: 3, glide: 20 }); // 217–244: over the gantry edge
-    b.crystal(234, 10); // 4 (sky) — at the crest of the leap, beside the catwalk
-    c = railCascade(b, c.endX, c.endRow); // the landing feeds straight onto rails
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6, enemy: true }); // climb out
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1 }); // one last roller
-    signpostFinish(b, c.endX, c.endRow, { len: 339 - c.endX + 1 > 12 ? 339 - c.endX + 1 : 12 }); // to 339
+    let c = rollingStart(b, 0, 34, { drop: 2 }); // row 36
+    c = valley(b, c.endX, c.endRow, { depth: 10, out: 12, crabs: 1, prize: 'rings10' }); // out higher than in: row 34
+    const v1 = c.endX;
+    c = cartCanyon(b, c.endX, c.endRow, { gap: 7 }); // the first ore cart, alone
+    b.crystal(v1 + 9, c.endRow - 6); // CRYSTAL 1 — over the track: jump out of the cart for it
+    b.checkpoint(c.endX - 2, c.endRow);
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 8, roof: 'shield' }); // the exit outclimbs the run-up: row 32
+    c = vault(b, c.endX, c.endRow, { reward: 'rings10' }); // secret 1
+    c = stairClimb(b, c.endX, c.endRow, { steps: 3, rise: 3, tread: 8 }); // row 23
+    c = longJump(b, c.endX, c.endRow, { gap: 12, fall: 0, pit: 'crab' });
+    c = runway(b, c.endX, c.endRow, { len: 8 }); // the leap lands on ground and rings
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 24, density: 2 });
+    b.swingBall(g0 + 17, c.endRow - 10, 8, 160, 0); // the crane hook: the biome's first press tackle
+    const g1 = c.endX;
+    b.checkpoint(c.endX + 1, c.endRow);
+    c = undercroft(b, c.endX, c.endRow, { rise: 6, crown: 14, down: 4, prize: 'crystal', secret: true }); // CRYSTAL 5, secret 2; row 21
+    const top = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 22, crystal: true }); // CRYSTAL 2 — the top gantry's shelf
+    b.checkpoint(c.endX - 2, c.endRow);
+    // The rush: everything from here to the signpost is downhill.
+    c = plunge(b, c.endX, c.endRow, { drop: 12, runout: 4 }); // row 33
+    c = valley(b, c.endX, c.endRow, { depth: 12, out: 6, crabs: 2, prize: 'crystal' }); // CRYSTAL 3 — a rolled plunge reaches the top shelf; row 39
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 6, roof: 'rings10' });
+    c = tubeShot(b, c.endX, c.endRow, { drop: 6, runout: 44, top: 'shield' }); // out through the yard wall; row 45
+    signpostFinish(b, c.endX, c.endRow, { len: 24 });
 
-    // Sky overlay at row 10 (leap ring trail tops out at row 11 — no clash).
-    let s = canopyRun(b, 68, 10, { len: 104, crystal: true }); // crystal 5 (sky)
-    s = canopyRun(b, s.endX, s.endRow, { len: 104 });
-    canopyRun(b, s.endX, s.endRow, { len: 39 });
+    /* ============================== HIGH ROAD ==============================
+     * The gantry catwalk: one line of ledges from the first valley's rim to
+     * the summit, riding over the cart, the loop, the terraces and the hook.
+     */
+    highRoad(b, v1 - 4, top - 14, { droneEvery: 4, crumbleEvery: 5, monitors: ['rings10', 'shield', 'rings10', 'shoes'] });
 
-    // The gantry yard's service tunnel, in two segments: the cart canyon's
-    // consolation ledge (floor 30, cols 140–146) keeps its own springs, and
-    // the act's tail past col 245 already dives into the under band itself
-    // (rail cascade to row 33, rollers home at row 30), so the east segment
-    // hands over to it at col 244 with a 6-column seam. The sneak-under
-    // pocket (125–132, floor 34) is absorbed whole, under crystal and all.
-    // Shafts: post-cascade runway (96), stacked-choice deck (117), between
-    // the stalactites (196) — clear of the bowl (22–37), both rail cascades
-    // and the leap (217–244).
-    underGallery(b, 4, { len: 136, row: 34, shafts: [92, 113], hazards: 1, crystal: false });
-    underGallery(b, 147, { len: 98, row: 34, shafts: [49], hazards: 1, crystal: false });
+    /* =============================== LOW ROAD ==============================
+     * The rivet store under the plates.
+     */
+    lowRoad(b, g0 + 1, g1 - 2, { shafts: [g0 + 2], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 4, secret 3
   },
 };

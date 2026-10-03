@@ -1,36 +1,60 @@
 import type { LevelDef, LevelBuilder } from '../../game/Level.ts';
+import { glideRun, hazardGauntlet, rollersRun, runway, secretPocket, signpostFinish, stackedChoice } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  stackedChoice,
-  corridorLoop,
-  boardSprint,
-  secretPocket,
-  sneakUnder,
-  hazardGauntlet,
-  stalactiteGallery,
-  phaseCrossing,
-  quarterPipeBowl,
-  railCascade,
-  leapOfFaith,
-  signpostFinish,
-  canopyRun,
-  skySteps,
-  glideRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  plunge,
+  longJump,
+  undercroft,
+  springCliff,
+  highRoad,
+  droneBridge,
+  lowRoad,
+  groundRow,
+} from '../sections.ts';
+import { crumbleSpan, reefBowl, tideFlats } from './pieces.ts';
 
 /**
  * DUSKMERE COAST — ACT 9 — "Riptide Boardwalk"
  *
- * The Mag-Board returns for one act: a three-section board sprint down the
- * boardwalk is the fast ground line, and after the dismount the act turns
- * into the biome's toughest mixed run — a density-3 gauntlet, a wide phase
- * crossing, a bowl, a rail cascade and the longest leap of faith yet. The
- * act opens over one big swell (no dash-pad apron), the sky mixes steps,
- * catwalks and a closing glide to the goal, and the sea-cave gallery runs
- * beneath it all — its doors include holes in the board sprint's third pit
- * and the phase crossing's floor.
+ * The high road's act. Below, the ground is cut by rip channels — a cliff, a
+ * tide pool too wide to jump cold, a kicker valley, rotten decking, the
+ * Riptide itself — and it is the meanest ground in the biome so far. Above
+ * it, from the pier head to the far side of the Riptide, runs the
+ * boardwalk: long planks that follow the ground, every third one rotten,
+ * drones in the gaps to be used as stepping stones, two drone bridges where
+ * the planks give out. Stay up and the act is a different, faster one — and
+ * at its end the boardwalk hands you the wing and the widest rip to fly.
+ *
+ * BEATS (knot = tension, the rest is release):
+ *   opening   the apron tips downhill,
+ *   plunge    over the cliff,
+ *   leap      and across the first rip, if you kept the speed: the first
+ *             fork, with no boardwalk over it yet.
+ *   knot      the pier head: a guarded road, and the sprung shelf that is
+ *             the way up to the planks.                       -- checkpoint
+ *   valley    the kicker valley; its ledges are the boardwalk here.
+ *   knot      rotten decking over a channel with a crab in it.
+ *   sandbar   a hill with the sea cave under it (crystal, secret room).
+ *   knot      hopper, clocked traps, a pendulum; a gallery beneath
+ *             (crystal, secret room).                         -- checkpoint
+ *   bowl      the reef bowl: its fling tops out ON the boardwalk.
+ *   loop      on its hill, under the planks.
+ *   knot      two tide pools, two hoppers.
+ *   riptide   the signature, three ways: the valley floor and its crabs;
+ *             the kicker and its ledges; or, from the boardwalk's last
+ *             perch, the wing and a full thermal — held through it, the
+ *             wing tops out a screen over the water, where the crystal
+ *             hangs, and comes down on the pier over the far bank.
+ *                                                            -- checkpoint
+ *   home      sprung up the far bank; a pocket, the last loop on its hill,
+ *             swells, the signpost.
+ *
+ * ROADS: the high road is the star — three of the five crystals ride it. The
+ * middle road is the rips; the low road is the pools and channel floors, the
+ * sandbar's cave and the gallery under the last trap knot.
  */
 export const act09: LevelDef = {
   name: 'DUSKMERE COAST',
@@ -38,65 +62,71 @@ export const act09: LevelDef = {
   title: 'Riptide Boardwalk',
   biome: 0,
   theme: 'verdant',
-  width: 400,
+  width: 703,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 8, rings: false }); // 0–7: start apron
-    b.start(4, 24);
-    c = rollersRun(b, c.endX, c.endRow, { cycles: 1, rise: 3, crown: 6 }); // 8–43: one big swell
-    c = runway(b, c.endX, c.endRow, { len: 6, dashPad: true }); // 44–49
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true, enemy: true }); // 50–55
-    c = boardSprint(b, c.endX, c.endRow, { sections: 3, board: true }); // 56–103: the boardwalk
-    c = corridorLoop(b, c.endX, c.endRow); // 104–131, loop centre 117
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 132–153, CRYSTAL 1 (sky shelf)
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 3, period: 150 }); // 154–171
-    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true }); // 172–179 (shaft at 176)
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 150 }); // 180–198
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true }); // 199–210, secret 1 (opens into the gallery)
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 6 }); // 211–226
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 16, count: 4 }); // 227–242
-    c = secretPocket(b, c.endX, c.endRow); // 243–252, CRYSTAL 2 + secret 2
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6 }); // 253–264, up to row 21 (shaft at 260)
-    c = railCascade(b, c.endX, c.endRow); // 265–295, grind down to row 27
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 6, enemy: true }); // 296–307, back to 24
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 22 }); // 308–337: blind drop to row 27
-    b.crystal(326, 12); // CRYSTAL 3 — riding the leap's ring arc
-    c = runway(b, c.endX, c.endRow, { rise: 3, len: 9, checkpoint: true }); // 338–352, back to 24 (shaft at 349)
-    c = secretPocket(b, c.endX, c.endRow, { reward: 'shoes' }); // 353–362, secret 3
-    c = runway(b, c.endX, c.endRow, { len: 21 }); // 363–383
-    signpostFinish(b, c.endX, c.endRow, { len: 16 }); // 384–399
+    let c = rollingStart(b, 0, 24, { drop: 4 }); // down to row 28
+    c = plunge(b, c.endX, c.endRow, { drop: 8, runout: 4 });
+    c = longJump(b, c.endX, c.endRow, { gap: 16, fall: 2, pit: 'crab' });
+    const k1 = c.endX;
+    c = stackedChoice(b, c.endX, c.endRow, { len: 22 }); // the pier head: its sprung shelf is the way up
+    b.checkpoint(c.endX - 2, c.endRow);
+    const v1 = c.endX;
+    c = launchValley(b, c.endX, c.endRow, { depth: 10, out: 8, crabs: 2, prize: 'rings10' });
+    const deck = c.endX;
+    c = crumbleSpan(b, c.endX, c.endRow, { planks: 5, crab: true });
+    const bar = c.endX;
+    c = undercroft(b, c.endX, c.endRow, { rise: 8, crown: 12, down: 8, prize: 'crystal', hazards: 2, secret: true }); // CRYSTAL 1 (cave), secret 1
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 30, density: 2, period: 140 });
+    b.swingBall(g0 + 22, c.endRow - 11, 8, 140, 30);
+    c = runway(b, c.endX, c.endRow, { len: 8, checkpoint: true });
+    const g1 = c.endX;
+    c = reefBowl(b, c.endX, c.endRow, { drop: 2, basin: 8, lift: 6, prize: 'shield' });
+    const l0 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 6, roof: 'rings10' });
+    c = runway(b, c.endX, c.endRow, { len: 12 }); // a loop's landing is ground and rings
+    c = tideFlats(b, c.endX, c.endRow, { pools: 2, depth: 2, prize: 'rings10' });
+    const rt = c.endX;
+    c = launchValley(b, c.endX, c.endRow, { depth: 12, out: 8, crabs: 2, prize: 'shield' });
+    const bank = c.endX;
+    b.checkpoint(c.endX - 2, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 8, top: 4 });
+    c = secretPocket(b, c.endX, c.endRow, { reward: 'rings10' }); // secret 3
+    c = loopHill(b, c.endX, c.endRow, { drop: 6, up: 4, roof: 'shield' });
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 1, rise: 2, crown: 6, depth: 2, basin: 6 });
+    signpostFinish(b, c.endX, c.endRow, { len: 28 });
 
-    // Sky overlay: steps over the boardwalk, catwalks through the middle,
-    // a trapped step set over the leap, and a glide down to the goal.
-    const k1 = skySteps(b, 80, 10, { steps: 5, drone: true, trap: false }); // 80–117
-    const s1 = canopyRun(b, k1.endX, 10, { len: 52, crystal: true }); // 118–169, CRYSTAL 5 (sky)
-    const s2 = canopyRun(b, s1.endX, 10, { len: 117 }); // 170–286
-    const k2 = skySteps(b, s2.endX, 10, { steps: 5, trap: true, drone: false }); // 287–324
-    const s3 = canopyRun(b, k2.endX, 10, { len: 13 }); // 325–337: seam catwalk
-    glideRun(b, s3.endX, 9, { len: 52 }); // 338–389: glide out over the last runways
-    // Mercy mast-tops under the closing glide keep the sky lane continuous.
-    for (const mx of [350, 358, 366, 374]) b.platform(mx, mx + 1, 15);
-
-    /* ============================ UNDER ROUTE ============================
-     * The gallery spans from under the boardwalk to the last checkpoint,
-     * carved last. Shafts sit on plain runways, clear of the loop corridor
-     * (104–131), the bowl, the cascade and the leap mesa; two more doors are
-     * carved through pit floors (board sprint pit 3, phase crossing).
+    /* ============================= THE BOARDWALK ===========================
+     * One road, laid in stretches so the set pieces show through it: long
+     * planks, short gaps, every third plank rotten. It follows the ground a
+     * jump at a time; where the ground falls away faster than a jump, a
+     * drone bridge carries it across.
      */
-    underGallery(b, 54, {
-      len: 300, // 54–353, within one column of the last secret pocket
-      shafts: [122, 206, 295], // at 176, 260, 349
-      hazards: 2,
-      rail: true,
-      crystal: true, // CRYSTAL 4 — under-lane prize below the sneak-under
-    });
-    // Door in the board sprint's third pit (its floor is row 29): bailing
-    // the board can become a route choice instead of just a time loss.
-    b.carve(93, 29, 94, 33);
-    b.spring(93, 34, 13);
-    b.spring(94, 34, 13);
-    // Door in the phase crossing's lower route.
-    b.carve(186, 29, 187, 33);
-    b.spring(186, 34, 13);
-    b.spring(187, 34, 13);
+    const planks = { span: 11, gap: 3, crumbleEvery: 3 };
+    highRoad(b, k1 + 2, v1 + 2, { ...planks, droneEvery: 2, monitors: ['rings10'], onRamp: true }); // over the pier head, to the brink of the valley: a drop from here lands on its downhill, and its own ledges carry on
+    c = droneBridge(b, deck - 12, { drones: 4, lift: 7, prize: 'rings10', onRamp: true }); // off the valley's upper ledge, over the rotten deck
+    b.crystal(c.endX - 3, c.endRow - 3); // CRYSTAL 2 — the bridge's far plank
+    highRoad(b, c.endX + 3, bar + 28, { ...planks, monitors: ['shield'], onRamp: true }); // up the sandbar
+    droneBridge(b, bar + 32, { drones: 3, prize: 'rings10', onRamp: true }); // off its crown
+    highRoad(b, g0 - 2, g1 + 20, { ...planks, droneEvery: 2, crystal: true, monitors: ['rings10'], onRamp: true }); // CRYSTAL 3 — over the trap knot, to the bowl
+    highRoad(b, l0 - 8, rt - 2, { ...planks, droneEvery: 3, monitors: ['rings10'], onRamp: true }); // on from the bowl's shelf, over the loop and the pools
+    // The last perch, the wing, and the Riptide under it. A wing held open
+    // through the first thermal tops out a full screen over the water — that
+    // is where the crystal hangs — and comes down on the pier over the far
+    // bank, well past glideRun's own deck.
+    const perch = groundRow(b, rt + 2) - 11;
+    glideRun(b, rt + 2, perch, { len: 72, windTo: perch + 8 }); // the thermals stop well short of the valley: its kicker's arcs are the approach speed, not the wind
+    b.crystal(rt + 56, perch - 11); // CRYSTAL 4 — the top of the glide
+    b.platform(bank + 9, bank + 35, perch + 1);
+    b.monitor(bank + 30, perch + 1, 'shoes');
+    b.ringsH(bank + 14, bank + 24, perch - 1);
+    highRoad(b, bank + 40, bank + 76, { ...planks, droneEvery: 2, onRamp: true }); // the last planks, over the home loop: its roof is a drop from here
+
+    /* =============================== LOW ROAD ==============================
+     * The gallery under the trap knot: in by the shaft at its head, out by
+     * the springs past its end.
+     */
+    lowRoad(b, g0 + 5, g1 - 1, { shafts: [g0 + 5], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 5, secret 2
   },
 };

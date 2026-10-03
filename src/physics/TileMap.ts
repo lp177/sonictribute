@@ -20,14 +20,47 @@ export interface Tile {
 }
 
 export function makeTile(heights: number[], widths?: number[], oneWay = false): Tile {
-  const w = widths ?? heights.map((v) => (v > 0 ? T : 0));
+  const side = widths ? { widths, widthsLeft: widths.map((v) => (v >= T ? T : 0)) } : sideProfiles(heights);
   return {
     heights,
-    widths: w,
+    widths: side.widths,
     heightsTop: heights.map((v) => (v >= T ? T : 0)),
-    widthsLeft: w.map((v) => (v >= T ? T : 0)),
+    widthsLeft: side.widthsLeft,
     oneWay,
   };
+}
+
+/**
+ * The side profiles of a tile that is solid below its height profile: what a
+ * sensor cast along a ROW meets. Row r (0 = top) is solid at column c when
+ * that column stands at least `T - r` tall.
+ *
+ * These used to default to "the whole box is a wall if the tile has anything
+ * in it" — and indexed the height array by row to decide. So the rounded foot
+ * of every ramp and kicker was a 16-px wall to anything whose middle was
+ * lower than a standing hero's: a rolling ball. One time in three it stopped
+ * dead at the foot of a rise and stood up; a slow climber's wall-mode sensors
+ * read the same boxes as a 63° face and threw him off the kicker in hops.
+ *
+ *  - an empty row is air: 0 from both sides;
+ *  - solid at the edge a cast would leave by: the true count from that edge;
+ *  - solid, but not at that edge (the tall side of a slope is the other one):
+ *    the face is on the near edge, so the whole row counts — as before.
+ */
+function sideProfiles(heights: number[]): { widths: number[]; widthsLeft: number[] } {
+  const widths = new Array<number>(T).fill(0);
+  const widthsLeft = new Array<number>(T).fill(0);
+  for (let r = 0; r < T; r++) {
+    const solid = (c: number) => heights[c] >= T - r;
+    if (!heights.some((_, c) => solid(c))) continue;
+    let fromRight = 0;
+    while (fromRight < T && solid(T - 1 - fromRight)) fromRight++;
+    let fromLeft = 0;
+    while (fromLeft < T && solid(fromLeft)) fromLeft++;
+    widths[r] = fromRight > 0 ? fromRight : T;
+    widthsLeft[r] = fromLeft > 0 ? fromLeft : T;
+  }
+  return { widths, widthsLeft };
 }
 
 const range = (n: number, fn: (i: number) => number) =>

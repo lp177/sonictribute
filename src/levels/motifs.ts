@@ -619,6 +619,8 @@ export interface UnderGalleryOpts {
   crystal?: boolean;
   /** Carve a secret side-pocket off the far end. */
   secret?: boolean;
+  /** Row the drop shafts open at (the surface of the road above). */
+  shaftTop?: number;
 }
 
 /**
@@ -630,14 +632,14 @@ export interface UnderGalleryOpts {
  * .. row; shafts additionally carve rows 18 .. row-4 at their columns.
  */
 export function underGallery(b: LevelBuilder, x: number, opts: UnderGalleryOpts = {}): MotifEnd {
-  const { len = 120, row = 34, shafts = [8, Math.floor((len - 3) / 2), len - 12], hazards = 1, rail = false, crystal = true, secret = false } = opts;
+  const { len = 120, row = 34, shafts = [8, Math.floor((len - 3) / 2), len - 12], hazards = 1, rail = false, crystal = true, secret = false, shaftTop = 18 } = opts;
   const x1 = x + len - 1;
   b.carve(x, row - 4, x1, row - 1);
   b.floor(x, x1, row);
 
   for (const off of shafts) {
     const sx = x + off;
-    b.carve(sx, 18, sx + 2, row - 1); // the visible way in (and the light well)
+    b.carve(sx, shaftTop, sx + 2, row - 1); // the visible way in (and the light well)
     b.spring(sx, row, 13); // and the way back out
     b.spring(sx + 1, row, 13);
   }
@@ -705,6 +707,8 @@ export interface GlideRunOpts {
   len?: number;
   /** Hang the sky crystal mid-glide (the glider is how you reach it). */
   crystal?: boolean;
+  /** Row the two thermals reach down to (the road under the glide). */
+  windTo?: number;
 }
 
 /**
@@ -716,7 +720,7 @@ export interface GlideRunOpts {
  * the ground band).
  */
 export function glideRun(b: LevelBuilder, x: number, row: number, opts: GlideRunOpts = {}): MotifEnd {
-  const { len = 64, crystal = false } = opts;
+  const { len = 64, crystal = false, windTo = 26 } = opts;
   // Launch perch with the wing waiting on it.
   b.platform(x, x + 5, row);
   b.glider(x + 3, row - 2);
@@ -725,8 +729,8 @@ export function glideRun(b: LevelBuilder, x: number, row: number, opts: GlideRun
   // a nudge. They reach into the ground band so a bailed run can recover.
   const w1 = x + Math.floor(len * 0.3);
   const w2 = x + Math.floor(len * 0.62);
-  b.wind(w1, row - 4, w1 + 4, 26, 0.4);
-  b.wind(w2, row - 5, w2 + 4, 26, 0.45);
+  b.wind(w1, row - 4, w1 + 4, windTo, 0.4);
+  b.wind(w2, row - 5, w2 + 4, windTo, 0.45);
   // The line to fly: a shallow descending-then-lifting ring arc.
   for (let i = 0; i < 8; i++) {
     b.ringsH(x + 8 + i * Math.floor((len - 20) / 8), x + 8 + i * Math.floor((len - 20) / 8), row + (i < 4 ? i : 8 - i) - 1);

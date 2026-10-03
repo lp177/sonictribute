@@ -1,4 +1,6 @@
 import { PAL } from './painter.ts';
+import { makeLayer, blit, renderScale, renderScaleVersion, type Layer as Surface } from '../core/view.ts';
+import { drawText, measureText } from './font.ts';
 
 /**
  * Title-screen art: the animated backdrop, BOLT's key-art pose and the
@@ -27,7 +29,7 @@ const SUN_X = 460;
 const SUN_Y = 190;
 
 interface Layer {
-  cv: HTMLCanvasElement;
+  cv: Surface;
   /** Where the strip's top edge lands on screen. */
   y: number;
   /** Parallax scroll, px per frame. */
@@ -35,8 +37,10 @@ interface Layer {
 }
 
 export interface TitleBackdrop {
-  sky: HTMLCanvasElement;
+  sky: Surface;
   layers: Layer[];
+  /** Render-scale version the layers were baked at. */
+  version: number;
 }
 
 function lcg(seed: number): () => number {
@@ -44,11 +48,10 @@ function lcg(seed: number): () => number {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-function surface(w: number, h: number): CanvasRenderingContext2D {
-  const cv = document.createElement('canvas');
-  cv.width = w;
-  cv.height = h;
-  return cv.getContext('2d')!;
+/** Offscreen strip baked at the device render scale (see core/view.ts). */
+function surface(w: number, h: number): CanvasRenderingContext2D & { layer: Surface } {
+  const layer = makeLayer(w, h);
+  return Object.assign(layer.ctx, { layer });
 }
 
 /* ------------------------------- Backdrop --------------------------------- */
@@ -62,7 +65,13 @@ export function renderTitleBackdrop(): TitleBackdrop {
       { cv: renderTreeline(), y: 200, speed: 0.55 },
       { cv: renderGround(), y: TITLE_GROUND_Y, speed: 2.2 },
     ],
+    version: renderScaleVersion(),
   };
+}
+
+/** Re-bakes the backdrop when the window moved to another render scale. */
+export function freshTitleBackdrop(bd: TitleBackdrop): TitleBackdrop {
+  return bd.version === renderScaleVersion() ? bd : renderTitleBackdrop();
 }
 
 export function drawTitleBackdrop(
@@ -71,13 +80,13 @@ export function drawTitleBackdrop(
   frame: number,
   reduced: boolean,
 ): void {
-  ctx.drawImage(bd.sky, 0, 0);
+  blit(ctx, bd.sky, 0, 0);
   drawCoreSun(ctx, frame, reduced);
   for (const l of bd.layers) {
     // Every layer tiles over exactly W, so two blits always cover the screen.
     const off = reduced ? 0 : (frame * l.speed) % W;
-    ctx.drawImage(l.cv, -off, l.y);
-    ctx.drawImage(l.cv, -off + W, l.y);
+    blit(ctx, l.cv, -off, l.y);
+    blit(ctx, l.cv, -off + W, l.y);
   }
   drawMotes(ctx, reduced ? 0 : frame);
   if (!reduced) {
@@ -87,7 +96,7 @@ export function drawTitleBackdrop(
   drawVignette(ctx);
 }
 
-function renderSky(): HTMLCanvasElement {
+function renderSky(): Surface {
   const ctx = surface(W, H);
   const sky = ctx.createLinearGradient(0, 0, 0, H);
   sky.addColorStop(0, '#04050e');
@@ -142,11 +151,11 @@ function renderSky(): HTMLCanvasElement {
   haze.addColorStop(1, 'rgba(255,150,90,0)');
   ctx.fillStyle = haze;
   ctx.fillRect(0, 168, W, 124);
-  return ctx.canvas;
+  return ctx.layer;
 }
 
 /** Far mountains: one self-contained peak per cell, so the strip wraps cleanly. */
-function renderRidge(): HTMLCanvasElement {
+function renderRidge(): Surface {
   const h = 130;
   const ctx = surface(W, h);
   const rnd = lcg(881);
@@ -174,11 +183,11 @@ function renderRidge(): HTMLCanvasElement {
   }
   ctx.fillStyle = '#101a34';
   ctx.fillRect(0, h - 10, W, 10);
-  return ctx.canvas;
+  return ctx.layer;
 }
 
 /** Mid hills with crystal spires — a nod to the vault under the coast. */
-function renderHills(): HTMLCanvasElement {
+function renderHills(): Surface {
   const h = 76;
   const ctx = surface(W, h);
   const line = (x: number) =>
@@ -217,11 +226,11 @@ function renderHills(): HTMLCanvasElement {
   ctx.moveTo(0, line(0));
   for (let x = 0; x <= W; x += 8) ctx.lineTo(x, line(x));
   ctx.stroke();
-  return ctx.canvas;
+  return ctx.layer;
 }
 
 /** Near treeline in near-black silhouette, standing on the running surface. */
-function renderTreeline(): HTMLCanvasElement {
+function renderTreeline(): Surface {
   const h = 120;
   const ctx = surface(W, h);
   const ground = TITLE_GROUND_Y - 200; // local y of the surface the trees stand on
@@ -268,11 +277,11 @@ function renderTreeline(): HTMLCanvasElement {
   ctx.lineTo(0, h);
   ctx.closePath();
   ctx.fill();
-  return ctx.canvas;
+  return ctx.layer;
 }
 
 /** The strip BOLT runs on: fastest layer, so it carries most of the speed read. */
-function renderGround(): HTMLCanvasElement {
+function renderGround(): Surface {
   const h = H - TITLE_GROUND_Y;
   const ctx = surface(W, h);
   const body = ctx.createLinearGradient(0, 0, 0, h);
@@ -311,7 +320,7 @@ function renderGround(): HTMLCanvasElement {
     ctx.fillRect(x, y, 12 + rnd() * 40, 1);
   }
   ctx.globalAlpha = 1;
-  return ctx.canvas;
+  return ctx.layer;
 }
 
 function drawCoreSun(ctx: CanvasRenderingContext2D, frame: number, reduced: boolean): void {
@@ -437,8 +446,11 @@ function drawChronoStutter(ctx: CanvasRenderingContext2D, frame: number): void {
     [148, 11, 9],
     [236, 13, -5],
   ];
+  // The source rect is in DEVICE pixels (the backing store), the
+  // destination in logical ones (the context carries the render scale).
+  const s = renderScale();
   for (const [by, bh, dx] of bands) {
-    ctx.drawImage(ctx.canvas, 0, by, W, bh, Math.round(dx * fade), by, W, bh);
+    ctx.drawImage(ctx.canvas, 0, by * s, W * s, bh * s, Math.round(dx * fade), by, W, bh);
   }
   ctx.globalAlpha = 0.09 * fade;
   ctx.fillStyle = PAL.crystal;
@@ -463,364 +475,6 @@ function drawVignette(ctx: CanvasRenderingContext2D): void {
 }
 
 /* --------------------------------- Hero ----------------------------------- */
-
-/**
- * BOLT as a key-art piece: a full sprint, drawn in the same design language as
- * the in-game hero (blue body, cream muzzle and chest, red shoes, lightning
- * tail, swept ear tufts) but bigger, leaning into the run and trailing
- * afterimages, dust and wind.
- *
- * `x`/`y` is the ground contact point; the whole figure is ~64 units tall
- * before `scale`.
- */
-export function drawTitleHero(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  scale: number,
-  frame: number,
-  reduced: boolean,
-): void {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-
-  const spin = frame / 2.6;
-  const bob = reduced ? 0 : Math.sin(spin * 2) * 1.1;
-
-  ctx.fillStyle = 'rgba(3,5,12,0.45)';
-  ctx.beginPath();
-  ctx.ellipse(-1, 1, 19, 4.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (!reduced) {
-    heroDust(ctx, frame);
-    heroGhost(ctx, -11, 0.16);
-    heroGhost(ctx, -22, 0.08);
-    heroWind(ctx, frame);
-  }
-
-  if (reduced) plantedLegs(ctx);
-  else runWheel(ctx, spin);
-
-  const swing = reduced ? 0 : Math.sin(spin);
-  ctx.save();
-  ctx.translate(0, -17 + bob);
-  ctx.rotate(0.17); // forward lean — the pose has to read as SPEED at a glance
-  heroTail(ctx, frame, reduced);
-  // Shoulders sit on the torso's top corners so the gloves swing OUTSIDE the
-  // silhouette — an arm ending inside the chest just reads as a stray blob.
-  heroArm(ctx, -5, -14, 3.05 + swing * 0.35, 10.5, '#2a63cc', '#cbb894');
-  heroTorso(ctx);
-  heroArm(ctx, 5, -13.5, 0.35 - swing * 0.5, 11, PAL.heroBlue, PAL.heroCream);
-  heroHead(ctx, frame, reduced);
-  ctx.restore();
-
-  if (!reduced) heroSpark(ctx, frame);
-  ctx.restore();
-}
-
-function heroGhost(ctx: CanvasRenderingContext2D, dx: number, alpha: number): void {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = PAL.heroBlue;
-  ctx.translate(dx, 0);
-  ctx.beginPath();
-  ctx.roundRect(-10, -34, 20, 20, 9);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(0, -45, 10, 9.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(0, -8, 13, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-/** The classic sprint read: the legs blur into a wheel and only the shoes land. */
-function runWheel(ctx: CanvasRenderingContext2D, spin: number): void {
-  const rx = 11.5;
-  const ry = 6.5;
-  const cy = -9;
-  ctx.save();
-  ctx.fillStyle = 'rgba(47,125,246,0.22)';
-  ctx.beginPath();
-  ctx.ellipse(0, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(196,231,255,0.32)';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.ellipse(0, cy, rx, ry, 0, spin, spin + 2.2);
-  ctx.stroke();
-  ctx.restore();
-
-  for (let i = 0; i < 2; i++) {
-    const a = spin + i * Math.PI;
-    const sx = Math.cos(a) * rx;
-    const sy = cy + Math.sin(a) * ry;
-    ctx.save();
-    ctx.strokeStyle = i === 0 ? PAL.heroBlue : PAL.heroBlueDark;
-    ctx.lineWidth = 4.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, -17);
-    ctx.lineTo(sx, sy);
-    ctx.stroke();
-    ctx.restore();
-    heroShoe(ctx, sx, sy, -Math.sin(a) * 0.4, i === 0);
-  }
-}
-
-/** Reduced motion gets a planted hero stance instead of a frozen blur. */
-function plantedLegs(ctx: CanvasRenderingContext2D): void {
-  ctx.save();
-  ctx.lineWidth = 4.5;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = PAL.heroBlueDark;
-  ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.lineTo(-7, -4);
-  ctx.stroke();
-  ctx.strokeStyle = PAL.heroBlue;
-  ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.lineTo(7, -4);
-  ctx.stroke();
-  ctx.restore();
-  heroShoe(ctx, -8, -3, -0.1, false);
-  heroShoe(ctx, 8, -3, 0.05, true);
-}
-
-function heroShoe(ctx: CanvasRenderingContext2D, sx: number, sy: number, ang: number, near: boolean): void {
-  ctx.save();
-  ctx.translate(sx, sy);
-  ctx.rotate(ang);
-  // One white stripe and a sock cuff: any more white and the shoe stops
-  // reading as red at this size.
-  ctx.fillStyle = near ? PAL.heroShoe : '#a82134';
-  ctx.beginPath();
-  ctx.roundRect(-6, -3.2, 13, 6.8, 3);
-  ctx.fill();
-  ctx.fillStyle = near ? '#f6f8ff' : '#cfd4de';
-  ctx.fillRect(-4.5, -0.6, 11, 1.8);
-  ctx.beginPath();
-  ctx.roundRect(-4.5, -5.6, 8, 2.8, 1.4);
-  ctx.fill();
-  ctx.restore();
-}
-
-function heroTorso(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = PAL.heroBlue;
-  ctx.beginPath();
-  ctx.roundRect(-11, -18, 22, 20, 9);
-  ctx.fill();
-  // Rim light: the Core burns behind him, so his leading edge catches it.
-  ctx.fillStyle = 'rgba(150,210,255,0.35)';
-  ctx.beginPath();
-  ctx.roundRect(5.5, -16, 4, 15, 2);
-  ctx.fill();
-  ctx.fillStyle = PAL.heroCream;
-  ctx.beginPath();
-  ctx.roundRect(-5.5, -13, 12.5, 15, 6);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(10,28,74,0.30)';
-  ctx.beginPath();
-  ctx.roundRect(-11, -3, 22, 5, 2.5);
-  ctx.fill();
-}
-
-function heroArm(
-  ctx: CanvasRenderingContext2D,
-  ox: number,
-  oy: number,
-  ang: number,
-  len: number,
-  color: string,
-  glove: string,
-): void {
-  ctx.save();
-  ctx.translate(ox, oy);
-  ctx.rotate(ang);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(len, 0);
-  ctx.stroke();
-  // Cuff, so the glove reads as a hand on an arm and not a floating ball.
-  ctx.strokeStyle = '#0d2f74';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(len - 3.4, -2.4);
-  ctx.lineTo(len - 3.4, 2.4);
-  ctx.stroke();
-  ctx.fillStyle = glove;
-  ctx.beginPath();
-  ctx.arc(len, 0, 3.1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function heroTail(ctx: CanvasRenderingContext2D, frame: number, reduced: boolean): void {
-  ctx.save();
-  ctx.translate(-8, -4);
-  ctx.rotate(reduced ? -0.1 : Math.sin(frame / 7) * 0.14 - 0.1);
-  ctx.scale(0.85, 0.85);
-  // Chunky enough to read as a lightning bolt rather than a glass shard.
-  ctx.beginPath();
-  ctx.moveTo(2, -6);
-  ctx.lineTo(-13, -15);
-  ctx.lineTo(-5.5, -5);
-  ctx.lineTo(-20, 3);
-  ctx.lineTo(-4, 2);
-  ctx.closePath();
-  ctx.fillStyle = '#0d2f74';
-  ctx.fill();
-  ctx.strokeStyle = '#0d2f74';
-  ctx.lineWidth = 2.4;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  ctx.fillStyle = PAL.heroBlueDark;
-  ctx.fill();
-  ctx.fillStyle = `rgba(120,215,255,${reduced ? 0.45 : 0.3 + 0.25 * Math.sin(frame / 6)})`;
-  ctx.beginPath();
-  ctx.moveTo(0.5, -6.5);
-  ctx.lineTo(-9.5, -12.5);
-  ctx.lineTo(-6, -6);
-  ctx.lineTo(-15, -0.5);
-  ctx.lineTo(-5, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function heroHead(ctx: CanvasRenderingContext2D, frame: number, reduced: boolean): void {
-  ctx.save();
-  // Sits low enough to overlap the shoulders — a head floating over a neck gap
-  // is the single fastest way to make a character read as parts, not a body.
-  ctx.translate(1, -22);
-  ctx.rotate(-0.12 + (reduced ? 0 : Math.sin(frame / 26) * 0.03));
-
-  // Fox ears: broad at the base, swept back by the run. Thin spikes read as
-  // antennae at this size — the base width is what makes them ears.
-  ctx.fillStyle = PAL.heroBlueDark;
-  ctx.beginPath();
-  ctx.moveTo(-7, -4);
-  ctx.lineTo(-13.5, -13);
-  ctx.lineTo(-1, -8.5);
-  ctx.closePath();
-  ctx.moveTo(-0.5, -6.5);
-  ctx.lineTo(-1.5, -17);
-  ctx.lineTo(7, -7);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(243,229,195,0.6)';
-  ctx.beginPath();
-  ctx.moveTo(0.8, -8);
-  ctx.lineTo(-0.2, -14);
-  ctx.lineTo(4.6, -8.2);
-  ctx.closePath();
-  ctx.fill();
-
-  // Dark keyline first: without it the head fuses into the shoulders and the
-  // whole hero reads as one blue mass.
-  ctx.fillStyle = '#0d2f74';
-  ctx.beginPath();
-  ctx.roundRect(-8.8, -9.8, 17.6, 16, 7);
-  ctx.fill();
-  ctx.fillStyle = '#3a88ff';
-  ctx.beginPath();
-  ctx.roundRect(-8, -9, 16, 14.5, 6.5);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(150,210,255,0.4)';
-  ctx.beginPath();
-  ctx.roundRect(3, -8, 3.6, 7, 1.8);
-  ctx.fill();
-
-  ctx.fillStyle = PAL.heroCream;
-  ctx.beginPath();
-  ctx.roundRect(1.5, -1.5, 9.5, 7.5, 3.5);
-  ctx.fill();
-  ctx.fillStyle = '#12181f';
-  ctx.beginPath();
-  ctx.ellipse(10.2, 0.4, 2, 1.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#12181f';
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.arc(7, 2, 2.6, 0.2, 1.2);
-  ctx.stroke();
-
-  ctx.fillStyle = '#f4f8ff';
-  ctx.beginPath();
-  ctx.roundRect(0.8, -6.2, 6.4, 5.6, 2.6);
-  ctx.fill();
-  ctx.fillStyle = '#16213c';
-  ctx.beginPath();
-  ctx.ellipse(4.8, -3.6, 1.5, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = PAL.crystal;
-  ctx.fillRect(5.2, -4.7, 0.9, 0.9);
-  // Brow: the difference between "mascot" and "determined mascot".
-  ctx.strokeStyle = PAL.heroBlueDark;
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(0.6, -7.2);
-  ctx.lineTo(7.2, -5.6);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function heroWind(ctx: CanvasRenderingContext2D, frame: number): void {
-  ctx.save();
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 5; i++) {
-    const p = (frame * 1.6 + i * 17) % 46;
-    const x = -18 - p;
-    const y = -8 - i * 9;
-    const len = 10 + (i % 2) * 8;
-    ctx.globalAlpha = Math.max(0, 0.5 - p / 60);
-    ctx.strokeStyle = i % 2 ? PAL.crystal : '#cfe8ff';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x - len, y + 1.5);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function heroDust(ctx: CanvasRenderingContext2D, frame: number): void {
-  ctx.save();
-  for (let i = 0; i < 4; i++) {
-    const p = (frame * 1.4 + i * 15) % 60;
-    ctx.globalAlpha = Math.max(0, 0.35 - p / 170);
-    ctx.fillStyle = i % 2 ? '#9fb4c8' : '#d9c9a6';
-    ctx.beginPath();
-    ctx.arc(-6 - p * 0.9, -1 - p * 0.12, 2 + p * 0.13, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
-function heroSpark(ctx: CanvasRenderingContext2D, frame: number): void {
-  if (frame % 46 > 5) return;
-  ctx.save();
-  ctx.strokeStyle = PAL.crystal;
-  ctx.lineWidth = 1.4;
-  ctx.globalAlpha = 0.8;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-16, -4);
-  ctx.lineTo(-21, -9);
-  ctx.lineTo(-18, -9);
-  ctx.lineTo(-25, -16);
-  ctx.stroke();
-  ctx.restore();
-}
 
 /* --------------------------------- Logo ----------------------------------- */
 
@@ -851,52 +505,40 @@ export function drawTitleLogo(
   boltGlyph(ctx, cx - 98, y - 32, 2.2, PAL.crystal);
   ctx.restore();
 
-  ctx.save();
-  ctx.translate(cx, y);
-  ctx.transform(1, 0, -0.16, 1, 0, 0); // forward shear: the logo leans like he does
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 58px monospace';
+  // The wordmark: BOLT Display, extruded toward the lower right, with a
+  // heavy keyline so it holds against the moving sky, and a specular sweep.
   const word = 'BOLT';
-  for (let d = 6; d >= 1; d--) {
-    ctx.fillStyle = d > 3 ? '#050b1c' : '#0d2352';
-    ctx.fillText(word, d, d * 0.85);
+  const size = 50;
+  for (let d = 7; d >= 1; d--) {
+    drawText(ctx, word, cx + d * 0.9, y + d, { size, fill: d > 3 ? '#050b1c' : '#0d2352', align: 'center', outline: d > 3 ? '#050b1c' : '#0d2352', outlineWidth: 4 });
   }
-  // Heavy keyline: the letters have to hold against a moving sky.
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 7;
-  ctx.strokeStyle = '#040814';
-  ctx.strokeText(word, 0, 0);
-  const body = ctx.createLinearGradient(0, -44, 0, 8);
+  const body = ctx.createLinearGradient(0, y - size, 0, y);
   body.addColorStop(0, '#eef8ff');
-  body.addColorStop(0.3, '#8ad6ff');
-  body.addColorStop(0.52, '#2f7df6');
-  body.addColorStop(0.86, '#1a4fb8');
+  body.addColorStop(0.32, '#8ad6ff');
+  body.addColorStop(0.55, '#2f7df6');
+  body.addColorStop(0.88, '#1a4fb8');
   body.addColorStop(1, '#5fb4ff');
-  ctx.fillStyle = body;
-  ctx.fillText(word, 0, 0);
+  drawText(ctx, word, cx, y, { size, fill: body, outline: '#040814', outlineWidth: 4, align: 'center' });
   if (!reduced) {
-    // Specular sweep: the letters are re-drawn white through a moving slit,
-    // which is the cheapest way to "clip to text" on a 2D canvas.
-    const sweep = ((frame % 280) / 280) * 320 - 160;
+    const ww = measureText(word, size);
+    const sweep = ((frame % 280) / 280) * (ww + 140) - 70 - ww / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(sweep - 13, -54);
-    ctx.lineTo(sweep + 13, -54);
-    ctx.lineTo(sweep + 31, 14);
-    ctx.lineTo(sweep + 5, 14);
+    ctx.moveTo(cx + sweep - 10, y - size - 8);
+    ctx.lineTo(cx + sweep + 12, y - size - 8);
+    ctx.lineTo(cx + sweep + 26, y + 8);
+    ctx.lineTo(cx + sweep + 4, y + 8);
     ctx.closePath();
     ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText(word, 0, 0);
+    drawText(ctx, word, cx, y, { size, fill: 'rgba(255,255,255,0.55)', align: 'center' });
     ctx.restore();
   }
-  ctx.restore();
 
   // Sub-title plate.
-  const rw = 190;
-  const rh = 26;
+  const rw = 196;
+  const rh = 24;
   const rx = cx - rw / 2;
-  const ry = y + 14;
+  const ry = y + 12;
   ctx.beginPath();
   ctx.moveTo(rx + 9, ry);
   ctx.lineTo(rx + rw - 9, ry);
@@ -910,14 +552,9 @@ export function drawTitleLogo(
   ctx.strokeStyle = 'rgba(75,225,255,0.75)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.fillStyle = 'rgba(75,225,255,0.18)';
-  ctx.fillRect(rx + 12, ry + 3, rw - 24, 1);
-
-  ctx.font = 'bold 14px monospace';
-  ctx.fillStyle = PAL.crystal;
-  spacedText(ctx, 'CHRONO RUSH', cx, ry + 18, 3);
-  boltGlyph(ctx, rx + 13, ry + rh / 2, 0.6, PAL.crystal);
-  boltGlyph(ctx, rx + rw - 13, ry + rh / 2, 0.6, PAL.crystal);
+  drawText(ctx, 'CHRONO RUSH', cx, ry + rh / 2 + 4.5, { size: 9, fill: PAL.crystal, align: 'center', tracking: 1.2 });
+  boltGlyph(ctx, rx + 14, ry + rh / 2, 0.6, PAL.crystal);
+  boltGlyph(ctx, rx + rw - 14, ry + rh / 2, 0.6, PAL.crystal);
 }
 
 function boltGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string): void {
@@ -935,25 +572,4 @@ function boltGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, s: numbe
   ctx.closePath();
   ctx.fill();
   ctx.restore();
-}
-
-/** Letter-spaced centred text — canvas has no tracking control worth relying on. */
-function spacedText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  cx: number,
-  y: number,
-  spacing: number,
-): void {
-  const chars = [...text];
-  const widths = chars.map((c) => ctx.measureText(c).width);
-  const total = widths.reduce((a, b) => a + b, 0) + spacing * (chars.length - 1);
-  const align = ctx.textAlign;
-  ctx.textAlign = 'left';
-  let x = cx - total / 2;
-  chars.forEach((c, i) => {
-    ctx.fillText(c, x, y);
-    x += widths[i] + spacing;
-  });
-  ctx.textAlign = align;
 }

@@ -1,30 +1,56 @@
 import type { LevelBuilder, LevelDef } from '../../game/Level.ts';
+import { boardSprint, hazardGauntlet, rollersRun, runway, signpostFinish } from '../motifs.ts';
 import {
-  runway,
-  rollersRun,
-  corridorLoop,
-  stackedChoice,
-  phaseCrossing,
-  leapOfFaith,
-  cartCanyon,
-  sneakUnder,
-  stalactiteGallery,
-  secretPocket,
-  hazardGauntlet,
-  quarterPipeBowl,
-  signpostFinish,
-  canopyRun,
-  underGallery,
-} from '../motifs.ts';
+  WORLD_ROWS,
+  rollingStart,
+  launchValley,
+  loopHill,
+  longJump,
+  springCliff,
+  highRoad,
+  lowRoad,
+} from '../sections.ts';
+import { lightBridge, roofedTube, rooftops, skyRail } from './pieces.ts';
 
-const W = 384;
+const W = 758;
 
 /**
- * NOON TOMORROW — ACT 7: rush hour, forever. Dash pads chain like traffic
- * lights, the cart canyon stretches to the 9-tile limit, and two gauntlets
- * (the closer at density 3) book-end the act. The canopy steps down through
- * three tower blocks on rail ribbons. Fast lane: GROUND — this is the speed
- * act; hold the pads and never brake.
+ * NOON TOMORROW — ACT 7 — "Rush Hour Forever"
+ *
+ * The Mag-Board act. The board is handed over at the first knot and kept
+ * almost to the end; on it the hero never drops under 7 px/frame and cannot
+ * curl up, so the act is built the way a freeway is: valleys wide enough to
+ * fly, long wavelengths, and only four knots — each one a question asked at
+ * speed. Nothing here is a booster but the pad that starts the ride; the
+ * traffic is the terrain.
+ *
+ * BEATS:
+ *   opening    a safe apron tips downhill.
+ *   knot       the on-ramp: the board, one pad, one pit to clear. The ride
+ *              begins.
+ *   valley 1   the deepest valley of the biome: the board always makes the
+ *              ledge,
+ *   arch       the loop its climb-out feeds,
+ *   freeway    and the widest gap in the game — the board carries it.
+ *   lift       a spring back to the rooftops.                   -- checkpoint
+ *   knot       the roofs at 7 px/frame: you cannot stop, only time the hops
+ *              (the street under them is empty: a miss costs the line, never
+ *              the board).
+ *   rollers    two waves to pump,
+ *   valley 2   and a long ribbon over the second valley (a crystal over it).
+ *                                                               -- checkpoint
+ *   knot       hard light at speed: the bridge blinks faster than you cross
+ *              it.
+ *   tunnel     the tunnel out; the ride ends on its landing strip.
+ *                                                               -- checkpoint
+ *   lift       sprung up on foot,
+ *   knot       the full gauntlet, slowly, after all that,
+ *   home       and the last long slope to the signpost.
+ *
+ * ROADS: the middle road is the freeway. The high road is the valley's ledge
+ * and the catwalks over the loop, the roofs, the rollers and the bridge; the
+ * low road is the valley floors, the street under the roofs, the dip under
+ * the bridge and the galleries under the landing strip and the gauntlet.
  */
 export const act07: LevelDef = {
   name: 'NOON TOMORROW',
@@ -33,62 +59,51 @@ export const act07: LevelDef = {
   biome: 3,
   theme: 'neon',
   width: W,
+  height: WORLD_ROWS,
   build(b: LevelBuilder): void {
-    let c = runway(b, 0, 24, { len: 10, rings: false }); // 0–9: start apron
-    b.start(4, 24);
-    c = runway(b, c.endX, c.endRow, { len: 14, dashPad: true, enemy: true }); // 10–23
-    c = corridorLoop(b, c.endX, c.endRow); // 24–51
-    c = runway(b, c.endX, c.endRow, { len: 8, dashPad: true }); // 52–59
-    b.hopper(58, 24);
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 16, density: 2, period: 140 }); // 60–75
-    c = stackedChoice(b, c.endX, c.endRow, { crystal: true }); // 76–97, crystal 1 (sky shelf)
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 9, period: 140 }); // 98–116
-    c = runway(b, c.endX, c.endRow, { len: 7, checkpoint: true }); // 117–123
-    c = rollersRun(b, c.endX, c.endRow); // 124–181: two cycles at full tilt
-    c = sneakUnder(b, c.endX, c.endRow, { secret: true, crystal: true }); // 182–193, crystal 2 (under), secret 1
-    c = cartCanyon(b, c.endX, c.endRow, { gap: 9 }); // 194–213: the limit canyon
-    c = stalactiteGallery(b, c.endX, c.endRow, { len: 14, count: 3 }); // 214–227
-    c = runway(b, c.endX, c.endRow, { len: 6, checkpoint: true, enemy: true }); // 228–233
-    c = quarterPipeBowl(b, c.endX, c.endRow, { basin: 6 }); // 234–249
-    c = secretPocket(b, c.endX, c.endRow); // 250–259, crystal 3 (ground), secret 2
-    c = phaseCrossing(b, c.endX, c.endRow, { gap: 8, period: 130 }); // 260–277
-    c = runway(b, c.endX, c.endRow, { len: 8, dashPad: true }); // 278–285
-    c = leapOfFaith(b, c.endX, c.endRow, { glide: 22 }); // 286–315: blind drop to 27
-    c = runway(b, c.endX, c.endRow, { len: 6, rise: 3, checkpoint: true }); // 316–327, up to 24
-    c = secretPocket(b, c.endX, c.endRow); // 328–337, crystal 4 (ground), secret 3
-    c = hazardGauntlet(b, c.endX, c.endRow, { len: 18, density: 3, period: 140 }); // 338–355
-    const fin = signpostFinish(b, c.endX, c.endRow, { len: 28 }); // 356–383
-    if (fin.endX !== W) throw new Error(`act07 chain ends at ${fin.endX}, not ${W}`);
+    let c = rollingStart(b, 0, 22); // → row 26
+    c = boardSprint(b, c.endX, c.endRow, { sections: 1, board: true }); // the on-ramp
+    c = launchValley(b, c.endX, c.endRow, { depth: 16, basin: 12, out: 12, crabs: 2, prize: 'shield' }); // → row 30
+    const f0 = c.endX;
+    c = loopHill(b, c.endX, c.endRow, { drop: 4, up: 0, roof: 'rings10' }); // → row 34
+    c = longJump(b, c.endX, c.endRow, { gap: 16, fall: 2 }); // → row 36
+    c = springCliff(b, c.endX, c.endRow, { rise: 10, top: 6 }); // → row 26
+    b.checkpoint(c.endX - 2, c.endRow);
+    const r0 = c.endX;
+    c = rooftops(b, c.endX, c.endRow, { steps: [0, 1, -2, 2, -1, 1, 1], width: 8, depth: 9, crabs: 0, room: 'crystal', secret: true }); // CRYSTAL 1, secret 1 → row 28
+    const r1 = c.endX;
+    c = rollersRun(b, c.endX, c.endRow, { cycles: 2, rise: 3, depth: 3, crown: 6, basin: 6 });
+    const w1 = c.endX;
+    c = skyRail(b, c.endX, c.endRow, { drop: 10, len: 72, depth: 16, hoppers: 2, prize: 'rings10', crystal: true, runout: 12 }); // CRYSTAL 2 → row 38
+    b.checkpoint(c.endX - 3, c.endRow);
+    const lb = c.endX;
+    c = lightBridge(b, c.endX, c.endRow, { depth: 6, basin: 16, period: 140, hazards: 1, prize: 'rings10' });
+    c = roofedTube(b, c.endX, c.endRow, { drop: 6, runout: 44, top: 'crystal' }); // CRYSTAL 3 (on the bluff) → row 44
+    const strip = c.endX;
+    b.boardEnd(strip - 4); // the ride ends where the tunnel's flight comes down
+    b.checkpoint(strip - 2, c.endRow);
+    c = springCliff(b, c.endX, c.endRow, { rise: 14, top: 12 }); // → row 30
+    const g0 = c.endX;
+    c = hazardGauntlet(b, c.endX, c.endRow, { len: 22, density: 3, period: 140 });
+    const g1 = c.endX;
+    c = runway(b, c.endX, c.endRow, { drop: 12, len: 40 }); // → row 42
+    c = signpostFinish(b, c.endX, c.endRow, { len: 24 });
+    if (c.endX !== W) throw new Error(`act07 chain ends at ${c.endX}, not ${W}`);
 
-    // Sky overlay: tower blocks joined by descending rail ribbons, each rail
-    // ending flush on the next block's deck.
-    const s1 = canopyRun(b, 36, 10, { len: 103, crystal: true }); // crystal 5 (sky)
-    b.rail(135, 10, s1.endX, 12);
-    const s2 = canopyRun(b, s1.endX, 12, { len: 100 });
-    // A real ribbon, not a 1-column stub: the rail spans the whole seam.
-    b.rail(s2.endX - 1, 12, s2.endX + 4, 14);
-    canopyRun(b, s2.endX + 4, 14, { len: 40 });
-    b.drone(85, 7, 3);
-    b.drone(200, 8, 3);
-    b.drone(300, 7, 3);
+    /* ============================== HIGH ROAD ============================== */
+    highRoad(b, f0 - 8, f0 + 12, { monitors: [] }); // the upper deck: the loop's roof is a drop from here
+    b.spring(f0 - 2, 30, 11);
+    highRoad(b, f0 + 28, f0 + 46); // and on from the roof, as far as the gap's ramp
+    highRoad(b, r0 - 2, r1 + 4, { lift: 9, monitors: ['rings10'] }); // over the roofs
+    b.spring(r0 - 4, 26, 10);
+    highRoad(b, r1 + 2, w1 - 2, { lift: 10, crumbleEvery: 4, crystal: true, monitors: ['shield', 'rings10'] }); // CRYSTAL 4 — over the rollers
+    highRoad(b, lb + 2, lb + 46, { lift: 9 }); // over the bridge of light
+    b.spring(lb - 4, 38, 10);
+    highRoad(b, strip - 21, strip - 2); // two ledges past the tunnel's ring cloud
+    highRoad(b, g0 - 2, g1 + 4, { droneEvery: 2 }); // over the gauntlet
 
-    // Undercity metro gallery, split around the limit cart canyon (199-207,
-    // ledge floor on row 30 sits in the carve band and bridges the under
-    // lane itself). Late act: hazard pressure 2 (spikes + a clocked trap,
-    // both far beyond idle-silence range of the start). Segment A shafts:
-    // 21 (fed by the opening dash-pad straight, clear of the crab at 14-20),
-    // 52 (landing feeds the pad at 55, three tiles clear of the hopper at
-    // 58) and 121 (plain floor past the checkpoint) — clear of the loop at
-    // 24-51. Segment B shaft: 283 (pad-fed, landing delivers you onto the
-    // leap-of-faith launch pad); the sneakUnder pocket at 184-191 is
-    // segment A's eastern entrance.
-    underGallery(b, 12, { len: 185, shafts: [9, 40, 109], hazards: 2, crystal: false });
-    underGallery(b, 210, { len: 140, shafts: [73], hazards: 2, crystal: false });
-    // Service hatch in the late phase pit's floor (same grammar as act 6):
-    // the slow lower route continues into the metro; twin springs beneath
-    // the slot throw a faller straight back out.
-    b.carve(266, 29, 267, 33);
-    b.spring(266, 34, 13);
-    b.spring(267, 34, 13);
+    /* =============================== LOW ROAD ============================== */
+    lowRoad(b, strip - 40, strip - 4, { shafts: [strip - 38], depth: 8, crabs: 1, prize: 'rings10', secret: true }); // secret 2 — under the landing strip
+    lowRoad(b, g0 + 1, g1 - 2, { shafts: [g0 + 2], crabs: 1, traps: 1, prize: 'crystal', secret: true }); // CRYSTAL 5, secret 3
   },
 };

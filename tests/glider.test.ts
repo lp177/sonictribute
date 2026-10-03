@@ -42,6 +42,21 @@ describe('Hang glider (deltaplane)', () => {
     expect(p.gliding).toBe(false); // ascending on a held jump is still a jump
   });
 
+  it('opens at the top of a jump when the button is still held, and hangs upright', () => {
+    const map = makeFlatMap(300, 40, 620);
+    const p = spawnOnGround(map, 300, 620);
+    p.hasGlider = true;
+    p.update(map, input({ jump: true, jumpPressed: true }));
+    let opened = -1;
+    for (let f = 0; f < 80 && opened < 0; f++) {
+      p.update(map, input({ jump: true }));
+      if (p.gliding) opened = f;
+    }
+    expect(opened).toBeGreaterThan(20); // not on the way up
+    expect(p.ysp).toBeGreaterThan(0);
+    expect(p.ball).toBe(false);
+  });
+
   it('caps the sink rate and steers harder than bare air control', () => {
     const { map, p } = airborne();
     p.hasGlider = true;
