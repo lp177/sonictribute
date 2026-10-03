@@ -10,11 +10,11 @@
  * the player decide when to take it, so a version never swaps mid-run.
  */
 
-const VERSION = 'a6806d6b';
+const VERSION = 'dffda3a5';
 const CACHE = `bolt-${VERSION}`;
 const PRECACHE = [
-  "assets/index-BfJhXYWT.css",
-  "assets/index-CY6BZtMJ.js",
+  "assets/index-B5I7mLMz.css",
+  "assets/index-CtYpzI6a.js",
   "favicon.svg",
   "index.html",
   "manifest.webmanifest"
